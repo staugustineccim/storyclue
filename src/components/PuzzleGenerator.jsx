@@ -30,16 +30,20 @@ const GRADE_GROUPS = [
 ];
 
 const FAITH_TRADITIONS = [
-  { key:"none",      label:"None / Secular" },
-  { key:"christian", label:"Christian" },
-  { key:"catholic",  label:"Catholic" },
-  { key:"jewish",    label:"Jewish" },
+  { key:"none",                 label:"None / Secular" },
+  { key:"christian-protestant", label:"Christian — Protestant" },
+  { key:"christian-catholic",   label:"Christian — Catholic" },
+  { key:"jewish",               label:"Jewish" },
+  { key:"islamic",              label:"Islamic" },
+  { key:"hindu",                label:"Hindu" },
+  { key:"buddhist",             label:"Buddhist" },
+  { key:"other",                label:"Other Faith Tradition" },
 ];
 
 const BOOK_EXAMPLES = [
-  "Book of Jonah (KJV Bible)",
+  "Book of Jonah",
   "Charlotte's Web, Chapter 1",
-  "Genesis Chapter 1 (KJV Bible)",
+  "Genesis Chapter 1",
   "The Gettysburg Address",
   "Romeo and Juliet, Act 1 Scene 1",
   "The Lion the Witch and the Wardrobe, Chapter 1",
@@ -238,7 +242,7 @@ export default function PuzzleGenerator() {
               </div>
               <div style={{ marginTop:"10px", padding:"10px 12px", background:"#e8f0d8", borderRadius:"4px", border:"1px solid #b8d898" }}>
                 <div style={{ fontFamily:"Lora,serif", fontSize:"12px", color:"#3a5a18", lineHeight:1.6 }}>
-                  <strong>Works best with:</strong> Bible chapters (KJV), classic literature, Shakespeare, history topics, children's books, and any well-known story. For modern copyrighted books, Claude uses its knowledge of the story to create vocabulary-rich clues.
+                  <strong>Works best with:</strong> any faith tradition, classic literature, children's books, and well-known stories. For modern copyrighted books, Claude uses its knowledge of the story to create vocabulary-rich clues.
                 </div>
               </div>
             </div>

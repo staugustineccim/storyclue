@@ -1,16 +1,16 @@
 const GRADE_DESCRIPTIONS = {
-  k:       "kindergarten level — very simple, picture-clue style language, one short sentence",
-  "1":     "first grade level — short friendly sentences, simple words",
-  "2":     "second grade level — simple definitions a child can understand",
-  "3":     "third grade level — standard chapter-book level, default difficulty",
-  "4":     "fourth grade level — more context and detail in clues",
-  "5":     "fifth grade level — literary vocabulary, richer descriptions",
-  "6":     "sixth grade level — analytical language, concise definitions",
-  "7":     "seventh grade level — sophisticated vocabulary, nuanced clues with context",
-  "8":     "eighth grade level — complex vocabulary, clues that require inference",
-  "9-10":  "high school freshman/sophomore level — academic vocabulary, precise literary definitions",
-  "11-12": "high school junior/senior level — advanced vocabulary, AP/college-prep analytical clues",
-  "adult": "adult reader and senior level — rich elegant vocabulary, no grade constraints, clues that reward a lifetime of reading",
+  k:       "kindergarten level — use only the simplest everyday words a 5-year-old would say out loud. One very short sentence. No complex words.",
+  "1":     "first grade level — use short friendly sentences and only simple everyday words a 6-year-old would know. Keep it fun and concrete.",
+  "2":     "second grade level — use simple everyday words and short sentences a 7-year-old would understand. No vocabulary above 2nd grade.",
+  "3":     "third grade level — clear simple definitions using words an 8-year-old would know. Standard chapter-book vocabulary.",
+  "4":     "fourth grade level — use everyday language a 9-year-old would understand. A bit more detail but still simple and direct.",
+  "5":     "fifth grade level — slightly richer vocabulary, short descriptive sentences a 10-year-old would appreciate.",
+  "6":     "sixth grade level — analytical language, concise definitions appropriate for middle school.",
+  "7":     "seventh grade level — sophisticated vocabulary, nuanced clues with context for 7th graders.",
+  "8":     "eighth grade level — complex vocabulary, clues that require inference, appropriate for 8th graders.",
+  "9-10":  "high school freshman/sophomore level — academic vocabulary, precise literary definitions.",
+  "11-12": "high school junior/senior level — advanced vocabulary, AP/college-prep analytical clues.",
+  "adult": "adult reader and senior level — rich elegant vocabulary, no grade constraints, clues that reward a lifetime of reading.",
 };
 
 const SYSTEM_PROMPT = `You are a crossword puzzle creator specializing in educational content for children and adults.
@@ -29,8 +29,17 @@ export default async function handler(req, res) {
 
   let faithNote = "";
   if (faith && faith !== "none") {
-    const faithLabels = { christian: "Christian", catholic: "Catholic", jewish: "Jewish" };
-    faithNote = `\nFaith tradition: ${faithLabels[faith] || faith}. Write all clues with respect for this tradition. Use faith-appropriate language.`;
+    const faithGuidance = {
+      "christian-protestant": "Christian (Protestant) tradition. Write all clues in modern plain English that any Protestant family would understand. Do NOT use King James Version or archaic scripture language. Reference Bible stories, characters, and vocabulary in everyday contemporary language.",
+      "christian-catholic":   "Christian (Catholic) tradition. Write all clues in modern plain English appropriate for Catholic families. Do NOT use archaic scripture language. You may reference sacraments, saints, and Catholic vocabulary naturally in everyday language.",
+      "jewish":               "Jewish tradition. Write all clues in modern plain English. Reference Torah stories, Hebrew terms (with plain English context), Jewish holidays, and Jewish vocabulary naturally. Do NOT use Christian scripture language.",
+      "islamic":              "Islamic tradition. Write all clues in modern plain English respectful of Islamic faith. Reference Quran vocabulary, Islamic stories, Arabic terms (with plain English context), and Islamic concepts naturally.",
+      "hindu":                "Hindu tradition. Write all clues in modern plain English respectful of Hindu faith. Reference Sanskrit terms (with plain English context), Hindu stories, deities, and concepts naturally.",
+      "buddhist":             "Buddhist tradition. Write all clues in modern plain English respectful of Buddhist faith. Reference Buddhist concepts, Pali or Sanskrit terms (with plain English context), and Buddhist stories naturally.",
+      "other":                "faith-inclusive tradition. Write all clues in modern plain English that is respectful and culturally sensitive.",
+    };
+    const guidance = faithGuidance[faith] || "faith-inclusive tradition. Write all clues in modern plain English.";
+    faithNote = `\nFaith tradition: ${guidance} All faith-based content must be culturally respectful. NEVER use archaic or scripture-specific language — always use modern everyday English.`;
   }
 
   let seriesNote = "";
@@ -56,9 +65,15 @@ Instructions:
 - Each word must be ALL CAPS, letters only (A-Z), no spaces, no hyphens, no punctuation
 - Word length must be between 3 and 13 letters
 - Write every clue at ${gradeDesc}
+- Write ALL clues in modern plain everyday English — never use archaic, scriptural, or overly formal language
 - The title should specifically name the source (e.g. "Book of Jonah — Vocabulary Crossword")
-- For Bible content, use King James Version language in clues
 - Do NOT reproduce extended passages of text — only vocabulary words and short clues
+
+VALIDATION STEP — before returning, review every word-clue pair:
+- Each clue must specifically and accurately describe its exact answer word
+- A clue for SHEPHERD must describe a shepherd, not a king or a fish
+- A clue for ARK must describe an ark, not a whale
+- If any clue does not match its word, fix it before returning
 
 Return this exact JSON structure with no other text:
 {
@@ -86,7 +101,12 @@ Instructions:
 - Each word must be ALL CAPS, letters only (A-Z), no spaces, no hyphens, no punctuation
 - Word length must be between 3 and 13 letters
 - Write every clue at ${gradeDesc}
+- Write ALL clues in modern plain everyday English — never use archaic, scriptural, or overly formal language
 - The title should be a short, specific title for this puzzle
+
+VALIDATION STEP — before returning, review every word-clue pair:
+- Each clue must specifically and accurately describe its exact answer word
+- If any clue does not match its word, fix it before returning
 
 Return this exact JSON structure with no other text:
 {
