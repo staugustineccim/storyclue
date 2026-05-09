@@ -4,14 +4,29 @@ import { encodePuzzle } from "../utils/urlEncoder";
 import { buildLayout } from "../utils/layoutBuilder";
 import { buildDemoData, getDemoUrl, SERIES_DATA } from "../utils/demoData";
 
-const GRADES = [
-  { key:"k",  label:"Kindergarten" },
-  { key:"1",  label:"1st Grade" },
-  { key:"2",  label:"2nd Grade" },
-  { key:"3",  label:"3rd Grade (default)" },
-  { key:"4",  label:"4th Grade" },
-  { key:"5",  label:"5th Grade" },
-  { key:"6",  label:"6th Grade" },
+const GRADE_GROUPS = [
+  { label: "Early Learners", grades: [
+    { key:"k", label:"K" },
+    { key:"1", label:"1st" },
+    { key:"2", label:"2nd" },
+  ]},
+  { label: "Elementary", grades: [
+    { key:"3", label:"3rd" },
+    { key:"4", label:"4th" },
+    { key:"5", label:"5th" },
+  ]},
+  { label: "Middle School", grades: [
+    { key:"6", label:"6th" },
+    { key:"7", label:"7th" },
+    { key:"8", label:"8th" },
+  ]},
+  { label: "High School", grades: [
+    { key:"9-10",  label:"9th–10th" },
+    { key:"11-12", label:"11th–12th" },
+  ]},
+  { label: "Adult & Seniors", grades: [
+    { key:"adult", label:"Reader Mode" },
+  ]},
 ];
 
 const FAITH_TRADITIONS = [
@@ -261,13 +276,20 @@ export default function PuzzleGenerator() {
           {/* Grade Level */}
           <div style={{ marginBottom:"24px" }}>
             <label style={labelStyle}>Grade Level for Clues</label>
-            <div style={{ display:"flex", flexWrap:"wrap", gap:"6px" }}>
-              {GRADES.map(g => (
-                <button type="button" key={g.key}
-                  className={`grade-btn${grade===g.key?" on":""}`}
-                  onClick={() => setGrade(g.key)}>
-                  {g.label}
-                </button>
+            <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
+              {GRADE_GROUPS.map(group => (
+                <div key={group.label}>
+                  <div style={{ fontSize:"11px", color:"#8a7a5a", fontFamily:"Lora,serif", marginBottom:"5px", textTransform:"uppercase", letterSpacing:"0.5px" }}>{group.label}</div>
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:"5px" }}>
+                    {group.grades.map(g => (
+                      <button type="button" key={g.key}
+                        className={`grade-btn${grade===g.key?" on":""}`}
+                        onClick={() => setGrade(g.key)}>
+                        {g.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           </div>

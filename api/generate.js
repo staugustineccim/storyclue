@@ -1,11 +1,16 @@
 const GRADE_DESCRIPTIONS = {
-  k:   "kindergarten level — very simple, picture-clue style language, one short sentence",
-  "1": "first grade level — short friendly sentences, simple words",
-  "2": "second grade level — simple definitions a child can understand",
-  "3": "third grade level — standard chapter-book level, default difficulty",
-  "4": "fourth grade level — more context and detail in clues",
-  "5": "fifth grade level — literary vocabulary, richer descriptions",
-  "6": "sixth grade level — analytical language, concise definitions",
+  k:       "kindergarten level — very simple, picture-clue style language, one short sentence",
+  "1":     "first grade level — short friendly sentences, simple words",
+  "2":     "second grade level — simple definitions a child can understand",
+  "3":     "third grade level — standard chapter-book level, default difficulty",
+  "4":     "fourth grade level — more context and detail in clues",
+  "5":     "fifth grade level — literary vocabulary, richer descriptions",
+  "6":     "sixth grade level — analytical language, concise definitions",
+  "7":     "seventh grade level — sophisticated vocabulary, nuanced clues with context",
+  "8":     "eighth grade level — complex vocabulary, clues that require inference",
+  "9-10":  "high school freshman/sophomore level — academic vocabulary, precise literary definitions",
+  "11-12": "high school junior/senior level — advanced vocabulary, AP/college-prep analytical clues",
+  "adult": "adult reader and senior level — rich elegant vocabulary, no grade constraints, clues that reward a lifetime of reading",
 };
 
 const SYSTEM_PROMPT = `You are a crossword puzzle creator specializing in educational content for children and adults.
