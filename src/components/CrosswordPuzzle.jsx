@@ -14,6 +14,8 @@ const GRADE_LABELS = {
   "11-12":"11th–12th", "adult":"Reader Mode",
 };
 
+const MAX_HINTS = 3;
+
 export default function CrosswordPuzzle() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -40,31 +42,45 @@ export default function CrosswordPuzzle() {
   return <PuzzleBoard {...puzzleData} />;
 }
 
-function PuzzleBoard({ title, grade, rows, cols, words }) {
+function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) {
   const navigate = useNavigate();
-  const SOLUTION = buildGrid(words, rows, cols);
+  const SOLUTION  = buildGrid(words, rows, cols);
   const NUMBERING = buildNumbering(words, rows, cols);
 
   const ACROSS = words.filter(w => w.orientation === "across").sort((a, b) => a.number - b.number);
   const DOWN   = words.filter(w => w.orientation === "down").sort((a, b) => a.number - b.number);
 
-  const [cells, setCells] = useState(() => Array.from({ length: rows }, () => Array(cols).fill("")));
-  const [sel, setSel] = useState(null);
-  const [activeWord, setActiveWord] = useState(null);
-  const [checked, setChecked] = useState(false);
-  const [revealed, setRevealed] = useState(false);
-  const [won, setWon] = useState(false);
-  const [seconds, setSeconds] = useState(0);
-  const [timerActive, setTimerActive] = useState(false);
-  const [mistakes, setMistakes] = useState(0);
-  const [clueTab, setClueTab] = useState("across");
-  const [shareMsg, setShareMsg] = useState("");
+  // ── Core state ────────────────────────────────────────────────────────────
+  const [cells,        setCells]        = useState(() => Array.from({ length: rows }, () => Array(cols).fill("")));
+  const [sel,          setSel]          = useState(null);
+  const [activeWord,   setActiveWord]   = useState(null);
+  const [checked,      setChecked]      = useState(false);
+  const [revealed,     setRevealed]     = useState(false);
+  const [won,          setWon]          = useState(false);
+  const [seconds,      setSeconds]      = useState(0);
+  const [timerActive,  setTimerActive]  = useState(false);
+  const [mistakes,     setMistakes]     = useState(0);
+  const [clueTab,      setClueTab]      = useState("across");
+  const [shareMsg,     setShareMsg]     = useState("");
   const [showFeedback, setShowFeedback] = useState(false);
-  const [feedbackShown, setFeedbackShown] = useState(false);
-  const refs = useRef({});
-  const timerRef = useRef(null);
-  const activeClueRef = useRef(null);
+  const [feedbackShown,setFeedbackShown]= useState(false);
 
+  // ── Hint state ────────────────────────────────────────────────────────────
+  const [hintsLeft,       setHintsLeft]       = useState(MAX_HINTS);
+  const [showHintMenu,    setShowHintMenu]     = useState(false);
+  const [simplerClues,    setSimplerClues]     = useState({}); // key → simpler clue text
+  const [hintLoading,     setHintLoading]      = useState(false);
+  const [hintMsg,         setHintMsg]          = useState("");
+
+  // ── Reveal-confirm state ──────────────────────────────────────────────────
+  const [showRevealConfirm, setShowRevealConfirm] = useState(false);
+
+  const refs         = useRef({});
+  const timerRef     = useRef(null);
+  const activeClueRef = useRef(null);
+  const hintMenuRef  = useRef(null);
+
+  // ── Effects ───────────────────────────────────────────────────────────────
   useEffect(() => {
     if (timerActive && !won) {
       timerRef.current = setInterval(() => setSeconds(s => s + 1), 1000);
@@ -76,13 +92,28 @@ function PuzzleBoard({ title, grade, rows, cols, words }) {
     activeClueRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [activeWord]);
 
-  // Show feedback after win or reveal (once per session)
   useEffect(() => {
     if ((won || revealed) && !feedbackShown) {
       const timer = setTimeout(() => { setShowFeedback(true); setFeedbackShown(true); }, 1200);
       return () => clearTimeout(timer);
     }
   }, [won, revealed]);
+
+  // Close hint menu on outside click
+  useEffect(() => {
+    function onOutside(e) {
+      if (hintMenuRef.current && !hintMenuRef.current.contains(e.target)) {
+        setShowHintMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", onOutside);
+    return () => document.removeEventListener("mousedown", onOutside);
+  }, []);
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function wordKey(w) { return `${w.orientation}-${w.number}`; }
+
+  function getClue(w) { return simplerClues[wordKey(w)] || w.clue; }
 
   function wordAt(r, c, prefDir) {
     const hits = words.filter(w =>
@@ -96,6 +127,17 @@ function PuzzleBoard({ title, grade, rows, cols, words }) {
   }
 
   function focus(r, c) { refs.current[`${r},${c}`]?.focus(); }
+
+  // Jump to first empty cell in word, or first cell if all filled
+  function focusFirstEmpty(w) {
+    for (let i = 0; i < w.answer.length; i++) {
+      const r = w.orientation === "down" ? w.starty + i : w.starty;
+      const c = w.orientation === "across" ? w.startx + i : w.startx;
+      if (!cells[r][c]) { setSel({ r, c }); focus(r, c); return; }
+    }
+    setSel({ r: w.starty, c: w.startx });
+    focus(w.starty, w.startx);
+  }
 
   function clickCell(r, c) {
     if (!SOLUTION[r][c]) return;
@@ -158,9 +200,10 @@ function PuzzleBoard({ title, grade, rows, cols, words }) {
     if (allOk) { setWon(true); setTimerActive(false); }
   }
 
-  function reveal() {
+  function doReveal() {
     setCells(SOLUTION.map(row => row.map(c => c || "")));
     setRevealed(true); setChecked(false); setTimerActive(false);
+    setShowRevealConfirm(false);
   }
 
   function reset() {
@@ -169,12 +212,67 @@ function PuzzleBoard({ title, grade, rows, cols, words }) {
     setSel(null); setActiveWord(null);
     setSeconds(0); setTimerActive(false); setMistakes(0);
     setShowFeedback(false); setFeedbackShown(false);
+    setHintsLeft(MAX_HINTS); setSimplerClues({}); setHintMsg("");
   }
 
   function share() {
     navigator.clipboard?.writeText(window.location.href).then(() => {
       setShareMsg("Copied!"); setTimeout(() => setShareMsg(""), 2000);
     }).catch(() => { setShareMsg("Copy URL from browser"); setTimeout(() => setShareMsg(""), 3000); });
+  }
+
+  // ── Hint: reveal one letter ───────────────────────────────────────────────
+  function hintRevealLetter() {
+    if (hintsLeft <= 0) { setHintMsg("No hints left!"); setShowHintMenu(false); return; }
+    if (!activeWord) { setHintMsg("Click a word first."); setShowHintMenu(false); return; }
+    for (let i = 0; i < activeWord.answer.length; i++) {
+      const r = activeWord.orientation === "down" ? activeWord.starty + i : activeWord.starty;
+      const c = activeWord.orientation === "across" ? activeWord.startx + i : activeWord.startx;
+      if (!cells[r][c] || cells[r][c] !== SOLUTION[r][c]) {
+        const next = cells.map(row => [...row]);
+        next[r][c] = SOLUTION[r][c];
+        setCells(next); setChecked(false);
+        setHintsLeft(h => h - 1);
+        setHintMsg(`Letter revealed! (${hintsLeft - 1} hint${hintsLeft - 1 !== 1 ? "s" : ""} left)`);
+        setTimeout(() => setHintMsg(""), 3000);
+        setShowHintMenu(false);
+        return;
+      }
+    }
+    setHintMsg("All letters in this word are already correct!");
+    setShowHintMenu(false);
+  }
+
+  // ── Hint: simpler clue ────────────────────────────────────────────────────
+  async function hintSimplerClue() {
+    if (hintsLeft <= 0) { setHintMsg("No hints left!"); setShowHintMenu(false); return; }
+    if (!activeWord) { setHintMsg("Click a word first."); setShowHintMenu(false); return; }
+    const key = wordKey(activeWord);
+    if (simplerClues[key]) { setHintMsg("Already simplified!"); setShowHintMenu(false); return; }
+
+    setHintLoading(true);
+    setShowHintMenu(false);
+    setHintMsg("Getting a simpler clue...");
+
+    try {
+      const res = await fetch("/api/simplify-clue", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ word: activeWord.answer, clue: activeWord.clue, grade }),
+      });
+      const data = await res.json();
+      if (data.clue) {
+        setSimplerClues(prev => ({ ...prev, [key]: data.clue }));
+        setHintsLeft(h => h - 1);
+        setHintMsg(`Clue simplified! (${hintsLeft - 1} hint${hintsLeft - 1 !== 1 ? "s" : ""} left)`);
+      } else {
+        setHintMsg("Couldn't simplify that clue. Try again.");
+      }
+    } catch {
+      setHintMsg("Couldn't reach the server. Try again.");
+    }
+    setHintLoading(false);
+    setTimeout(() => setHintMsg(""), 4000);
   }
 
   function cellClass(r, c) {
@@ -202,10 +300,11 @@ function PuzzleBoard({ title, grade, rows, cols, words }) {
   }).length;
   const pct = totalCells ? Math.round(correct / totalCells * 100) : 0;
 
-  const clueList = clueTab === "across" ? ACROSS : DOWN;
+  const clueList  = clueTab === "across" ? ACROSS : DOWN;
   const gradeLabel = GRADE_LABELS[grade] ? `${GRADE_LABELS[grade]} Grade` : "";
+  const isSpanish = language === "spanish" || language?.startsWith("bilingual");
 
-  // Print cell size (px) — keeps full grid within letter-page margins
+  // Print cell size — fits full grid within letter-page margins
   const PRINT_CS = Math.min(22, Math.floor(540 / cols));
 
   return (
@@ -229,18 +328,33 @@ function PuzzleBoard({ title, grade, rows, cols, words }) {
         .clue{padding:8px 10px;border-radius:5px;font-size:14px;line-height:1.55;cursor:pointer;transition:background .1s;font-family:Lora,Georgia,serif;color:#2c1a08;border-left:3px solid transparent;}
         .clue:hover{background:#ede0c0}
         .clue.act{background:#e8f0d8;font-weight:600;border-left-color:#5a8a2a}
+        .clue.simpler{border-left-color:#8a7a30;font-style:italic;}
         .cn{font-weight:700;color:#6a4a10;margin-right:5px;font-size:13px}
         .btn{font-family:'Playfair Display',Georgia,serif;font-weight:700;border:none;border-radius:4px;cursor:pointer;transition:all .15s;font-size:13px;}
         .bg{background:#3a6a1a;color:#f0ead8;padding:9px 18px;box-shadow:2px 2px 0 #1a3a08}
         .bg:hover{background:#5a8a2a;transform:translateY(-1px)}
         .bo{background:transparent;color:#4a3a18;border:1.5px solid #8a7a5a;padding:8px 14px}
         .bo:hover{background:#e8e0cc}
+        .bh{background:#8a7a30;color:#fff;border:none;padding:5px 12px;box-shadow:1px 1px 0 #5a4a10}
+        .bh:hover{background:#aa9a40}
         .ctab{flex:1;padding:10px;border:none;border-bottom:3px solid transparent;background:transparent;font-family:'Playfair Display',serif;font-weight:700;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#6a5a30;cursor:pointer;transition:all .15s;}
         .ctab.on{border-bottom-color:#3a6a1a;color:#3a6a1a}
         .ptrack{height:6px;background:#e0d8c8;border-radius:3px;overflow:hidden}
         .pfill{height:100%;background:#3a6a1a;border-radius:3px;transition:width .4s ease}
         @keyframes pop{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
         .win{animation:pop .45s cubic-bezier(.175,.885,.32,1.275)}
+
+        /* Hint menu */
+        .hint-menu{position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1.5px solid #c8b888;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:200;min-width:210px;overflow:hidden;}
+        .hint-item{padding:11px 14px;font-family:Lora,Georgia,serif;font-size:13px;cursor:pointer;color:#2c1a08;border-bottom:1px solid #f0e8d8;transition:background .1s;}
+        .hint-item:last-child{border-bottom:none}
+        .hint-item:hover{background:#e8f0d8}
+        .hint-item.disabled{color:#bbb;cursor:not-allowed}
+        .hint-item.disabled:hover{background:#fff}
+
+        /* Confirm overlay */
+        .confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9000;}
+        .confirm-box{background:#fdfaf4;border-radius:12px;padding:2rem;max-width:340px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:Lora,Georgia,serif;}
 
         /* ── PRINT STYLES ── */
         .print-only{display:none}
@@ -258,15 +372,13 @@ function PuzzleBoard({ title, grade, rows, cols, words }) {
         }
       `}</style>
 
-      {/* ══════════════════════════════════════════
-          PRINT-ONLY WORKSHEET (hidden on screen)
-      ══════════════════════════════════════════ */}
+      {/* ══ PRINT-ONLY WORKSHEET ══════════════════════════════════════════ */}
       <div className="print-only" style={{ fontFamily:"Arial,sans-serif", padding:"0" }}>
-        {/* Worksheet header */}
         <div style={{ marginBottom:"14px", borderBottom:"2px solid #000", paddingBottom:"10px" }}>
           <div style={{ fontSize:"18px", fontWeight:"bold", fontFamily:"Georgia,serif", marginBottom:"6px" }}>{title}</div>
           <div style={{ fontSize:"11px", color:"#555", marginBottom:"10px" }}>
             {gradeLabel} · {words.length} Words · StoryClue.ai
+            {isSpanish && " · AI-generated Spanish content — recommend review by fluent speaker"}
           </div>
           <div style={{ display:"flex", gap:"40px", fontSize:"12px" }}>
             <span>Name: <span style={{ display:"inline-block", width:"180px", borderBottom:"1px solid #000" }}>&nbsp;</span></span>
@@ -274,8 +386,6 @@ function PuzzleBoard({ title, grade, rows, cols, words }) {
             <span>Date: <span style={{ display:"inline-block", width:"100px", borderBottom:"1px solid #000" }}>&nbsp;</span></span>
           </div>
         </div>
-
-        {/* Print grid — static cells, no inputs */}
         <div style={{ marginBottom:"16px", lineHeight:0 }}>
           {Array.from({ length:rows }, (_,r) => (
             <div key={r} style={{ display:"flex", lineHeight:0 }}>
@@ -292,14 +402,12 @@ function PuzzleBoard({ title, grade, rows, cols, words }) {
             </div>
           ))}
         </div>
-
-        {/* Two-column clues */}
         <div style={{ display:"flex", gap:"32px", marginTop:"12px", borderTop:"1px solid #ccc", paddingTop:"10px" }}>
           <div style={{ flex:1 }}>
             <div style={{ fontSize:"13px", fontWeight:"bold", fontFamily:"Georgia,serif", marginBottom:"8px", textTransform:"uppercase", letterSpacing:"1px", borderBottom:"1px solid #ccc", paddingBottom:"4px" }}>Across</div>
             {ACROSS.map(w => (
               <div key={w.number} className="p-clue">
-                <span className="p-clue-num">{w.number}.</span>{w.clue}
+                <span className="p-clue-num">{w.number}.</span>{getClue(w)}
               </div>
             ))}
           </div>
@@ -307,16 +415,14 @@ function PuzzleBoard({ title, grade, rows, cols, words }) {
             <div style={{ fontSize:"13px", fontWeight:"bold", fontFamily:"Georgia,serif", marginBottom:"8px", textTransform:"uppercase", letterSpacing:"1px", borderBottom:"1px solid #ccc", paddingBottom:"4px" }}>Down</div>
             {DOWN.map(w => (
               <div key={w.number} className="p-clue">
-                <span className="p-clue-num">{w.number}.</span>{w.clue}
+                <span className="p-clue-num">{w.number}.</span>{getClue(w)}
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* ══════════════════════════════════════════
-          SCREEN UI (hidden during print)
-      ══════════════════════════════════════════ */}
+      {/* ══ SCREEN UI ════════════════════════════════════════════════════ */}
       <div className="screen-only" style={{ display:"flex", flexDirection:"column", height:"100%", overflow:"hidden" }}>
 
         {/* TOP BAR */}
@@ -325,7 +431,7 @@ function PuzzleBoard({ title, grade, rows, cols, words }) {
           <div style={{ flex:1 }}>
             <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"17px", color:"#f0ead8", lineHeight:1.2 }}>{title}</div>
             <div style={{ fontSize:"10px", color:"#a8d890", fontStyle:"italic", letterSpacing:"1px" }}>
-              {gradeLabel ? `${gradeLabel} · ` : ""}{words.length} Words
+              {gradeLabel ? `${gradeLabel} · ` : ""}{words.length} Words{isSpanish ? " · 🇪🇸 Spanish" : ""}
             </div>
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:"12px", flexShrink:0 }}>
@@ -344,14 +450,58 @@ function PuzzleBoard({ title, grade, rows, cols, words }) {
         {/* COMPACT TOOLBAR */}
         <div className="no-print" style={{ background:"#f0ead8", borderBottom:"1px solid #c8b888", padding:"6px 10px", flexShrink:0, display:"flex", gap:"6px", alignItems:"center", flexWrap:"wrap" }}>
           <button className="btn bg" onClick={check} style={{ padding:"5px 14px", fontSize:"12px" }}>Check</button>
-          <button className="btn bo" onClick={reveal} style={{ padding:"4px 12px", fontSize:"12px" }}>Reveal</button>
+
+          {/* Hint button with dropdown */}
+          <div style={{ position:"relative" }} ref={hintMenuRef}>
+            <button
+              className="btn bh"
+              onClick={() => setShowHintMenu(v => !v)}
+              disabled={hintLoading}
+              style={{ padding:"5px 12px", fontSize:"12px", opacity: hintsLeft === 0 ? 0.5 : 1 }}
+            >
+              💡 Hint ({hintsLeft})
+            </button>
+            {showHintMenu && (
+              <div className="hint-menu">
+                <div
+                  className={`hint-item${hintsLeft === 0 || !activeWord ? " disabled" : ""}`}
+                  onClick={hintLoading || hintsLeft === 0 || !activeWord ? undefined : hintSimplerClue}
+                >
+                  <strong>Simpler Clue</strong>
+                  <div style={{ fontSize:"11px", color:"#888", marginTop:"2px" }}>Rewrite this clue in plainer language</div>
+                </div>
+                <div
+                  className={`hint-item${hintsLeft === 0 || !activeWord ? " disabled" : ""}`}
+                  onClick={hintsLeft === 0 || !activeWord ? undefined : hintRevealLetter}
+                >
+                  <strong>Reveal a Letter</strong>
+                  <div style={{ fontSize:"11px", color:"#888", marginTop:"2px" }}>Show the first empty letter in this word</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Show Answer (was Reveal) */}
+          <button className="btn bo" onClick={() => setShowRevealConfirm(true)} style={{ padding:"4px 12px", fontSize:"12px" }}>Show Answer</button>
+
           <button className="btn bo" onClick={reset} style={{ padding:"4px 12px", fontSize:"12px" }}>Restart</button>
           <button className="btn bo" onClick={() => navigate("/create")} style={{ padding:"4px 12px", fontSize:"12px" }}>New Puzzle</button>
           <button className="btn bo" onClick={() => window.print()} style={{ padding:"4px 10px", fontSize:"12px" }}>🖨️ Print</button>
           <button className="btn bo" onClick={share} style={{ padding:"4px 10px", fontSize:"12px" }}>🔗 Share</button>
-          {shareMsg && <span style={{ fontSize:"11px", color:"#3a6a1a", fontFamily:"Lora,serif", fontStyle:"italic" }}>{shareMsg}</span>}
+          {shareMsg  && <span style={{ fontSize:"11px", color:"#3a6a1a", fontFamily:"Lora,serif", fontStyle:"italic" }}>{shareMsg}</span>}
+          {hintMsg   && <span style={{ fontSize:"11px", color:"#8a7a30", fontFamily:"Lora,serif", fontStyle:"italic" }}>{hintMsg}</span>}
+          {hintLoading && <span style={{ fontSize:"11px", color:"#8a7a30", fontFamily:"Lora,serif", fontStyle:"italic" }}>Getting simpler clue…</span>}
           {checked && !won && !revealed && <span style={{ fontSize:"11px", color:"#7a5a00", fontFamily:"Lora,serif", fontStyle:"italic" }}>🟢 correct · 🔴 wrong · 🟡 empty</span>}
         </div>
+
+        {/* Spanish disclaimer banner */}
+        {isSpanish && (
+          <div className="no-print" style={{ background:"#fff8e8", borderBottom:"1px solid #e0c860", padding:"5px 14px", flexShrink:0 }}>
+            <span style={{ fontFamily:"Lora,serif", fontSize:"11px", color:"#7a5500" }}>
+              ⚠️ AI-generated Spanish content. We recommend review by a fluent Spanish speaker for classroom use.
+            </span>
+          </div>
+        )}
 
         {/* PROGRESS BAR */}
         <div className="no-print" style={{ padding:"6px 14px", background:"#f0ead8", borderBottom:"1px solid #c8b888", flexShrink:0 }}>
@@ -369,7 +519,7 @@ function PuzzleBoard({ title, grade, rows, cols, words }) {
           </div>
         )}
 
-        {/* GRID PANEL */}
+        {/* GRID */}
         <div className="grid-scroll" style={{ flex:"1 1 60%", minHeight:0, overflowX:"auto", overflowY:"auto", WebkitOverflowScrolling:"touch", padding:"10px", background:"#faf7f0" }}>
           <div style={{ display:"inline-block", background:"rgba(255,254,245,.98)", border:"2px solid #8a7a5a", borderRadius:"6px", padding:"12px", boxShadow:"3px 4px 0 #c8b870" }}>
             <table style={{ borderCollapse:"collapse" }}>
@@ -416,7 +566,10 @@ function PuzzleBoard({ title, grade, rows, cols, words }) {
               <span style={{ fontWeight:700, color:"#6a4a10", fontFamily:"'Playfair Display',serif", fontSize:"13px", marginRight:"6px" }}>
                 {activeWord.number} {activeWord.orientation.toUpperCase()}
               </span>
-              <span style={{ fontFamily:"Lora,serif", fontSize:"13px", color:"#2c1a08" }}>{activeWord.clue}</span>
+              <span style={{ fontFamily:"Lora,serif", fontSize:"13px", color:"#2c1a08" }}>
+                {getClue(activeWord)}
+                {simplerClues[wordKey(activeWord)] && <span style={{ fontSize:"11px", color:"#8a7a30", marginLeft:"6px" }}>✏️ simplified</span>}
+              </span>
             </div>
           )}
           <div style={{ display:"flex", borderBottom:"2px solid #e0d8c8", flexShrink:0 }}>
@@ -425,15 +578,22 @@ function PuzzleBoard({ title, grade, rows, cols, words }) {
           </div>
           <div style={{ overflowY:"auto", WebkitOverflowScrolling:"touch", flex:1, padding:"4px 8px" }}>
             {clueList.map(w => {
-              const isActive = activeWord?.number === w.number && activeWord?.orientation === clueTab;
+              const isActive  = activeWord?.number === w.number && activeWord?.orientation === clueTab;
+              const isSimpler = !!simplerClues[wordKey(w)];
               return (
                 <div
                   key={`${clueTab}${w.number}`}
                   ref={isActive ? activeClueRef : null}
-                  className={`clue${isActive ? " act" : ""}`}
-                  onClick={() => { setSel({ r:w.starty, c:w.startx }); setActiveWord(w); focus(w.starty, w.startx); }}
+                  className={`clue${isActive ? " act" : ""}${isSimpler ? " simpler" : ""}`}
+                  onClick={() => {
+                    setActiveWord(w);
+                    setClueTab(w.orientation);
+                    focusFirstEmpty(w);
+                  }}
                 >
-                  <span className="cn">{w.number}.</span>{w.clue}
+                  <span className="cn">{w.number}.</span>
+                  {getClue(w)}
+                  {isSimpler && <span style={{ fontSize:"10px", color:"#8a7a30", marginLeft:"5px" }}>✏️</span>}
                 </div>
               );
             })}
@@ -442,7 +602,36 @@ function PuzzleBoard({ title, grade, rows, cols, words }) {
 
       </div>{/* end screen-only */}
 
-      {/* FEEDBACK MODAL */}
+      {/* ══ REVEAL CONFIRMATION ══════════════════════════════════════════ */}
+      {showRevealConfirm && (
+        <div className="confirm-overlay" onClick={() => setShowRevealConfirm(false)}>
+          <div className="confirm-box" onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize:"2.2rem", marginBottom:"0.5rem" }}>🤔</div>
+            <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#2D5A1A", margin:"0 0 0.7rem", fontSize:"1.3rem" }}>
+              Are you sure?
+            </h2>
+            <p style={{ color:"#555", marginBottom:"1.5rem", lineHeight:1.5, fontSize:"0.95rem" }}>
+              Showing the answer will end your puzzle session.
+            </p>
+            <div style={{ display:"flex", gap:"0.8rem", justifyContent:"center" }}>
+              <button
+                onClick={doReveal}
+                style={{ background:"#c0392b", color:"#fff", border:"none", borderRadius:"8px", padding:"0.65rem 1.4rem", fontFamily:"Lora,Georgia,serif", fontWeight:600, fontSize:"0.95rem", cursor:"pointer" }}
+              >
+                Yes, show the answer
+              </button>
+              <button
+                onClick={() => setShowRevealConfirm(false)}
+                style={{ background:"#2D5A1A", color:"#fff", border:"none", borderRadius:"8px", padding:"0.65rem 1.4rem", fontFamily:"Lora,Georgia,serif", fontWeight:600, fontSize:"0.95rem", cursor:"pointer" }}
+              >
+                No, keep trying
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ FEEDBACK MODAL ═══════════════════════════════════════════════ */}
       {showFeedback && (
         <FeedbackModal
           puzzleTitle={title}

@@ -23,10 +23,15 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { inputMode, bookRef, chapterText, grade = "3", faith, seriesMode, selectedBooks, seriesName } = req.body || {};
+  const {
+    inputMode, bookRef, chapterText, urlRef,
+    grade = "3", faith, language = "english", bilingualMode,
+    seriesMode, selectedBooks, seriesName, currentChapter,
+  } = req.body || {};
 
   const gradeDesc = GRADE_DESCRIPTIONS[grade] || GRADE_DESCRIPTIONS["3"];
 
+  // ── Faith guidance ──────────────────────────────────────────────────────
   let faithNote = "";
   if (faith && faith !== "none") {
     const faithGuidance = {
@@ -42,22 +47,78 @@ export default async function handler(req, res) {
     faithNote = `\nFaith tradition: ${guidance} All faith-based content must be culturally respectful. NEVER use archaic or scripture-specific language — always use modern everyday English.`;
   }
 
+  // ── Series + chapter-level spoiler protection ───────────────────────────
   let seriesNote = "";
   if (seriesMode && selectedBooks?.length) {
-    seriesNote = `\nSpoiler protection: This puzzle is from the "${seriesName}" series. The user has only read: ${selectedBooks.join(", ")}. Do NOT reference events, characters, or vocabulary from books they have NOT read.`;
+    seriesNote = `\nSpoiler protection: This puzzle is from the "${seriesName}" series. The user has ONLY read these books: ${selectedBooks.join(", ")}.`;
+    if (currentChapter && Number(currentChapter) > 0) {
+      seriesNote += ` The user is currently on Chapter ${Number(currentChapter)} and has NOT read beyond it. Do NOT reference any events, character deaths, plot twists, new characters, or vocabulary introduced after Chapter ${Number(currentChapter)}.`;
+    }
+    seriesNote += ` This spoiler protection is critical — never reference anything from unread books or unread chapters.`;
   }
 
+  // ── Language / Spanish / Bilingual ──────────────────────────────────────
+  let languageNote = "";
+  let langFlag = "english";
+  if (language === "spanish" && !bilingualMode) {
+    langFlag = "spanish";
+    languageNote = `\nLanguage: Generate ALL vocabulary WORDS and CLUES entirely in Spanish. Answer words must be Spanish words in ALL CAPS using only the letters A-Z (no accents, tildes, or special characters — use plain ASCII: N for Ñ, etc.). Clues must be in Spanish at the appropriate grade level. After generating, run a secondary validation pass: confirm each Spanish word is correctly spelled, grammatically appropriate for the grade level, and each clue accurately describes its answer word in Spanish. Fix any errors before returning.`;
+  } else if (bilingualMode === "en-clue-es-word") {
+    langFlag = "bilingual-en-clue-es-word";
+    languageNote = `\nBilingual Mode (English clues / Spanish answers): Write all CLUES in English, but the ANSWER WORDS must be their Spanish equivalents in ALL CAPS (A-Z only, no accents). For example, clue "A friendly spider" → answer ARANA (for araña). Each English clue describes what the Spanish word means.`;
+  } else if (bilingualMode === "es-clue-en-word") {
+    langFlag = "bilingual-es-clue-en-word";
+    languageNote = `\nBilingual Mode (Spanish clues / English answers): Write all CLUES in Spanish, but the ANSWER WORDS must be English (ALL CAPS, A-Z only). Each Spanish clue describes the English answer word.`;
+  }
+
+  // ── URL mode: fetch and extract text ────────────────────────────────────
+  let resolvedText = chapterText;
+  if (inputMode === "url") {
+    if (!urlRef || !urlRef.trim().startsWith("http")) {
+      return res.status(400).json({ error: "Please enter a valid URL starting with http or https." });
+    }
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const pageRes = await fetch(urlRef.trim(), {
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; StoryClue/1.0; +https://storyclue.ai)" },
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      if (!pageRes.ok) throw new Error(`HTTP ${pageRes.status}`);
+      const html = await pageRes.text();
+      resolvedText = html
+        .replace(/<script[\s\S]*?<\/script>/gi, " ")
+        .replace(/<style[\s\S]*?<\/style>/gi, " ")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&quot;/gi, '"')
+        .replace(/&#\d+;/g, " ")
+        .replace(/&[a-z0-9]+;/gi, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    } catch {
+      return res.status(400).json({ error: "Some websites block outside access. Try copying and pasting the article text directly instead." });
+    }
+    if (!resolvedText || resolvedText.trim().length < 50) {
+      return res.status(400).json({ error: "Some websites block outside access. Try copying and pasting the article text directly instead." });
+    }
+  }
+
+  // ── Build prompt ─────────────────────────────────────────────────────────
   let userPrompt;
 
   if (inputMode === "lookup") {
-    // Book/chapter lookup mode — Claude uses its own knowledge
     if (!bookRef || bookRef.trim().length < 3) {
       return res.status(400).json({ error: "Please enter a book name or chapter reference." });
     }
 
     userPrompt = `Create a crossword puzzle vocabulary list from your knowledge of: "${bookRef}"
 
-Grade level for clues: ${gradeDesc}${faithNote}${seriesNote}
+Grade level for clues: ${gradeDesc}${faithNote}${seriesNote}${languageNote}
 
 Instructions:
 - Use your knowledge of this text, chapter, or topic to identify 20 to 25 important vocabulary words
@@ -84,17 +145,17 @@ Return this exact JSON structure with no other text:
 }`;
 
   } else {
-    // Paste mode — user provided their own text
-    if (!chapterText || chapterText.trim().length < 50) {
+    // paste or url (url text was resolved above)
+    if (!resolvedText || resolvedText.trim().length < 50) {
       return res.status(400).json({ error: "Please provide more text — at least a paragraph." });
     }
 
     userPrompt = `Text to create puzzle from:
 """
-${chapterText.slice(0, 6000)}
+${resolvedText.slice(0, 6000)}
 """
 
-Grade level for clues: ${gradeDesc}${faithNote}${seriesNote}
+Grade level for clues: ${gradeDesc}${faithNote}${seriesNote}${languageNote}
 
 Instructions:
 - Extract 20 to 25 vocabulary words from the text above
@@ -117,6 +178,7 @@ Return this exact JSON structure with no other text:
 }`;
   }
 
+  // ── Call Claude ──────────────────────────────────────────────────────────
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -163,6 +225,9 @@ Return this exact JSON structure with no other text:
     parsed.words = parsed.words
       .map(w => ({ ...w, word: String(w.word).toUpperCase().replace(/[^A-Z]/g, "") }))
       .filter(w => w.word.length >= 3 && w.word.length <= 13 && w.clue);
+
+    // Pass language flag through so the puzzle player can show disclaimer
+    parsed.language = langFlag;
 
     return res.status(200).json(parsed);
   } catch (err) {

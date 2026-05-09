@@ -55,17 +55,21 @@ export default function PuzzleGenerator() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const [inputMode, setInputMode] = useState("lookup"); // "lookup" or "paste"
-  const [bookRef, setBookRef] = useState("");
-  const [text, setText] = useState("");
-  const [title, setTitle] = useState("");
-  const [grade, setGrade] = useState("3");
-  const [seriesMode, setSeriesMode] = useState(false);
+  const [inputMode, setInputMode]       = useState("lookup"); // "lookup" | "paste" | "url"
+  const [bookRef, setBookRef]           = useState("");
+  const [text, setText]                 = useState("");
+  const [urlRef, setUrlRef]             = useState("");
+  const [title, setTitle]               = useState("");
+  const [grade, setGrade]               = useState("3");
+  const [faith, setFaith]               = useState("none");
+  const [language, setLanguage]         = useState("english"); // "english" | "spanish"
+  const [bilingualMode, setBilingual]   = useState(""); // "" | "en-clue-es-word" | "es-clue-en-word"
+  const [seriesMode, setSeriesMode]     = useState(false);
   const [selectedSeries, setSelectedSeries] = useState("charlottes-web");
-  const [selectedBooks, setSelectedBooks] = useState([]);
-  const [faith, setFaith] = useState("none");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [selectedBooks, setSelectedBooks]   = useState([]);
+  const [currentChapter, setCurrentChapter] = useState("");
+  const [loading, setLoading]           = useState(false);
+  const [error, setError]               = useState("");
 
   useEffect(() => {
     if (searchParams.get("demo") === "cw") {
@@ -93,6 +97,13 @@ export default function PuzzleGenerator() {
       setError("Please enter a book name or chapter reference.");
       return;
     }
+    if (inputMode === "url") {
+      const u = urlRef.trim();
+      if (!u.startsWith("http")) {
+        setError("Please enter a valid URL starting with http or https.");
+        return;
+      }
+    }
 
     setLoading(true);
 
@@ -101,11 +112,15 @@ export default function PuzzleGenerator() {
         inputMode,
         bookRef: bookRef.trim(),
         chapterText: text,
+        urlRef: urlRef.trim(),
         grade,
         faith,
+        language: language === "spanish" && bilingualMode ? "english" : language,
+        bilingualMode: language === "spanish" ? bilingualMode : "",
         seriesMode,
         selectedBooks: seriesMode ? selectedBooks : [],
         seriesName: seriesMode ? SERIES_DATA[selectedSeries]?.name : "",
+        currentChapter: seriesMode ? currentChapter : "",
       };
 
       const res = await fetch("/api/generate", {
@@ -139,6 +154,7 @@ export default function PuzzleGenerator() {
       const puzzleData = {
         title: title.trim() || data.title || "StoryClue Puzzle",
         grade,
+        language: data.language || "english",
         rows: layout.rows,
         cols: layout.cols,
         words: layout.words,
@@ -166,6 +182,8 @@ export default function PuzzleGenerator() {
     fontSize:"13px", color:"#4a3a18",
   };
 
+  const isSpanish = language === "spanish";
+
   return (
     <div style={{ minHeight:"100vh", background:"#faf7f0", fontFamily:"Georgia,serif" }}>
       <style>{`
@@ -175,14 +193,22 @@ export default function PuzzleGenerator() {
         .grade-btn{padding:7px 14px;border:1.5px solid #c8b888;border-radius:4px;font-size:12px;font-family:'Playfair Display',serif;font-weight:700;cursor:pointer;background:transparent;color:#4a3a18;transition:all .15s}
         .grade-btn:hover{background:#e8e0cc}
         .grade-btn.on{background:#3a6a1a;color:#f0ead8;border-color:#3a6a1a}
-        .mode-btn{flex:1;padding:12px;border:1.5px solid #c8b888;border-radius:4px;font-family:'Playfair Display',serif;font-weight:700;font-size:13px;cursor:pointer;transition:all .15s;text-align:center}
+        .mode-btn{flex:1;padding:10px 8px;border:1.5px solid #c8b888;border-radius:4px;font-family:'Playfair Display',serif;font-weight:700;font-size:12px;cursor:pointer;transition:all .15s;text-align:center}
         .mode-btn.on{background:#3a6a1a;color:#f0ead8;border-color:#3a6a1a}
         .mode-btn:not(.on){background:#fffef5;color:#4a3a18}
         .mode-btn:not(.on):hover{background:#e8e0cc}
+        .lang-btn{padding:8px 18px;border:1.5px solid #c8b888;border-radius:4px;font-size:13px;font-family:'Playfair Display',serif;font-weight:700;cursor:pointer;transition:all .15s}
+        .lang-btn.on{background:#3a6a1a;color:#f0ead8;border-color:#3a6a1a}
+        .lang-btn:not(.on){background:#fffef5;color:#4a3a18}
+        .lang-btn:not(.on):hover{background:#e8e0cc}
         .book-check{display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;font-family:Lora,serif;font-size:13px;color:#2c1a08}
         .book-check input{accent-color:#3a6a1a;width:15px;height:15px;cursor:pointer}
         .example-chip{display:inline-block;padding:5px 10px;margin:3px;border:1px solid #c8b888;border-radius:20px;font-family:Lora,serif;font-size:12px;color:#4a3a18;cursor:pointer;background:#fffef5;transition:all .15s}
         .example-chip:hover{background:#e8f0d8;border-color:#5a8a2a;color:#2d4a18}
+        .bilingual-btn{flex:1;padding:7px 6px;border:1.5px solid #c8b888;border-radius:4px;font-family:Lora,serif;font-size:11px;cursor:pointer;transition:all .15s;text-align:center;line-height:1.4}
+        .bilingual-btn.on{background:#3a6a1a;color:#f0ead8;border-color:#3a6a1a}
+        .bilingual-btn:not(.on){background:#fffef5;color:#4a3a18}
+        .bilingual-btn:not(.on):hover{background:#e8e0cc}
       `}</style>
 
       {/* Header */}
@@ -199,12 +225,12 @@ export default function PuzzleGenerator() {
           Create Your Crossword
         </h1>
         <p style={{ fontFamily:"Lora,serif", fontSize:"15px", color:"#6a5a30", marginBottom:"28px", fontStyle:"italic" }}>
-          Name any book and chapter — or paste your own text. StoryClue builds the puzzle in seconds.
+          Name any book and chapter, paste your own text, or drop in a URL. StoryClue builds the puzzle in seconds.
         </p>
 
         <form onSubmit={handleGenerate}>
 
-          {/* Mode Toggle */}
+          {/* ── Mode Toggle ─────────────────────────────────────────────── */}
           <div style={{ marginBottom:"24px" }}>
             <label style={labelStyle}>How would you like to create your puzzle?</label>
             <div style={{ display:"flex", gap:"8px" }}>
@@ -216,10 +242,14 @@ export default function PuzzleGenerator() {
                 onClick={() => setInputMode("paste")}>
                 📋 Paste Your Own Text
               </button>
+              <button type="button" className={`mode-btn${inputMode==="url"?" on":""}`}
+                onClick={() => setInputMode("url")}>
+                🌐 Paste a URL
+              </button>
             </div>
           </div>
 
-          {/* LOOKUP MODE */}
+          {/* ── LOOKUP MODE ─────────────────────────────────────────────── */}
           {inputMode === "lookup" && (
             <div style={{ marginBottom:"24px" }}>
               <label style={labelStyle}>Book, Chapter, or Topic</label>
@@ -248,7 +278,7 @@ export default function PuzzleGenerator() {
             </div>
           )}
 
-          {/* PASTE MODE */}
+          {/* ── PASTE MODE ──────────────────────────────────────────────── */}
           {inputMode === "paste" && (
             <div style={{ marginBottom:"24px" }}>
               <label style={labelStyle}>Chapter or Passage Text *</label>
@@ -265,7 +295,26 @@ export default function PuzzleGenerator() {
             </div>
           )}
 
-          {/* Title */}
+          {/* ── URL MODE ────────────────────────────────────────────────── */}
+          {inputMode === "url" && (
+            <div style={{ marginBottom:"24px" }}>
+              <label style={labelStyle}>Article or Web Page URL</label>
+              <input
+                type="url"
+                value={urlRef}
+                onChange={e => setUrlRef(e.target.value)}
+                placeholder="https://example.com/article"
+                style={{ ...inputStyle, fontSize:"15px", padding:"12px 14px" }}
+              />
+              <div style={{ marginTop:"10px", padding:"10px 12px", background:"#e8f0d8", borderRadius:"4px", border:"1px solid #b8d898" }}>
+                <div style={{ fontFamily:"Lora,serif", fontSize:"12px", color:"#3a5a18", lineHeight:1.6 }}>
+                  StoryClue will fetch the article and extract the text automatically. <strong>Note:</strong> Some websites block outside access — if that happens, copy and paste the article text directly using the Paste option instead.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Title ───────────────────────────────────────────────────── */}
           <div style={{ marginBottom:"24px" }}>
             <label style={labelStyle}>Puzzle Title (optional — we'll generate one if blank)</label>
             <input
@@ -277,7 +326,7 @@ export default function PuzzleGenerator() {
             />
           </div>
 
-          {/* Grade Level */}
+          {/* ── Grade Level ─────────────────────────────────────────────── */}
           <div style={{ marginBottom:"24px" }}>
             <label style={labelStyle}>Grade Level for Clues</label>
             <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
@@ -298,7 +347,7 @@ export default function PuzzleGenerator() {
             </div>
           </div>
 
-          {/* Faith Tradition */}
+          {/* ── Faith Tradition ─────────────────────────────────────────── */}
           <div style={{ marginBottom:"24px" }}>
             <label style={labelStyle}>Faith Tradition (optional)</label>
             <select value={faith} onChange={e => setFaith(e.target.value)} style={{ ...inputStyle, cursor:"pointer" }}>
@@ -308,7 +357,44 @@ export default function PuzzleGenerator() {
             </select>
           </div>
 
-          {/* Series Mode */}
+          {/* ── Language ────────────────────────────────────────────────── */}
+          <div style={{ marginBottom:"24px" }}>
+            <label style={labelStyle}>Language</label>
+            <div style={{ display:"flex", gap:"8px", marginBottom: isSpanish ? "12px" : 0 }}>
+              <button type="button" className={`lang-btn${!isSpanish?" on":""}`} onClick={() => { setLanguage("english"); setBilingual(""); }}>
+                🇺🇸 English
+              </button>
+              <button type="button" className={`lang-btn${isSpanish?" on":""}`} onClick={() => setLanguage("spanish")}>
+                🇪🇸 Spanish
+              </button>
+            </div>
+
+            {isSpanish && (
+              <div style={{ marginTop:"10px" }}>
+                <div style={{ fontSize:"11px", color:"#8a7a5a", fontFamily:"Lora,serif", marginBottom:"6px" }}>
+                  Bilingual Mode (optional)
+                </div>
+                <div style={{ display:"flex", gap:"6px" }}>
+                  <button type="button" className={`bilingual-btn${bilingualMode===""?" on":""}`} onClick={() => setBilingual("")}>
+                    Spanish only
+                  </button>
+                  <button type="button" className={`bilingual-btn${bilingualMode==="en-clue-es-word"?" on":""}`} onClick={() => setBilingual("en-clue-es-word")}>
+                    English clues<br/>Spanish answers
+                  </button>
+                  <button type="button" className={`bilingual-btn${bilingualMode==="es-clue-en-word"?" on":""}`} onClick={() => setBilingual("es-clue-en-word")}>
+                    Spanish clues<br/>English answers
+                  </button>
+                </div>
+                <div style={{ marginTop:"8px", padding:"8px 10px", background:"#fff8e8", border:"1px solid #e0c860", borderRadius:"4px" }}>
+                  <div style={{ fontFamily:"Lora,serif", fontSize:"11px", color:"#7a5500", lineHeight:1.6 }}>
+                    ⚠️ AI-generated Spanish content. We recommend review by a fluent Spanish speaker for classroom use.
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Series Mode ─────────────────────────────────────────────── */}
           <div style={{ marginBottom:"28px", background:"#f4efe4", border:"1.5px solid #c8b888", borderRadius:"6px", padding:"16px" }}>
             <label style={{ display:"flex", alignItems:"center", gap:"10px", cursor:"pointer", marginBottom:0 }}>
               <input type="checkbox" checked={seriesMode} onChange={e => setSeriesMode(e.target.checked)}
@@ -318,8 +404,9 @@ export default function PuzzleGenerator() {
               </span>
             </label>
             <div style={{ fontSize:"12px", color:"#6a5a30", fontFamily:"Lora,serif", marginTop:"6px", marginLeft:"26px" }}>
-              Select which books you've read. StoryClue will never reference events from unread books.
+              Select which books you've read. StoryClue will never reference events from unread books or chapters.
             </div>
+
             {seriesMode && (
               <div style={{ marginTop:"16px" }}>
                 <div style={{ marginBottom:"10px" }}>
@@ -331,7 +418,8 @@ export default function PuzzleGenerator() {
                     ))}
                   </select>
                 </div>
-                <div style={{ marginBottom:"8px" }}>
+
+                <div style={{ marginBottom:"10px" }}>
                   <label style={{ ...labelStyle, fontSize:"12px" }}>Books I Have Read</label>
                   <div style={{ maxHeight:"200px", overflowY:"auto", background:"#fffef5", border:"1px solid #c8b888", borderRadius:"4px", padding:"8px 12px" }}>
                     {seriesBooks.map(book => (
@@ -342,18 +430,39 @@ export default function PuzzleGenerator() {
                     ))}
                   </div>
                 </div>
+
+                {/* Chapter-level protection */}
+                <div style={{ marginBottom:"4px" }}>
+                  <label style={{ ...labelStyle, fontSize:"12px" }}>
+                    I'm currently on Chapter (optional — for chapter-level spoiler protection)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="200"
+                    value={currentChapter}
+                    onChange={e => setCurrentChapter(e.target.value)}
+                    placeholder="e.g. 5"
+                    style={{ ...inputStyle, fontSize:"13px", width:"120px" }}
+                  />
+                  {currentChapter && (
+                    <div style={{ fontSize:"11px", color:"#3a5a18", fontFamily:"Lora,serif", marginTop:"4px" }}>
+                      Puzzle will only use vocabulary from Chapters 1–{currentChapter}.
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
 
-          {/* Error */}
+          {/* ── Error ───────────────────────────────────────────────────── */}
           {error && (
             <div style={{ background:"#ffe0e0", border:"1px solid #e08080", borderRadius:"4px", padding:"10px 14px", marginBottom:"16px", fontFamily:"Lora,serif", fontSize:"13px", color:"#8b1010" }}>
               {error}
             </div>
           )}
 
-          {/* Submit */}
+          {/* ── Submit ──────────────────────────────────────────────────── */}
           <button type="submit" disabled={loading} style={{
             width:"100%", padding:"14px", fontSize:"16px",
             fontFamily:"'Playfair Display',serif", fontWeight:900,
@@ -368,7 +477,9 @@ export default function PuzzleGenerator() {
 
           {loading && (
             <div style={{ textAlign:"center", marginTop:"14px", fontFamily:"Lora,serif", fontSize:"13px", color:"#5a8a2a", fontStyle:"italic" }}>
-              Claude is reading {inputMode === "lookup" ? `"${bookRef}"` : "your text"} and writing clues... about 10 seconds.
+              {inputMode === "url"
+                ? "Fetching article and writing clues... about 15 seconds."
+                : `Claude is reading ${inputMode === "lookup" ? `"${bookRef}"` : "your text"} and writing clues... about 10 seconds.`}
             </div>
           )}
         </form>
