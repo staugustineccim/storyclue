@@ -21,10 +21,23 @@ const FAITH_TRADITIONS = [
   { key:"jewish",    label:"Jewish" },
 ];
 
+const BOOK_EXAMPLES = [
+  "Book of Jonah (KJV Bible)",
+  "Charlotte's Web, Chapter 1",
+  "Genesis Chapter 1 (KJV Bible)",
+  "The Gettysburg Address",
+  "Romeo and Juliet, Act 1 Scene 1",
+  "The Lion the Witch and the Wardrobe, Chapter 1",
+  "Harry Potter and the Philosopher's Stone, Chapter 1",
+  "Jack Reacher: Killing Floor, Chapter 1",
+];
+
 export default function PuzzleGenerator() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  const [inputMode, setInputMode] = useState("lookup"); // "lookup" or "paste"
+  const [bookRef, setBookRef] = useState("");
   const [text, setText] = useState("");
   const [title, setTitle] = useState("");
   const [grade, setGrade] = useState("3");
@@ -35,7 +48,6 @@ export default function PuzzleGenerator() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Handle ?demo=cw param — load Charlotte's Web demo directly
   useEffect(() => {
     if (searchParams.get("demo") === "cw") {
       navigate(getDemoUrl("3"), { replace: true });
@@ -54,8 +66,12 @@ export default function PuzzleGenerator() {
     e.preventDefault();
     setError("");
 
-    if (!text.trim() || text.trim().length < 50) {
+    if (inputMode === "paste" && text.trim().length < 50) {
       setError("Please paste at least a paragraph of text to generate a puzzle.");
+      return;
+    }
+    if (inputMode === "lookup" && bookRef.trim().length < 3) {
+      setError("Please enter a book name or chapter reference.");
       return;
     }
 
@@ -63,8 +79,11 @@ export default function PuzzleGenerator() {
 
     try {
       const body = {
+        inputMode,
+        bookRef: bookRef.trim(),
         chapterText: text,
         grade,
+        faith,
         seriesMode,
         selectedBooks: seriesMode ? selectedBooks : [],
         seriesName: seriesMode ? SERIES_DATA[selectedSeries]?.name : "",
@@ -85,16 +104,15 @@ export default function PuzzleGenerator() {
       }
 
       if (!data.words || data.words.length < 10) {
-        setError("No vocabulary found. Try pasting more chapter content.");
+        setError("No vocabulary found. Try being more specific about the book and chapter.");
         setLoading(false);
         return;
       }
 
-      // Build layout client-side
       const layout = buildLayout(data.words);
 
       if (!layout) {
-        setError("Couldn't build a grid from this text. Try pasting more content or a different passage.");
+        setError("Couldn't build a grid from this content. Try a different chapter or paste the text directly.");
         setLoading(false);
         return;
       }
@@ -107,8 +125,7 @@ export default function PuzzleGenerator() {
         words: layout.words,
       };
 
-      const encoded = encodePuzzle(puzzleData);
-      navigate("/play?p=" + encoded);
+      navigate("/play?p=" + encodePuzzle(puzzleData));
     } catch (err) {
       console.error(err);
       setError("Could not generate puzzle. Please try again.");
@@ -139,8 +156,14 @@ export default function PuzzleGenerator() {
         .grade-btn{padding:7px 14px;border:1.5px solid #c8b888;border-radius:4px;font-size:12px;font-family:'Playfair Display',serif;font-weight:700;cursor:pointer;background:transparent;color:#4a3a18;transition:all .15s}
         .grade-btn:hover{background:#e8e0cc}
         .grade-btn.on{background:#3a6a1a;color:#f0ead8;border-color:#3a6a1a}
+        .mode-btn{flex:1;padding:12px;border:1.5px solid #c8b888;border-radius:4px;font-family:'Playfair Display',serif;font-weight:700;font-size:13px;cursor:pointer;transition:all .15s;text-align:center}
+        .mode-btn.on{background:#3a6a1a;color:#f0ead8;border-color:#3a6a1a}
+        .mode-btn:not(.on){background:#fffef5;color:#4a3a18}
+        .mode-btn:not(.on):hover{background:#e8e0cc}
         .book-check{display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;font-family:Lora,serif;font-size:13px;color:#2c1a08}
         .book-check input{accent-color:#3a6a1a;width:15px;height:15px;cursor:pointer}
+        .example-chip{display:inline-block;padding:5px 10px;margin:3px;border:1px solid #c8b888;border-radius:20px;font-family:Lora,serif;font-size:12px;color:#4a3a18;cursor:pointer;background:#fffef5;transition:all .15s}
+        .example-chip:hover{background:#e8f0d8;border-color:#5a8a2a;color:#2d4a18}
       `}</style>
 
       {/* Header */}
@@ -148,44 +171,89 @@ export default function PuzzleGenerator() {
         <button onClick={() => navigate("/")} style={{ background:"none", border:"none", cursor:"pointer", fontSize:"28px", padding:0 }}>🕷️</button>
         <div>
           <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"20px", color:"#f0ead8", lineHeight:1.1 }}>StoryClue</div>
-          <div style={{ fontSize:"11px", color:"#a8d890", fontStyle:"italic" }}>Create a Crossword Puzzle</div>
+          <div style={{ fontSize:"11px", color:"#a8d890", fontStyle:"italic" }}>AI Generated Crossword Puzzle Maker</div>
         </div>
       </div>
 
-      {/* Form */}
       <div style={{ maxWidth:"700px", margin:"0 auto", padding:"32px 20px" }}>
         <h1 style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"28px", color:"#2d4a18", marginBottom:"8px" }}>
           Create Your Crossword
         </h1>
-        <p style={{ fontFamily:"Lora,serif", fontSize:"15px", color:"#6a5a30", marginBottom:"32px", fontStyle:"italic" }}>
-          Paste any chapter, passage, or topic description below. StoryClue extracts the vocabulary and builds your puzzle in seconds.
+        <p style={{ fontFamily:"Lora,serif", fontSize:"15px", color:"#6a5a30", marginBottom:"28px", fontStyle:"italic" }}>
+          Name any book and chapter — or paste your own text. StoryClue builds the puzzle in seconds.
         </p>
 
         <form onSubmit={handleGenerate}>
-          {/* Chapter Text */}
+
+          {/* Mode Toggle */}
           <div style={{ marginBottom:"24px" }}>
-            <label style={labelStyle}>Chapter or Passage Text *</label>
-            <textarea
-              value={text}
-              onChange={e => setText(e.target.value)}
-              placeholder="Paste a chapter, passage, or topic description here. The more text you paste, the better the puzzle. Minimum one paragraph."
-              rows={10}
-              style={{ ...inputStyle, resize:"vertical", lineHeight:1.6 }}
-              required
-            />
-            <div style={{ fontSize:"11px", color:"#8a7a5a", marginTop:"4px", fontFamily:"Lora,serif" }}>
-              {text.length > 0 ? `${text.length.toLocaleString()} characters` : "Paste at least 200 characters for best results"}
+            <label style={labelStyle}>How would you like to create your puzzle?</label>
+            <div style={{ display:"flex", gap:"8px" }}>
+              <button type="button" className={`mode-btn${inputMode==="lookup"?" on":""}`}
+                onClick={() => setInputMode("lookup")}>
+                📚 Name a Book or Chapter
+              </button>
+              <button type="button" className={`mode-btn${inputMode==="paste"?" on":""}`}
+                onClick={() => setInputMode("paste")}>
+                📋 Paste Your Own Text
+              </button>
             </div>
           </div>
 
+          {/* LOOKUP MODE */}
+          {inputMode === "lookup" && (
+            <div style={{ marginBottom:"24px" }}>
+              <label style={labelStyle}>Book, Chapter, or Topic</label>
+              <input
+                type="text"
+                value={bookRef}
+                onChange={e => setBookRef(e.target.value)}
+                placeholder="e.g. Book of Jonah, Charlotte's Web Chapter 1, Genesis Chapter 1"
+                style={{ ...inputStyle, fontSize:"15px", padding:"12px 14px" }}
+              />
+              <div style={{ marginTop:"10px" }}>
+                <div style={{ fontSize:"11px", color:"#8a7a5a", fontFamily:"Lora,serif", marginBottom:"6px" }}>
+                  Try one of these:
+                </div>
+                <div>
+                  {BOOK_EXAMPLES.map(ex => (
+                    <span key={ex} className="example-chip" onClick={() => setBookRef(ex)}>{ex}</span>
+                  ))}
+                </div>
+              </div>
+              <div style={{ marginTop:"10px", padding:"10px 12px", background:"#e8f0d8", borderRadius:"4px", border:"1px solid #b8d898" }}>
+                <div style={{ fontFamily:"Lora,serif", fontSize:"12px", color:"#3a5a18", lineHeight:1.6 }}>
+                  <strong>Works best with:</strong> Bible chapters (KJV), classic literature, Shakespeare, history topics, children's books, and any well-known story. For modern copyrighted books, Claude uses its knowledge of the story to create vocabulary-rich clues.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* PASTE MODE */}
+          {inputMode === "paste" && (
+            <div style={{ marginBottom:"24px" }}>
+              <label style={labelStyle}>Chapter or Passage Text *</label>
+              <textarea
+                value={text}
+                onChange={e => setText(e.target.value)}
+                placeholder="Paste a chapter, passage, or topic description here. The more text you paste, the better the puzzle."
+                rows={10}
+                style={{ ...inputStyle, resize:"vertical", lineHeight:1.6 }}
+              />
+              <div style={{ fontSize:"11px", color:"#8a7a5a", marginTop:"4px", fontFamily:"Lora,serif" }}>
+                {text.length > 0 ? `${text.length.toLocaleString()} characters` : "Paste at least 200 characters for best results"}
+              </div>
+            </div>
+          )}
+
           {/* Title */}
           <div style={{ marginBottom:"24px" }}>
-            <label style={labelStyle}>Puzzle Title (optional)</label>
+            <label style={labelStyle}>Puzzle Title (optional — we'll generate one if blank)</label>
             <input
               type="text"
               value={title}
               onChange={e => setTitle(e.target.value)}
-              placeholder="e.g. Charlotte's Web — Chapter 1"
+              placeholder="e.g. Book of Jonah — Vocabulary Crossword"
               style={inputStyle}
             />
           </div>
@@ -197,8 +265,7 @@ export default function PuzzleGenerator() {
               {GRADES.map(g => (
                 <button type="button" key={g.key}
                   className={`grade-btn${grade===g.key?" on":""}`}
-                  onClick={() => setGrade(g.key)}
-                >
+                  onClick={() => setGrade(g.key)}>
                   {g.label}
                 </button>
               ))}
@@ -208,31 +275,18 @@ export default function PuzzleGenerator() {
           {/* Faith Tradition */}
           <div style={{ marginBottom:"24px" }}>
             <label style={labelStyle}>Faith Tradition (optional)</label>
-            <select
-              value={faith}
-              onChange={e => setFaith(e.target.value)}
-              style={{ ...inputStyle, cursor:"pointer" }}
-            >
+            <select value={faith} onChange={e => setFaith(e.target.value)} style={{ ...inputStyle, cursor:"pointer" }}>
               {FAITH_TRADITIONS.map(f => (
                 <option key={f.key} value={f.key}>{f.label}</option>
               ))}
             </select>
-            {faith !== "none" && (
-              <div style={{ fontSize:"12px", color:"#5a8a2a", marginTop:"6px", fontFamily:"Lora,serif", fontStyle:"italic" }}>
-                Clues will be written with respect for {FAITH_TRADITIONS.find(f => f.key===faith)?.label} tradition.
-              </div>
-            )}
           </div>
 
           {/* Series Mode */}
           <div style={{ marginBottom:"28px", background:"#f4efe4", border:"1.5px solid #c8b888", borderRadius:"6px", padding:"16px" }}>
             <label style={{ display:"flex", alignItems:"center", gap:"10px", cursor:"pointer", marginBottom:0 }}>
-              <input
-                type="checkbox"
-                checked={seriesMode}
-                onChange={e => setSeriesMode(e.target.checked)}
-                style={{ accentColor:"#3a6a1a", width:"16px", height:"16px", cursor:"pointer" }}
-              />
+              <input type="checkbox" checked={seriesMode} onChange={e => setSeriesMode(e.target.checked)}
+                style={{ accentColor:"#3a6a1a", width:"16px", height:"16px", cursor:"pointer" }} />
               <span style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"14px", color:"#4a3a18" }}>
                 Series Mode — Spoiler Protection
               </span>
@@ -240,16 +294,12 @@ export default function PuzzleGenerator() {
             <div style={{ fontSize:"12px", color:"#6a5a30", fontFamily:"Lora,serif", marginTop:"6px", marginLeft:"26px" }}>
               Select which books you've read. StoryClue will never reference events from unread books.
             </div>
-
             {seriesMode && (
               <div style={{ marginTop:"16px" }}>
                 <div style={{ marginBottom:"10px" }}>
                   <label style={{ ...labelStyle, fontSize:"12px" }}>Select Series</label>
-                  <select
-                    value={selectedSeries}
-                    onChange={e => { setSelectedSeries(e.target.value); setSelectedBooks([]); }}
-                    style={{ ...inputStyle, fontSize:"13px" }}
-                  >
+                  <select value={selectedSeries} onChange={e => { setSelectedSeries(e.target.value); setSelectedBooks([]); }}
+                    style={{ ...inputStyle, fontSize:"13px" }}>
                     {Object.entries(SERIES_DATA).map(([key, s]) => (
                       <option key={key} value={key}>{s.name}</option>
                     ))}
@@ -265,9 +315,6 @@ export default function PuzzleGenerator() {
                       </label>
                     ))}
                   </div>
-                  <div style={{ fontSize:"11px", color:"#8a7a5a", marginTop:"4px", fontFamily:"Lora,serif" }}>
-                    {selectedBooks.length} book{selectedBooks.length!==1?"s":""} selected
-                  </div>
                 </div>
               </div>
             )}
@@ -281,26 +328,21 @@ export default function PuzzleGenerator() {
           )}
 
           {/* Submit */}
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width:"100%", padding:"14px", fontSize:"16px",
-              fontFamily:"'Playfair Display',serif", fontWeight:900,
-              background: loading ? "#8a9a78" : "#3a6a1a",
-              color:"#f0ead8", border:"none", borderRadius:"6px",
-              cursor: loading ? "not-allowed" : "pointer",
-              boxShadow: loading ? "none" : "3px 3px 0 #1a3a08",
-              transition:"all .2s",
-              letterSpacing:"1px",
-            }}
-          >
+          <button type="submit" disabled={loading} style={{
+            width:"100%", padding:"14px", fontSize:"16px",
+            fontFamily:"'Playfair Display',serif", fontWeight:900,
+            background: loading ? "#8a9a78" : "#3a6a1a",
+            color:"#f0ead8", border:"none", borderRadius:"6px",
+            cursor: loading ? "not-allowed" : "pointer",
+            boxShadow: loading ? "none" : "3px 3px 0 #1a3a08",
+            transition:"all .2s", letterSpacing:"1px",
+          }}>
             {loading ? "✨ Generating Puzzle..." : "✨ Generate Puzzle"}
           </button>
 
           {loading && (
             <div style={{ textAlign:"center", marginTop:"14px", fontFamily:"Lora,serif", fontSize:"13px", color:"#5a8a2a", fontStyle:"italic" }}>
-              Claude is reading your chapter and writing clues... this takes about 10 seconds.
+              Claude is reading {inputMode === "lookup" ? `"${bookRef}"` : "your text"} and writing clues... about 10 seconds.
             </div>
           )}
         </form>
@@ -313,10 +355,8 @@ export default function PuzzleGenerator() {
           <div style={{ fontFamily:"Lora,serif", fontSize:"13px", color:"#4a6a28", marginBottom:"12px" }}>
             Try the Charlotte's Web Chapter 1 demo — no text needed.
           </div>
-          <button
-            onClick={() => navigate(getDemoUrl("3"))}
-            style={{ background:"transparent", border:"2px solid #3a6a1a", color:"#3a6a1a", padding:"8px 20px", borderRadius:"4px", fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"13px", cursor:"pointer" }}
-          >
+          <button onClick={() => navigate(getDemoUrl("3"))}
+            style={{ background:"transparent", border:"2px solid #3a6a1a", color:"#3a6a1a", padding:"8px 20px", borderRadius:"4px", fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"13px", cursor:"pointer" }}>
             View Demo Puzzle
           </button>
         </div>
