@@ -64,21 +64,22 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
   const [shareMsg,     setShareMsg]     = useState("");
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackShown,setFeedbackShown]= useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // ── Hint state ────────────────────────────────────────────────────────────
-  const [hintsLeft,       setHintsLeft]       = useState(MAX_HINTS);
-  const [showHintMenu,    setShowHintMenu]     = useState(false);
-  const [simplerClues,    setSimplerClues]     = useState({}); // key → simpler clue text
-  const [hintLoading,     setHintLoading]      = useState(false);
-  const [hintMsg,         setHintMsg]          = useState("");
+  const [hintsLeft,    setHintsLeft]    = useState(MAX_HINTS);
+  const [showHintMenu, setShowHintMenu] = useState(false);
+  const [simplerClues, setSimplerClues] = useState({});
+  const [hintLoading,  setHintLoading]  = useState(false);
+  const [hintMsg,      setHintMsg]      = useState("");
 
   // ── Reveal-confirm state ──────────────────────────────────────────────────
   const [showRevealConfirm, setShowRevealConfirm] = useState(false);
 
-  const refs         = useRef({});
-  const timerRef     = useRef(null);
+  const refs          = useRef({});
+  const timerRef      = useRef(null);
   const activeClueRef = useRef(null);
-  const hintMenuRef  = useRef(null);
+  const hintMenuRef   = useRef(null);
 
   // ── Effects ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -88,8 +89,20 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
     return () => clearInterval(timerRef.current);
   }, [timerActive, won]);
 
+  // Item 1: fullscreen state tracking
   useEffect(() => {
-    activeClueRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    function onFsChange() { setIsFullscreen(!!document.fullscreenElement); }
+    document.addEventListener("fullscreenchange", onFsChange);
+    document.addEventListener("webkitfullscreenchange", onFsChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFsChange);
+      document.removeEventListener("webkitfullscreenchange", onFsChange);
+    };
+  }, []);
+
+  // Item 8: reliable scroll — "auto" + "center"
+  useEffect(() => {
+    activeClueRef.current?.scrollIntoView({ behavior: "auto", block: "center" });
   }, [activeWord]);
 
   useEffect(() => {
@@ -114,6 +127,33 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
   function wordKey(w) { return `${w.orientation}-${w.number}`; }
 
   function getClue(w) { return simplerClues[wordKey(w)] || w.clue; }
+
+  // Item 9: word-state helpers for strikethrough
+  function isWordFilled(w) {
+    for (let i = 0; i < w.answer.length; i++) {
+      const r = w.orientation === "down" ? w.starty + i : w.starty;
+      const c = w.orientation === "across" ? w.startx + i : w.startx;
+      if (!cells[r][c]) return false;
+    }
+    return true;
+  }
+
+  function isWordCorrect(w) {
+    for (let i = 0; i < w.answer.length; i++) {
+      const r = w.orientation === "down" ? w.starty + i : w.starty;
+      const c = w.orientation === "across" ? w.startx + i : w.startx;
+      if (cells[r][c] !== SOLUTION[r][c]) return false;
+    }
+    return true;
+  }
+
+  // Returns extra CSS class(es) for a clue row
+  function clueStatusClass(w) {
+    if (isWordCorrect(w))                        return " chk-ok";   // green strikethrough
+    if (checked && isWordFilled(w))              return " chk-err";  // red, no strikethrough
+    if (isWordFilled(w))                         return " filled";   // gray strikethrough
+    return "";
+  }
 
   function wordAt(r, c, prefDir) {
     const hits = words.filter(w =>
@@ -221,6 +261,14 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
     }).catch(() => { setShareMsg("Copy URL from browser"); setTimeout(() => setShareMsg(""), 3000); });
   }
 
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen?.();
+    } else {
+      document.exitFullscreen?.();
+    }
+  }
+
   // ── Hint: reveal one letter ───────────────────────────────────────────────
   function hintRevealLetter() {
     if (hintsLeft <= 0) { setHintMsg("No hints left!"); setShowHintMenu(false); return; }
@@ -293,31 +341,39 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
     return parts.join(" ");
   }
 
-  const totalCells = SOLUTION.flat().filter(Boolean).length;
-  const correct = cells.flat().filter((v, i) => {
+  const totalCells  = SOLUTION.flat().filter(Boolean).length;
+  const correct     = cells.flat().filter((v, i) => {
     const r = Math.floor(i / cols), c = i % cols;
     return SOLUTION[r][c] && v === SOLUTION[r][c];
   }).length;
-  const pct = totalCells ? Math.round(correct / totalCells * 100) : 0;
-
-  const clueList  = clueTab === "across" ? ACROSS : DOWN;
-  const gradeLabel = GRADE_LABELS[grade] ? `${GRADE_LABELS[grade]} Grade` : "";
-  const isSpanish = language === "spanish" || language?.startsWith("bilingual");
+  const pct         = totalCells ? Math.round(correct / totalCells * 100) : 0;
+  const clueList    = clueTab === "across" ? ACROSS : DOWN;
+  const gradeLabel  = GRADE_LABELS[grade] ? `${GRADE_LABELS[grade]} Grade` : "";
+  const isSpanish   = language === "spanish" || language?.startsWith("bilingual");
 
   // Print cell size — fits full grid within letter-page margins
   const PRINT_CS = Math.min(22, Math.floor(540 / cols));
 
   return (
-    <div style={{ display:"flex", flexDirection:"column", height:"100vh", overflow:"hidden", background:"#faf7f0", fontFamily:"Georgia,serif" }}>
+    <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Lora:ital,wght@0,400;0,600;1,400&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
+
+        /* Item 2 & 4: position:fixed layout — keyboard on iPad/mobile doesn't push content */
         html,body,#root{height:100%;overflow:hidden}
-        :root{--cs:42px;--fs:17px;--ns:9px}
-        @media(max-width:480px){:root{--cs:30px;--fs:13px;--ns:7px}}
+        .puzzle-root{position:fixed;inset:0;display:flex;flex-direction:column;background:#faf7f0;font-family:Georgia,serif;}
+
+        /* Item 6: cell numbers 11px, no mobile reduction */
+        :root{--cs:42px;--fs:17px;--ns:11px}
+        @media(max-width:480px){:root{--cs:30px;--fs:13px}}
+
         .ci{width:var(--cs);height:var(--cs);border:1.5px solid #8a7a5a;background:#fffef5;text-align:center;font-size:var(--fs);font-weight:700;font-family:Lora,Georgia,serif;color:#1a1008;text-transform:uppercase;cursor:pointer;outline:none;caret-color:transparent;padding:0;transition:background .1s;}
-        .ci.hi{background:#e8f0d8}
-        .ci.sel{background:#5a8a2a!important;color:#fff}
+
+        /* Item 5 & 7: NYT-style colors */
+        .ci.hi{background:#C8E6C0}
+        .ci.sel{background:#2D5A1A!important;color:#fff}
+
         .ci.ok{background:#bff0b0!important;color:#1a6010}
         .ci.err{background:#ffb0b0!important;color:#8b1010}
         .ci.rev{background:#fff3b0!important;color:#7a5500}
@@ -325,10 +381,16 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
         .blk{width:var(--cs);height:var(--cs);background:#2a1a08;display:block}
         .cwrap{position:relative;display:inline-block;width:var(--cs);height:var(--cs)}
         .cnum{position:absolute;top:2px;left:2px;font-size:var(--ns);color:#5a4010;font-weight:700;font-family:Lora,Georgia,serif;pointer-events:none;z-index:2;line-height:1;}
+
+        /* Item 9: clue strikethrough states */
         .clue{padding:8px 10px;border-radius:5px;font-size:14px;line-height:1.55;cursor:pointer;transition:background .1s;font-family:Lora,Georgia,serif;color:#2c1a08;border-left:3px solid transparent;}
         .clue:hover{background:#ede0c0}
-        .clue.act{background:#e8f0d8;font-weight:600;border-left-color:#5a8a2a}
+        .clue.act{background:#e8f0d8;font-weight:600;border-left-color:#2D5A1A}
         .clue.simpler{border-left-color:#8a7a30;font-style:italic;}
+        .clue.filled{color:#999;text-decoration:line-through}
+        .clue.chk-ok{color:#2a6a10;text-decoration:line-through;opacity:.75}
+        .clue.chk-err{color:#c03010;text-decoration:none}
+
         .cn{font-weight:700;color:#6a4a10;margin-right:5px;font-size:13px}
         .btn{font-family:'Playfair Display',Georgia,serif;font-weight:700;border:none;border-radius:4px;cursor:pointer;transition:all .15s;font-size:13px;}
         .bg{background:#3a6a1a;color:#f0ead8;padding:9px 18px;box-shadow:2px 2px 0 #1a3a08}
@@ -360,6 +422,7 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
         .print-only{display:none}
         @media print{
           html,body,#root{height:auto!important;overflow:visible!important}
+          .puzzle-root{position:static!important}
           .no-print{display:none!important}
           .print-only{display:block!important}
           .screen-only{display:none!important}
@@ -422,8 +485,8 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
         </div>
       </div>
 
-      {/* ══ SCREEN UI ════════════════════════════════════════════════════ */}
-      <div className="screen-only" style={{ display:"flex", flexDirection:"column", height:"100%", overflow:"hidden" }}>
+      {/* ══ SCREEN UI — Items 1,2,3,4 fixed layout ══════════════════════ */}
+      <div className="puzzle-root screen-only">
 
         {/* TOP BAR */}
         <div className="no-print" style={{ background:"linear-gradient(135deg,#2d4a18,#4a7a22)", padding:"10px 16px", borderBottom:"3px solid #8a7a30", display:"flex", alignItems:"center", gap:"12px", flexShrink:0 }}>
@@ -439,11 +502,12 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
               <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"18px", letterSpacing:"2px" }}>{formatTime(seconds)}</div>
               <div style={{ fontSize:"10px", color:"#a8d890" }}>{mistakes} mistake{mistakes!==1?"s":""}</div>
             </div>
+            {/* Item 1: fullscreen button reflects live state */}
             <button
-              onClick={() => { if(!document.fullscreenElement){document.documentElement.requestFullscreen?.()}else{document.exitFullscreen?.()} }}
+              onClick={toggleFullscreen}
               style={{ background:"rgba(255,255,255,.15)", border:"1.5px solid rgba(255,255,255,.4)", borderRadius:"6px", color:"#f0ead8", padding:"7px 11px", cursor:"pointer", fontSize:"18px", lineHeight:1, flexShrink:0 }}
-              title="Toggle fullscreen"
-            >⛶</button>
+              title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+            >{isFullscreen ? "⛶" : "⛶"}</button>
           </div>
         </div>
 
@@ -481,20 +545,37 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
             )}
           </div>
 
-          {/* Show Answer (was Reveal) */}
           <button className="btn bo" onClick={() => setShowRevealConfirm(true)} style={{ padding:"4px 12px", fontSize:"12px" }}>Show Answer</button>
-
           <button className="btn bo" onClick={reset} style={{ padding:"4px 12px", fontSize:"12px" }}>Restart</button>
           <button className="btn bo" onClick={() => navigate("/create")} style={{ padding:"4px 12px", fontSize:"12px" }}>New Puzzle</button>
           <button className="btn bo" onClick={() => window.print()} style={{ padding:"4px 10px", fontSize:"12px" }}>🖨️ Print</button>
           <button className="btn bo" onClick={share} style={{ padding:"4px 10px", fontSize:"12px" }}>🔗 Share</button>
-          {shareMsg  && <span style={{ fontSize:"11px", color:"#3a6a1a", fontFamily:"Lora,serif", fontStyle:"italic" }}>{shareMsg}</span>}
-          {hintMsg   && <span style={{ fontSize:"11px", color:"#8a7a30", fontFamily:"Lora,serif", fontStyle:"italic" }}>{hintMsg}</span>}
+          {shareMsg   && <span style={{ fontSize:"11px", color:"#3a6a1a", fontFamily:"Lora,serif", fontStyle:"italic" }}>{shareMsg}</span>}
+          {hintMsg    && <span style={{ fontSize:"11px", color:"#8a7a30", fontFamily:"Lora,serif", fontStyle:"italic" }}>{hintMsg}</span>}
           {hintLoading && <span style={{ fontSize:"11px", color:"#8a7a30", fontFamily:"Lora,serif", fontStyle:"italic" }}>Getting simpler clue…</span>}
           {checked && !won && !revealed && <span style={{ fontSize:"11px", color:"#7a5a00", fontFamily:"Lora,serif", fontStyle:"italic" }}>🟢 correct · 🔴 wrong · 🟡 empty</span>}
         </div>
 
-        {/* Spanish disclaimer banner */}
+        {/* Item 3: ACTIVE CLUE BAR — always visible above the puzzle */}
+        <div className="no-print" style={{ background:"#2D5A1A", borderBottom:"3px solid #1a3a0a", padding:"8px 14px", flexShrink:0, minHeight:"40px", display:"flex", alignItems:"center", gap:"10px" }}>
+          {activeWord ? (
+            <>
+              <span style={{ fontWeight:700, color:"#a8e878", fontFamily:"'Playfair Display',serif", fontSize:"13px", whiteSpace:"nowrap", flexShrink:0 }}>
+                {activeWord.number} {activeWord.orientation.toUpperCase()}
+              </span>
+              <span style={{ fontFamily:"Lora,serif", fontSize:"14px", color:"#f0ead8", lineHeight:1.35, fontWeight:600 }}>
+                {getClue(activeWord)}
+                {simplerClues[wordKey(activeWord)] && <span style={{ fontSize:"11px", color:"#a8e878", marginLeft:"6px", fontWeight:400 }}>✏️ simplified</span>}
+              </span>
+            </>
+          ) : (
+            <span style={{ fontFamily:"Lora,serif", fontSize:"13px", color:"#a8c890", fontStyle:"italic" }}>
+              ← Click any cell or clue to start
+            </span>
+          )}
+        </div>
+
+        {/* Spanish disclaimer */}
         {isSpanish && (
           <div className="no-print" style={{ background:"#fff8e8", borderBottom:"1px solid #e0c860", padding:"5px 14px", flexShrink:0 }}>
             <span style={{ fontFamily:"Lora,serif", fontSize:"11px", color:"#7a5500" }}>
@@ -504,7 +585,7 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
         )}
 
         {/* PROGRESS BAR */}
-        <div className="no-print" style={{ padding:"6px 14px", background:"#f0ead8", borderBottom:"1px solid #c8b888", flexShrink:0 }}>
+        <div className="no-print" style={{ padding:"5px 14px", background:"#f0ead8", borderBottom:"1px solid #c8b888", flexShrink:0 }}>
           <div style={{ display:"flex", justifyContent:"space-between", fontSize:"11px", color:"#6a5a30", fontFamily:"Lora,serif", marginBottom:"3px" }}>
             <span>Progress</span><span>{pct}%</span>
           </div>
@@ -513,94 +594,90 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
 
         {/* WIN BANNER */}
         {won && (
-          <div className="win no-print" style={{ background:"linear-gradient(135deg,#2d5a1a,#4a8a2a)", color:"#f0ead8", padding:"12px 20px", textAlign:"center", flexShrink:0 }}>
-            <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"20px" }}>🌟 Solved! Time: {formatTime(seconds)} · Mistakes: {mistakes} 🌟</div>
-            <div style={{ fontSize:"12px", fontFamily:"Lora,serif", fontStyle:"italic", marginTop:"3px" }}>Well done, good and faithful solver!</div>
+          <div className="win no-print" style={{ background:"linear-gradient(135deg,#2d5a1a,#4a8a2a)", color:"#f0ead8", padding:"10px 20px", textAlign:"center", flexShrink:0 }}>
+            <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"18px" }}>🌟 Solved! Time: {formatTime(seconds)} · Mistakes: {mistakes} 🌟</div>
+            <div style={{ fontSize:"12px", fontFamily:"Lora,serif", fontStyle:"italic", marginTop:"2px" }}>Well done, good and faithful solver!</div>
           </div>
         )}
 
-        {/* GRID */}
-        <div className="grid-scroll" style={{ flex:"1 1 60%", minHeight:0, overflowX:"auto", overflowY:"auto", WebkitOverflowScrolling:"touch", padding:"10px", background:"#faf7f0" }}>
-          <div style={{ display:"inline-block", background:"rgba(255,254,245,.98)", border:"2px solid #8a7a5a", borderRadius:"6px", padding:"12px", boxShadow:"3px 4px 0 #c8b870" }}>
-            <table style={{ borderCollapse:"collapse" }}>
-              <tbody>
-                {Array.from({ length:rows }, (_,r) => (
-                  <tr key={r}>
-                    {Array.from({ length:cols }, (_,c) => {
-                      const letter = SOLUTION[r][c];
-                      if (!letter) return <td key={c} style={{ padding:0 }}><div className="blk"/></td>;
-                      const num = NUMBERING[`${r},${c}`];
-                      const val = revealed ? letter : (cells[r][c] || "");
-                      return (
-                        <td key={c} style={{ padding:0 }}>
-                          <div className="cwrap">
-                            {num && <span className="cnum">{num}</span>}
-                            <input
-                              ref={el => { refs.current[`${r},${c}`] = el; }}
-                              type="text" maxLength={1}
-                              className={cellClass(r,c)}
-                              value={val}
-                              readOnly={revealed}
-                              onChange={() => {}}
-                              onClick={() => clickCell(r,c)}
-                              onKeyDown={e => keyDown(r,c,e)}
-                            />
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        {/* Item 2: THREE-PANE MAIN AREA — grid (flex:55) + clues (flex:45) */}
+        <div style={{ flex:1, display:"flex", flexDirection:"row", minHeight:0, overflow:"hidden" }}>
 
-        {/* DIVIDER */}
-        <div className="no-print" style={{ height:"4px", background:"linear-gradient(90deg,#3a6a1a,#8a7a5a,#3a6a1a)", flexShrink:0 }}/>
-
-        {/* CLUE PANEL */}
-        <div className="no-print" style={{ flex:"0 0 35%", display:"flex", flexDirection:"column", background:"#fff", minHeight:0 }}>
-          {activeWord && (
-            <div style={{ background:"#e8f0d8", borderBottom:"1px solid #c8d8a8", padding:"8px 14px", flexShrink:0 }}>
-              <span style={{ fontWeight:700, color:"#6a4a10", fontFamily:"'Playfair Display',serif", fontSize:"13px", marginRight:"6px" }}>
-                {activeWord.number} {activeWord.orientation.toUpperCase()}
-              </span>
-              <span style={{ fontFamily:"Lora,serif", fontSize:"13px", color:"#2c1a08" }}>
-                {getClue(activeWord)}
-                {simplerClues[wordKey(activeWord)] && <span style={{ fontSize:"11px", color:"#8a7a30", marginLeft:"6px" }}>✏️ simplified</span>}
-              </span>
+          {/* GRID PANE */}
+          <div style={{ flex:"55", minWidth:0, overflowX:"auto", overflowY:"auto", WebkitOverflowScrolling:"touch", padding:"10px", background:"#faf7f0" }}>
+            <div style={{ display:"inline-block", background:"rgba(255,254,245,.98)", border:"2px solid #8a7a5a", borderRadius:"6px", padding:"12px", boxShadow:"3px 4px 0 #c8b870" }}>
+              <table style={{ borderCollapse:"collapse" }}>
+                <tbody>
+                  {Array.from({ length:rows }, (_,r) => (
+                    <tr key={r}>
+                      {Array.from({ length:cols }, (_,c) => {
+                        const letter = SOLUTION[r][c];
+                        if (!letter) return <td key={c} style={{ padding:0 }}><div className="blk"/></td>;
+                        const num = NUMBERING[`${r},${c}`];
+                        const val = revealed ? letter : (cells[r][c] || "");
+                        return (
+                          <td key={c} style={{ padding:0 }}>
+                            <div className="cwrap">
+                              {num && <span className="cnum">{num}</span>}
+                              <input
+                                ref={el => { refs.current[`${r},${c}`] = el; }}
+                                type="text" maxLength={1}
+                                className={cellClass(r,c)}
+                                value={val}
+                                readOnly={revealed}
+                                onChange={() => {}}
+                                onClick={() => clickCell(r,c)}
+                                onKeyDown={e => keyDown(r,c,e)}
+                              />
+                            </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )}
-          <div style={{ display:"flex", borderBottom:"2px solid #e0d8c8", flexShrink:0 }}>
-            <button className={`ctab${clueTab==="across"?" on":""}`} onClick={() => setClueTab("across")}>Across ({ACROSS.length})</button>
-            <button className={`ctab${clueTab==="down"?" on":""}`} onClick={() => setClueTab("down")}>Down ({DOWN.length})</button>
           </div>
-          <div style={{ overflowY:"auto", WebkitOverflowScrolling:"touch", flex:1, padding:"4px 8px" }}>
-            {clueList.map(w => {
-              const isActive  = activeWord?.number === w.number && activeWord?.orientation === clueTab;
-              const isSimpler = !!simplerClues[wordKey(w)];
-              return (
-                <div
-                  key={`${clueTab}${w.number}`}
-                  ref={isActive ? activeClueRef : null}
-                  className={`clue${isActive ? " act" : ""}${isSimpler ? " simpler" : ""}`}
-                  onClick={() => {
-                    setActiveWord(w);
-                    setClueTab(w.orientation);
-                    focusFirstEmpty(w);
-                  }}
-                >
-                  <span className="cn">{w.number}.</span>
-                  {getClue(w)}
-                  {isSimpler && <span style={{ fontSize:"10px", color:"#8a7a30", marginLeft:"5px" }}>✏️</span>}
-                </div>
-              );
-            })}
-          </div>
-        </div>
 
-      </div>{/* end screen-only */}
+          {/* VERTICAL DIVIDER */}
+          <div className="no-print" style={{ width:"4px", background:"linear-gradient(180deg,#3a6a1a,#8a7a5a,#3a6a1a)", flexShrink:0 }}/>
+
+          {/* CLUE PANE */}
+          <div className="no-print" style={{ flex:"45", display:"flex", flexDirection:"column", background:"#fff", minWidth:0, minHeight:0 }}>
+            {/* Item 10: clue tabs — active clue is now in the bar above, not here */}
+            <div style={{ display:"flex", borderBottom:"2px solid #e0d8c8", flexShrink:0 }}>
+              <button className={`ctab${clueTab==="across"?" on":""}`} onClick={() => setClueTab("across")}>Across ({ACROSS.length})</button>
+              <button className={`ctab${clueTab==="down"?" on":""}`} onClick={() => setClueTab("down")}>Down ({DOWN.length})</button>
+            </div>
+            {/* Item 8 + 9 + 10: scrollable clue list */}
+            <div style={{ overflowY:"auto", WebkitOverflowScrolling:"touch", flex:1, minHeight:0, padding:"4px 8px" }}>
+              {clueList.map(w => {
+                const isActive  = activeWord?.number === w.number && activeWord?.orientation === clueTab;
+                const isSimpler = !!simplerClues[wordKey(w)];
+                const statusCls = clueStatusClass(w);
+                return (
+                  <div
+                    key={`${clueTab}${w.number}`}
+                    ref={isActive ? activeClueRef : null}
+                    className={`clue${isActive ? " act" : ""}${isSimpler ? " simpler" : ""}${statusCls}`}
+                    onClick={() => {
+                      setActiveWord(w);
+                      setClueTab(w.orientation);
+                      focusFirstEmpty(w);
+                    }}
+                  >
+                    <span className="cn">{w.number}.</span>
+                    {getClue(w)}
+                    {isSimpler && <span style={{ fontSize:"10px", color:"#8a7a30", marginLeft:"5px" }}>✏️</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+        </div>{/* end three-pane */}
+      </div>{/* end puzzle-root */}
 
       {/* ══ REVEAL CONFIRMATION ══════════════════════════════════════════ */}
       {showRevealConfirm && (
@@ -640,6 +717,6 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
           onClose={() => setShowFeedback(false)}
         />
       )}
-    </div>
+    </>
   );
 }
