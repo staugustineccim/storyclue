@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { encodePuzzle } from "../utils/urlEncoder";
 import { buildLayout } from "../utils/layoutBuilder";
 import { buildDemoData, getDemoUrl, SERIES_DATA } from "../utils/demoData";
+import { savePrefs, loadPrefs } from "../utils/prefs";
 
 const GRADE_GROUPS = [
   { label: "Early Learners", grades: [
@@ -55,21 +56,29 @@ export default function PuzzleGenerator() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const [inputMode, setInputMode]       = useState("lookup"); // "lookup" | "paste" | "url"
+  // ── Load saved prefs as initial state ──────────────────────────────────
+  const saved = loadPrefs() || {};
+
+  const [inputMode, setInputMode]       = useState(saved.inputMode   || "lookup");
   const [bookRef, setBookRef]           = useState("");
   const [text, setText]                 = useState("");
   const [urlRef, setUrlRef]             = useState("");
   const [title, setTitle]               = useState("");
-  const [grade, setGrade]               = useState("3");
-  const [faith, setFaith]               = useState("none");
-  const [language, setLanguage]         = useState("english"); // "english" | "spanish"
-  const [bilingualMode, setBilingual]   = useState(""); // "" | "en-clue-es-word" | "es-clue-en-word"
+  const [grade, setGrade]               = useState(saved.grade       || "3");
+  const [faith, setFaith]               = useState(saved.faith       || "none");
+  const [language, setLanguage]         = useState(saved.language    || "english");
+  const [bilingualMode, setBilingual]   = useState(saved.bilingualMode || "");
   const [seriesMode, setSeriesMode]     = useState(false);
   const [selectedSeries, setSelectedSeries] = useState("charlottes-web");
   const [selectedBooks, setSelectedBooks]   = useState([]);
   const [currentChapter, setCurrentChapter] = useState("");
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState("");
+
+  // ── Persist prefs whenever they change ─────────────────────────────────
+  useEffect(() => {
+    savePrefs({ inputMode, grade, faith, language, bilingualMode });
+  }, [inputMode, grade, faith, language, bilingualMode]);
 
   useEffect(() => {
     if (searchParams.get("demo") === "cw") {
