@@ -76,10 +76,11 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
   // ── Reveal-confirm state ──────────────────────────────────────────────────
   const [showRevealConfirm, setShowRevealConfirm] = useState(false);
 
-  const refs          = useRef({});
-  const timerRef      = useRef(null);
-  const activeClueRef = useRef(null);
-  const hintMenuRef   = useRef(null);
+  const refs             = useRef({});
+  const timerRef         = useRef(null);
+  const activeClueRef    = useRef(null);
+  const hintMenuRef      = useRef(null);
+  const userExitedFsRef  = useRef(false); // true only when user intentionally clicked toggle
 
   // ── Effects ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -89,9 +90,21 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
     return () => clearInterval(timerRef.current);
   }, [timerActive, won]);
 
-  // Item 1: fullscreen state tracking
+  // Item 1: fullscreen persistence — auto re-enter if browser exits unexpectedly
   useEffect(() => {
-    function onFsChange() { setIsFullscreen(!!document.fullscreenElement); }
+    function onFsChange() {
+      const isFs = !!document.fullscreenElement;
+      setIsFullscreen(isFs);
+      if (isFs) {
+        // Just entered — clear the intentional-exit flag
+        userExitedFsRef.current = false;
+      } else if (!userExitedFsRef.current) {
+        // Exited without the user clicking the toggle — re-enter
+        setTimeout(() => {
+          document.documentElement.requestFullscreen?.().catch(() => {});
+        }, 50);
+      }
+    }
     document.addEventListener("fullscreenchange", onFsChange);
     document.addEventListener("webkitfullscreenchange", onFsChange);
     return () => {
@@ -263,8 +276,10 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
 
   function toggleFullscreen() {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen?.();
+      userExitedFsRef.current = false;
+      document.documentElement.requestFullscreen?.().catch(() => {});
     } else {
+      userExitedFsRef.current = true; // intentional exit — do NOT re-enter
       document.exitFullscreen?.();
     }
   }
@@ -600,11 +615,11 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
           </div>
         )}
 
-        {/* Item 2: THREE-PANE MAIN AREA — grid (flex:55) + clues (flex:45) */}
-        <div style={{ flex:1, display:"flex", flexDirection:"row", minHeight:0, overflow:"hidden" }}>
+        {/* Item 2: THREE-PANE — vertically stacked: grid (55% height) → clues (40% height) */}
+        <div style={{ flex:1, display:"flex", flexDirection:"column", minHeight:0, overflow:"hidden" }}>
 
-          {/* GRID PANE */}
-          <div style={{ flex:"55", minWidth:0, overflowX:"auto", overflowY:"auto", WebkitOverflowScrolling:"touch", padding:"10px", background:"#faf7f0" }}>
+          {/* PANE 2: GRID — 55% of remaining height, scrollable both directions */}
+          <div style={{ flex:"55", minHeight:0, overflowX:"auto", overflowY:"auto", WebkitOverflowScrolling:"touch", padding:"10px", background:"#faf7f0" }}>
             <div style={{ display:"inline-block", background:"rgba(255,254,245,.98)", border:"2px solid #8a7a5a", borderRadius:"6px", padding:"12px", boxShadow:"3px 4px 0 #c8b870" }}>
               <table style={{ borderCollapse:"collapse" }}>
                 <tbody>
@@ -640,17 +655,17 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
             </div>
           </div>
 
-          {/* VERTICAL DIVIDER */}
-          <div className="no-print" style={{ width:"4px", background:"linear-gradient(180deg,#3a6a1a,#8a7a5a,#3a6a1a)", flexShrink:0 }}/>
+          {/* HORIZONTAL DIVIDER between grid and clue panel */}
+          <div className="no-print" style={{ height:"4px", background:"linear-gradient(90deg,#3a6a1a,#8a7a5a,#3a6a1a)", flexShrink:0 }}/>
 
-          {/* CLUE PANE */}
-          <div className="no-print" style={{ flex:"45", display:"flex", flexDirection:"column", background:"#fff", minWidth:0, minHeight:0 }}>
-            {/* Item 10: clue tabs — active clue is now in the bar above, not here */}
+          {/* PANE 3: CLUE PANEL — 40% of remaining height, independently scrollable */}
+          <div className="no-print" style={{ flex:"40", display:"flex", flexDirection:"column", background:"#fff", minHeight:0 }}>
+            {/* Clue tabs */}
             <div style={{ display:"flex", borderBottom:"2px solid #e0d8c8", flexShrink:0 }}>
               <button className={`ctab${clueTab==="across"?" on":""}`} onClick={() => setClueTab("across")}>Across ({ACROSS.length})</button>
               <button className={`ctab${clueTab==="down"?" on":""}`} onClick={() => setClueTab("down")}>Down ({DOWN.length})</button>
             </div>
-            {/* Item 8 + 9 + 10: scrollable clue list */}
+            {/* Clue list — Items 8, 9, 10 */}
             <div style={{ overflowY:"auto", WebkitOverflowScrolling:"touch", flex:1, minHeight:0, padding:"4px 8px" }}>
               {clueList.map(w => {
                 const isActive  = activeWord?.number === w.number && activeWord?.orientation === clueTab;

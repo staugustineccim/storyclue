@@ -75,10 +75,24 @@ export default function PuzzleGenerator() {
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState("");
 
+  // ── Items 11 & 12: version detection & grade advisory ─────────────────────
+  const [versionCheckDone, setVersionCheckDone] = useState(false);
+  const [versionData,      setVersionData]      = useState(null);   // API response
+  const [selectedVersion,  setSelectedVersion]  = useState(null);   // chosen version id
+  const [otherVersionText, setOtherVersionText] = useState("");
+
   // ── Persist prefs whenever they change ─────────────────────────────────
   useEffect(() => {
     savePrefs({ inputMode, grade, faith, language, bilingualMode });
   }, [inputMode, grade, faith, language, bilingualMode]);
+
+  // Reset version check whenever book reference or grade changes
+  useEffect(() => {
+    setVersionCheckDone(false);
+    setVersionData(null);
+    setSelectedVersion(null);
+    setOtherVersionText("");
+  }, [bookRef, grade]);
 
   useEffect(() => {
     if (searchParams.get("demo") === "cw") {
@@ -114,12 +128,53 @@ export default function PuzzleGenerator() {
       }
     }
 
+    // ── Item 11: Version check (lookup mode only, first time per book+grade) ──
+    if (inputMode === "lookup" && !versionCheckDone) {
+      setLoading(true);
+      try {
+        const vRes = await fetch("/api/check-versions", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ bookRef: bookRef.trim(), grade }),
+        });
+        const vData = await vRes.json();
+        setVersionCheckDone(true);
+        if (vData.needsSelection && vData.versions?.length) {
+          setVersionData(vData);
+          setLoading(false);
+          return; // Pause — show version picker to user
+        }
+        // No version ambiguity — fall through to generation below
+      } catch {
+        setVersionCheckDone(true); // Don't block on check failure
+      }
+    }
+
+    // ── Item 11: Version selected? ───────────────────────────────────────────
+    if (versionData && !selectedVersion) {
+      setError("Please select which version you're using before generating.");
+      return;
+    }
+    if (selectedVersion === "other" && !otherVersionText.trim()) {
+      setError("Please type the exact title of the version you are using.");
+      return;
+    }
+
+    // Build the final book reference with version appended
+    let resolvedBookRef = bookRef.trim();
+    if (selectedVersion && selectedVersion !== "other") {
+      const v = versionData?.versions.find(v => v.id === selectedVersion);
+      if (v) resolvedBookRef = `${bookRef.trim()} — ${v.name}`;
+    } else if (selectedVersion === "other" && otherVersionText.trim()) {
+      resolvedBookRef = `${bookRef.trim()} — ${otherVersionText.trim()}`;
+    }
+
     setLoading(true);
 
     try {
       const body = {
         inputMode,
-        bookRef: bookRef.trim(),
+        bookRef: resolvedBookRef,
         chapterText: text,
         urlRef: urlRef.trim(),
         grade,
@@ -464,6 +519,82 @@ export default function PuzzleGenerator() {
             )}
           </div>
 
+          {/* ── Items 11 & 12: Version picker & grade advisory ──────────── */}
+          {versionData && inputMode === "lookup" && (
+            <div style={{ marginBottom:"24px" }}>
+              {/* Version picker */}
+              <div style={{ background:"#f4efe4", border:"2px solid #c8a830", borderRadius:"8px", padding:"18px" }}>
+                <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"17px", color:"#2d4a18", marginBottom:"4px" }}>
+                  {versionData.promptFor}
+                </div>
+                <div style={{ fontFamily:"Lora,serif", fontSize:"12px", color:"#6a5a30", marginBottom:"14px" }}>
+                  Different versions use very different vocabulary. Selecting the right one gives the best clues for your grade.
+                </div>
+
+                <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
+                  {versionData.versions.map(v => {
+                    const isSelected = selectedVersion === v.id;
+                    return (
+                      <label key={v.id} style={{ display:"flex", alignItems:"flex-start", gap:"10px", padding:"10px 12px", borderRadius:"6px", border:`2px solid ${isSelected ? "#3a6a1a" : "#c8b888"}`, background: isSelected ? "#e8f0d8" : "#fffef5", cursor:"pointer", transition:"all .15s" }}>
+                        <input type="radio" name="version" value={v.id} checked={isSelected} onChange={() => { setSelectedVersion(v.id); setOtherVersionText(""); }} style={{ accentColor:"#3a6a1a", marginTop:"3px", flexShrink:0 }} />
+                        <div style={{ flex:1 }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:"8px", flexWrap:"wrap" }}>
+                            <span style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"14px", color:"#2c1a08" }}>{v.name}</span>
+                            {v.popular && (
+                              <span style={{ background:"#3a6a1a", color:"#f0ead8", fontSize:"10px", fontFamily:"Lora,serif", fontWeight:600, padding:"2px 7px", borderRadius:"10px", letterSpacing:"0.5px" }}>Most Popular</span>
+                            )}
+                          </div>
+                          {v.id !== "other" && (
+                            <div style={{ fontFamily:"Lora,serif", fontSize:"12px", color:"#6a5a30", marginTop:"2px" }}>{v.description}</div>
+                          )}
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                {/* Other: free-text input */}
+                {selectedVersion === "other" && (
+                  <div style={{ marginTop:"10px" }}>
+                    <input
+                      type="text"
+                      value={otherVersionText}
+                      onChange={e => setOtherVersionText(e.target.value)}
+                      placeholder="Type the exact title of the version you are using"
+                      autoFocus
+                      style={{ width:"100%", padding:"10px 12px", border:"2px solid #3a6a1a", borderRadius:"4px", fontFamily:"Lora,Georgia,serif", fontSize:"14px", background:"#fffef5", color:"#2c1a08", outline:"none" }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Item 12: Grade advisory — shown immediately when mismatch version is selected */}
+              {selectedVersion && selectedVersion !== "other" && (() => {
+                const v = versionData.versions.find(v => v.id === selectedVersion);
+                if (!v || v.gradeMatch === "excellent" || v.gradeMatch === "good" || v.gradeMatch === "unknown") return null;
+                const isSlight = v.gradeMatch === "slight-mismatch";
+                return (
+                  <div style={{ marginTop:"10px", padding:"12px 14px", background: isSlight ? "#fffbe8" : "#fff3e0", border:`2px solid ${isSlight ? "#d4a020" : "#d07010"}`, borderRadius:"6px" }}>
+                    <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"13px", color: isSlight ? "#7a5000" : "#8a3800", marginBottom:"4px" }}>
+                      {isSlight ? "⚠️ Grade Level Advisory" : "⚠️ Grade Level Warning"}
+                    </div>
+                    <div style={{ fontFamily:"Lora,serif", fontSize:"13px", color: isSlight ? "#7a5000" : "#8a3800", lineHeight:1.55 }}>
+                      {v.mismatchNote}
+                    </div>
+                    {v.alternativeName && (
+                      <div style={{ marginTop:"8px", fontFamily:"Lora,serif", fontSize:"12px", color:"#3a6a1a", fontWeight:600 }}>
+                        Better match for your grade: {v.alternativeName}
+                      </div>
+                    )}
+                    <div style={{ marginTop:"6px", fontFamily:"Lora,serif", fontSize:"11px", color:"#8a7a50", fontStyle:"italic" }}>
+                      You can still generate with your selected version — this is advisory only.
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
           {/* ── Error ───────────────────────────────────────────────────── */}
           {error && (
             <div style={{ background:"#ffe0e0", border:"1px solid #e08080", borderRadius:"4px", padding:"10px 14px", marginBottom:"16px", fontFamily:"Lora,serif", fontSize:"13px", color:"#8b1010" }}>
@@ -486,9 +617,11 @@ export default function PuzzleGenerator() {
 
           {loading && (
             <div style={{ textAlign:"center", marginTop:"14px", fontFamily:"Lora,serif", fontSize:"13px", color:"#5a8a2a", fontStyle:"italic" }}>
-              {inputMode === "url"
-                ? "Fetching article and writing clues... about 15 seconds."
-                : `Claude is reading ${inputMode === "lookup" ? `"${bookRef}"` : "your text"} and writing clues... about 10 seconds.`}
+              {!versionCheckDone && inputMode === "lookup"
+                ? "Checking for version options..."
+                : inputMode === "url"
+                  ? "Fetching article and writing clues... about 15 seconds."
+                  : `Claude is reading ${inputMode === "lookup" ? `"${bookRef}"` : "your text"} and writing clues... about 10 seconds.`}
             </div>
           )}
         </form>
