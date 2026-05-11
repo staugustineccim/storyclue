@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { decodePuzzle } from "../utils/urlEncoder";
 import { buildGrid, buildNumbering } from "../utils/layoutBuilder";
 import FeedbackModal from "./FeedbackModal";
+import VocabModal from "./VocabModal";
 
 function formatTime(s) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -76,6 +77,10 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
   // ── Reveal-confirm state ──────────────────────────────────────────────────
   const [showRevealConfirm, setShowRevealConfirm] = useState(false);
 
+  // ── Vocab study modal state ───────────────────────────────────────────────
+  const [showVocabModal,  setShowVocabModal]  = useState(false);
+  const [continueUsed,    setContinueUsed]    = useState(false); // persists per session
+
   const refs             = useRef({});
   const timerRef         = useRef(null);
   const activeClueRef    = useRef(null);
@@ -119,11 +124,12 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
   }, [activeWord]);
 
   useEffect(() => {
-    if ((won || revealed) && !feedbackShown) {
+    // Don't show feedback while the vocab modal is open — wait until it closes
+    if ((won || revealed) && !feedbackShown && !showVocabModal) {
       const timer = setTimeout(() => { setShowFeedback(true); setFeedbackShown(true); }, 1200);
       return () => clearTimeout(timer);
     }
-  }, [won, revealed]);
+  }, [won, revealed, feedbackShown, showVocabModal]);
 
   // Close hint menu on outside click
   useEffect(() => {
@@ -257,6 +263,21 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
     setCells(SOLUTION.map(row => row.map(c => c || "")));
     setRevealed(true); setChecked(false); setTimerActive(false);
     setShowRevealConfirm(false);
+    // K-12 → open vocabulary study modal; Reader Mode → grid fills, no modal
+    if (grade !== "adult") {
+      setShowVocabModal(true);
+    }
+  }
+
+  function handleVocabContinue() {
+    setContinueUsed(true);
+    setShowVocabModal(false);
+    // Feedback modal will appear after vocab modal closes (handled by effect)
+  }
+
+  function handleVocabRestart() {
+    setShowVocabModal(false);
+    reset(); // wipe grid — student starts fresh
   }
 
   function reset() {
@@ -565,6 +586,10 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
           <button className="btn bo" onClick={() => navigate("/create")} style={{ padding:"4px 12px", fontSize:"12px" }}>New Puzzle</button>
           <button className="btn bo" onClick={() => window.print()} style={{ padding:"4px 10px", fontSize:"12px" }}>🖨️ Print</button>
           <button className="btn bo" onClick={share} style={{ padding:"4px 10px", fontSize:"12px" }}>🔗 Share</button>
+          {/* Reader Mode: optional word list after reveal */}
+          {revealed && grade === "adult" && (
+            <button className="btn bo" onClick={() => setShowVocabModal(true)} style={{ padding:"4px 10px", fontSize:"12px", borderColor:"#3a6a1a", color:"#3a6a1a" }}>📚 Word List</button>
+          )}
           {shareMsg   && <span style={{ fontSize:"11px", color:"#3a6a1a", fontFamily:"Lora,serif", fontStyle:"italic" }}>{shareMsg}</span>}
           {hintMsg    && <span style={{ fontSize:"11px", color:"#8a7a30", fontFamily:"Lora,serif", fontStyle:"italic" }}>{hintMsg}</span>}
           {hintLoading && <span style={{ fontSize:"11px", color:"#8a7a30", fontFamily:"Lora,serif", fontStyle:"italic" }}>Getting simpler clue…</span>}
@@ -721,6 +746,17 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
             </div>
           </div>
         </div>
+      )}
+
+      {/* ══ VOCAB STUDY MODAL ════════════════════════════════════════════ */}
+      {showVocabModal && (
+        <VocabModal
+          words={words}
+          continueAvailable={!continueUsed}
+          readerMode={grade === "adult"}
+          onContinue={handleVocabContinue}
+          onRestart={handleVocabRestart}
+        />
       )}
 
       {/* ══ FEEDBACK MODAL ═══════════════════════════════════════════════ */}
