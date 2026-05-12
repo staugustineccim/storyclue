@@ -8,11 +8,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@vercel/kv": "^2.0.0",
+    "@vercel/postgres": "^0.10.0",
+    "crossword-layout-generator": "^0.1.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.24.0",
-    "crossword-layout-generator": "^0.1.1",
-    "@vercel/kv": "^2.0.0"
+    "react-router-dom": "^6.24.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",

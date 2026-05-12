@@ -11,6 +11,7 @@ export default function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/create" element={<PuzzleGenerator />} />
       <Route path="/play" element={<CrosswordPuzzle />} />
+      <Route path="/play/:slug" element={<CrosswordPuzzle />} />
       <Route path="/admin" element={<AdminDashboard />} />
       <Route path="*" element={<NotFound />} />
     </Routes>

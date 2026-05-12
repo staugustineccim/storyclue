@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { encodePuzzle } from "../utils/urlEncoder";
+// encodePuzzle no longer used — new puzzles get persistent slug URLs via api/save-puzzle
 import { buildLayout } from "../utils/layoutBuilder";
 import { buildDemoData, getDemoUrl, SERIES_DATA } from "../utils/demoData";
 import { savePrefs, loadPrefs } from "../utils/prefs";
@@ -238,14 +238,34 @@ export default function PuzzleGenerator() {
         words: layout.words,
       };
 
-      // Item 6: show confirmation screen with both student and teacher links
-      const pParam = encodePuzzle(puzzleData);
+      // Items 1 + 6: save puzzle to Postgres, get back a permanent readable slug
+      const saveRes = await fetch("/api/save-puzzle", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title:    puzzleData.title,
+          grade,
+          faith,
+          language: data.language || "english",
+          rows:     layout.rows,
+          cols:     layout.cols,
+          words:    layout.words,
+        }),
+      });
+      const saveData = await saveRes.json();
+      if (!saveRes.ok || !saveData.slug) {
+        setError(saveData.error || "Could not save puzzle to database. Make sure Vercel Postgres is connected in your project settings.");
+        setLoading(false);
+        return;
+      }
+
       const origin = window.location.origin;
       setGeneratedPuzzle({
         title:      puzzleData.title,
-        studentUrl: `${origin}/play?p=${pParam}`,
-        teacherUrl: `${origin}/play?p=${pParam}&t=1`,
-        playPath:   `/play?p=${pParam}`,
+        studentUrl: `${origin}/play/${saveData.slug}`,
+        teacherUrl: `${origin}/play/${saveData.slug}?t=1`,
+        playPath:   `/play/${saveData.slug}`,
+        slug:       saveData.slug,
       });
       setLoading(false);
     } catch (err) {
@@ -324,8 +344,18 @@ export default function PuzzleGenerator() {
               <h2 style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"1.4rem", color:"#2d4a18", margin:"0 0 6px" }}>
                 Puzzle Ready!
               </h2>
-              <div style={{ fontFamily:"Lora,serif", fontSize:"14px", color:"#4a6a28", marginBottom:"20px", fontStyle:"italic" }}>
+              <div style={{ fontFamily:"Lora,serif", fontSize:"14px", color:"#4a6a28", marginBottom:"14px", fontStyle:"italic" }}>
                 {generatedPuzzle.title}
+              </div>
+
+              {/* Save-this-link warning — required by spec */}
+              <div style={{ background:"#fff8e8", border:"2px solid #d4a020", borderRadius:"8px", padding:"12px 14px", marginBottom:"20px" }}>
+                <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"13px", color:"#7a5000", marginBottom:"4px" }}>
+                  ⚠️ Save your puzzle link now
+                </div>
+                <div style={{ fontFamily:"Lora,serif", fontSize:"12px", color:"#9a6820", lineHeight:1.6 }}>
+                  Your puzzle link has been created. Save this link — it works forever but we cannot recover it for you if it is lost.
+                </div>
               </div>
 
               {/* Student Link */}

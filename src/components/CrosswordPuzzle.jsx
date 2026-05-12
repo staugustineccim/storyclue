@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, useParams } from "react-router-dom";
 import { decodePuzzle } from "../utils/urlEncoder";
 import { buildGrid, buildNumbering } from "../utils/layoutBuilder";
 import FeedbackModal from "./FeedbackModal";
@@ -20,21 +20,48 @@ const MAX_HINTS = 3;
 export default function CrosswordPuzzle() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { slug } = useParams();
 
-  const puzzleData = (() => {
-    const p = searchParams.get("p");
-    if (!p) return null;
-    return decodePuzzle(p);
-  })();
+  // "loading" | "ready" | "error"
+  const [loadState,  setLoadState]  = useState("loading");
+  const [puzzleData, setPuzzleData] = useState(null);
 
   const isTeacher = searchParams.get("t") === "1";
 
-  if (!puzzleData) {
+  useEffect(() => {
+    if (slug) {
+      // New persistent URL — fetch from database
+      fetch(`/api/get-puzzle?slug=${encodeURIComponent(slug)}`)
+        .then(r => { if (!r.ok) throw Object.assign(new Error(), { status: r.status }); return r.json(); })
+        .then(data => { setPuzzleData(data); setLoadState("ready"); })
+        .catch(() => setLoadState("error"));
+    } else {
+      // Legacy Base64 URL — decode from ?p= param
+      const p = searchParams.get("p");
+      const data = p ? decodePuzzle(p) : null;
+      if (data) { setPuzzleData(data); setLoadState("ready"); }
+      else setLoadState("error");
+    }
+  }, [slug]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (loadState === "loading") {
+    return (
+      <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", height:"100vh", background:"#faf7f0", fontFamily:"Georgia,serif" }}>
+        <div style={{ fontSize:"48px", marginBottom:"16px", animation:"spin 1.2s linear infinite" }}>🕷️</div>
+        <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+        <div style={{ fontFamily:"Lora,serif", fontSize:"15px", color:"#6a5a30" }}>Loading puzzle…</div>
+      </div>
+    );
+  }
+
+  if (loadState === "error" || !puzzleData) {
     return (
       <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", height:"100vh", background:"#faf7f0", fontFamily:"Georgia,serif" }}>
         <div style={{ fontSize:"48px", marginBottom:"16px" }}>🕷️</div>
         <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"22px", color:"#2d4a18", marginBottom:"12px" }}>Puzzle not found</div>
-        <div style={{ color:"#6a5a30", marginBottom:"24px", fontFamily:"Lora,serif" }}>This puzzle link may be invalid or expired.</div>
+        <div style={{ color:"#6a5a30", marginBottom:"24px", fontFamily:"Lora,serif", textAlign:"center", maxWidth:"360px", lineHeight:1.6 }}>
+          This puzzle link may be incorrect or the puzzle hasn't been saved yet.
+        </div>
         <button onClick={() => navigate("/create")} style={{ background:"#3a6a1a", color:"#f0ead8", border:"none", borderRadius:"4px", padding:"10px 24px", fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"14px", cursor:"pointer" }}>
           Create a New Puzzle
         </button>
