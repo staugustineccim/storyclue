@@ -80,6 +80,7 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
   // ── Vocab study modal state ───────────────────────────────────────────────
   const [showVocabModal,  setShowVocabModal]  = useState(false);
   const [continueUsed,    setContinueUsed]    = useState(false); // persists per session
+  const [clueBarExpanded, setClueBarExpanded] = useState(false); // mobile: tap clue bar to expand
 
   const refs             = useRef({});
   const timerRef         = useRef(null);
@@ -200,7 +201,7 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
 
   function clickCell(r, c) {
     if (!SOLUTION[r][c]) return;
-    if (!timerActive) setTimerActive(true);
+    if (!timerActive && !revealed && !won) setTimerActive(true);
     if (sel?.r === r && sel?.c === c && activeWord) {
       const other = words.find(w => w !== activeWord && (
         w.orientation === "across"
@@ -218,7 +219,7 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
   }
 
   function keyDown(r, c, e) {
-    if (!timerActive) setTimerActive(true);
+    if (!timerActive && !revealed && !won) setTimerActive(true);
     if (e.key === "Backspace") {
       e.preventDefault();
       const next = cells.map(row => [...row]);
@@ -260,11 +261,15 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
   }
 
   function doReveal() {
-    setCells(SOLUTION.map(row => row.map(c => c || "")));
-    setRevealed(true); setChecked(false); setTimerActive(false);
     setShowRevealConfirm(false);
-    // K-12 → open vocabulary study modal; Reader Mode → grid fills, no modal
-    if (grade !== "adult") {
+    setTimerActive(false);
+    setChecked(false);
+    if (grade === "adult") {
+      // Reader Mode: fill grid immediately, mark revealed — no modal
+      setCells(SOLUTION.map(row => row.map(c => c || "")));
+      setRevealed(true);
+    } else {
+      // K-12: open vocab study modal first — grid stays untouched until modal resolves
       setShowVocabModal(true);
     }
   }
@@ -277,7 +282,14 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
 
   function handleVocabRestart() {
     setShowVocabModal(false);
-    reset(); // wipe grid — student starts fresh
+    if (continueUsed) {
+      // 2nd reveal "last resort" — fill answers now and mark revealed
+      setCells(SOLUTION.map(row => row.map(c => c || "")));
+      setRevealed(true); setChecked(false);
+    } else {
+      // 1st reveal → wipe grid, student starts fresh
+      reset();
+    }
   }
 
   function reset() {
@@ -361,15 +373,17 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
 
   function cellClass(r, c) {
     const parts = ["ci"];
-    if (sel?.r === r && sel?.c === c) parts.push("sel");
-    else if (activeWord) {
-      const aw = activeWord;
-      const inW = aw.orientation === "across"
+    const isSel = sel?.r === r && sel?.c === c;
+    const aw    = activeWord;
+    const inW   = aw && (
+      aw.orientation === "across"
         ? aw.starty === r && c >= aw.startx && c < aw.startx + aw.answer.length
-        : aw.startx === c && r >= aw.starty && r < aw.starty + aw.answer.length;
-      if (inW) parts.push("hi");
-    }
-    if (revealed) parts.push("rev");
+        : aw.startx === c && r >= aw.starty && r < aw.starty + aw.answer.length
+    );
+    // Mutually exclusive priority: selected > word-highlight > revealed > checked
+    if      (isSel)                    parts.push("sel");
+    else if (inW)                      parts.push("hi");
+    else if (revealed)                 parts.push("rev");
     else if (checked && SOLUTION[r][c]) {
       if (!cells[r][c]) parts.push("mt");
       else parts.push(cells[r][c] === SOLUTION[r][c] ? "ok" : "err");
@@ -441,6 +455,27 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
         .pfill{height:100%;background:#3a6a1a;border-radius:3px;transition:width .4s ease}
         @keyframes pop{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
         .win{animation:pop .45s cubic-bezier(.175,.885,.32,1.275)}
+
+        /* ── MOBILE LAYOUT (<768px) ─────────────────────────────────────── */
+        @media(max-width:767px){
+          .puzzle-root{height:100dvh}
+          .hdr{padding:6px 10px!important;max-height:50px!important}
+          .hdr-title{font-size:14px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100vw - 130px)}
+          .hdr-sub{display:none!important}
+          .hdr-mistakes{display:none!important}
+          .toolbar{padding:4px 8px!important;height:44px!important;overflow-x:auto!important;overflow-y:hidden!important;flex-wrap:nowrap!important;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+          .toolbar::-webkit-scrollbar{display:none}
+          .clue-bar{cursor:pointer;transition:max-height .25s ease}
+          .clue-bar:not(.expanded){min-height:36px!important;max-height:36px!important;overflow:hidden!important;padding-top:0!important;padding-bottom:0!important}
+          .clue-bar.expanded{max-height:120px!important;height:auto!important}
+          .clue-bar-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+          .clue-bar.expanded .clue-bar-text{white-space:normal;overflow:visible;text-overflow:clip}
+          .pbar-wrap{padding:2px 10px!important}
+          .pbar-label{display:none!important}
+          .pbar-wrap .ptrack{height:4px!important}
+          .grid-pane{min-height:40dvh!important}
+          .clue-panel{flex:none!important;height:35dvh!important}
+        }
 
         /* Hint menu */
         .hint-menu{position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1.5px solid #c8b888;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:200;min-width:210px;overflow:hidden;}
@@ -525,18 +560,18 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
       <div className="puzzle-root screen-only">
 
         {/* TOP BAR */}
-        <div className="no-print" style={{ background:"linear-gradient(135deg,#2d4a18,#4a7a22)", padding:"10px 16px", borderBottom:"3px solid #8a7a30", display:"flex", alignItems:"center", gap:"12px", flexShrink:0 }}>
+        <div className="no-print hdr" style={{ background:"linear-gradient(135deg,#2d4a18,#4a7a22)", padding:"10px 16px", borderBottom:"3px solid #8a7a30", display:"flex", alignItems:"center", gap:"12px", flexShrink:0 }}>
           <button onClick={() => navigate("/")} style={{ background:"none", border:"none", cursor:"pointer", fontSize:"26px", padding:0 }} title="StoryClue home">🕷️</button>
-          <div style={{ flex:1 }}>
-            <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"17px", color:"#f0ead8", lineHeight:1.2 }}>{title}</div>
-            <div style={{ fontSize:"10px", color:"#a8d890", fontStyle:"italic", letterSpacing:"1px" }}>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div className="hdr-title" style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"17px", color:"#f0ead8", lineHeight:1.2 }}>{title}</div>
+            <div className="hdr-sub" style={{ fontSize:"10px", color:"#a8d890", fontStyle:"italic", letterSpacing:"1px" }}>
               {gradeLabel ? `${gradeLabel} · ` : ""}{words.length} Words{isSpanish ? " · 🇪🇸 Spanish" : ""}
             </div>
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:"12px", flexShrink:0 }}>
             <div style={{ textAlign:"right", color:"#f0ead8" }}>
               <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"18px", letterSpacing:"2px" }}>{formatTime(seconds)}</div>
-              <div style={{ fontSize:"10px", color:"#a8d890" }}>{mistakes} mistake{mistakes!==1?"s":""}</div>
+              <div className="hdr-mistakes" style={{ fontSize:"10px", color:"#a8d890" }}>{mistakes} mistake{mistakes!==1?"s":""}</div>
             </div>
             {/* Item 1: fullscreen button reflects live state */}
             <button
@@ -548,7 +583,7 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
         </div>
 
         {/* COMPACT TOOLBAR */}
-        <div className="no-print" style={{ background:"#f0ead8", borderBottom:"1px solid #c8b888", padding:"6px 10px", flexShrink:0, display:"flex", gap:"6px", alignItems:"center", flexWrap:"wrap" }}>
+        <div className="no-print toolbar" style={{ background:"#f0ead8", borderBottom:"1px solid #c8b888", padding:"6px 10px", flexShrink:0, display:"flex", gap:"6px", alignItems:"center", flexWrap:"wrap" }}>
           <button className="btn bg" onClick={check} style={{ padding:"5px 14px", fontSize:"12px" }}>Check</button>
 
           {/* Hint button with dropdown */}
@@ -596,14 +631,18 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
           {checked && !won && !revealed && <span style={{ fontSize:"11px", color:"#7a5a00", fontFamily:"Lora,serif", fontStyle:"italic" }}>🟢 correct · 🔴 wrong · 🟡 empty</span>}
         </div>
 
-        {/* Item 3: ACTIVE CLUE BAR — always visible above the puzzle */}
-        <div className="no-print" style={{ background:"#2D5A1A", borderBottom:"3px solid #1a3a0a", padding:"8px 14px", flexShrink:0, minHeight:"40px", display:"flex", alignItems:"center", gap:"10px" }}>
+        {/* Item 3: ACTIVE CLUE BAR — always visible above the puzzle; tap to expand on mobile */}
+        <div
+          className={`no-print clue-bar${clueBarExpanded ? " expanded" : ""}`}
+          style={{ background:"#2D5A1A", borderBottom:"3px solid #1a3a0a", padding:"8px 14px", flexShrink:0, minHeight:"40px", display:"flex", alignItems:"center", gap:"10px" }}
+          onClick={() => setClueBarExpanded(v => !v)}
+        >
           {activeWord ? (
             <>
               <span style={{ fontWeight:700, color:"#a8e878", fontFamily:"'Playfair Display',serif", fontSize:"13px", whiteSpace:"nowrap", flexShrink:0 }}>
                 {activeWord.number} {activeWord.orientation.toUpperCase()}
               </span>
-              <span style={{ fontFamily:"Lora,serif", fontSize:"14px", color:"#f0ead8", lineHeight:1.35, fontWeight:600 }}>
+              <span className="clue-bar-text" style={{ fontFamily:"Lora,serif", fontSize:"14px", color:"#f0ead8", lineHeight:1.35, fontWeight:600, flex:1, minWidth:0 }}>
                 {getClue(activeWord)}
                 {simplerClues[wordKey(activeWord)] && <span style={{ fontSize:"11px", color:"#a8e878", marginLeft:"6px", fontWeight:400 }}>✏️ simplified</span>}
               </span>
@@ -625,8 +664,8 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
         )}
 
         {/* PROGRESS BAR */}
-        <div className="no-print" style={{ padding:"5px 14px", background:"#f0ead8", borderBottom:"1px solid #c8b888", flexShrink:0 }}>
-          <div style={{ display:"flex", justifyContent:"space-between", fontSize:"11px", color:"#6a5a30", fontFamily:"Lora,serif", marginBottom:"3px" }}>
+        <div className="no-print pbar-wrap" style={{ padding:"5px 14px", background:"#f0ead8", borderBottom:"1px solid #c8b888", flexShrink:0 }}>
+          <div className="pbar-label" style={{ display:"flex", justifyContent:"space-between", fontSize:"11px", color:"#6a5a30", fontFamily:"Lora,serif", marginBottom:"3px" }}>
             <span>Progress</span><span>{pct}%</span>
           </div>
           <div className="ptrack"><div className="pfill" style={{ width:pct+"%" }}/></div>
@@ -644,7 +683,7 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
         <div style={{ flex:1, display:"flex", flexDirection:"column", minHeight:0, overflow:"hidden" }}>
 
           {/* PANE 2: GRID — 55% of remaining height, scrollable both directions */}
-          <div style={{ flex:"55", minHeight:0, overflowX:"auto", overflowY:"auto", WebkitOverflowScrolling:"touch", padding:"10px", background:"#faf7f0" }}>
+          <div className="grid-pane" style={{ flex:"55", minHeight:0, overflowX:"auto", overflowY:"auto", WebkitOverflowScrolling:"touch", padding:"10px", background:"#faf7f0" }}>
             <div style={{ display:"inline-block", background:"rgba(255,254,245,.98)", border:"2px solid #8a7a5a", borderRadius:"6px", padding:"12px", boxShadow:"3px 4px 0 #c8b870" }}>
               <table style={{ borderCollapse:"collapse" }}>
                 <tbody>
@@ -684,7 +723,7 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
           <div className="no-print" style={{ height:"4px", background:"linear-gradient(90deg,#3a6a1a,#8a7a5a,#3a6a1a)", flexShrink:0 }}/>
 
           {/* PANE 3: CLUE PANEL — 40% of remaining height, independently scrollable */}
-          <div className="no-print" style={{ flex:"40", display:"flex", flexDirection:"column", background:"#fff", minHeight:0 }}>
+          <div className="no-print clue-panel" style={{ flex:"40", display:"flex", flexDirection:"column", background:"#fff", minHeight:0 }}>
             {/* Clue tabs */}
             <div style={{ display:"flex", borderBottom:"2px solid #e0d8c8", flexShrink:0 }}>
               <button className={`ctab${clueTab==="across"?" on":""}`} onClick={() => setClueTab("across")}>Across ({ACROSS.length})</button>
