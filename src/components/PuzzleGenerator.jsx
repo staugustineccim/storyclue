@@ -81,6 +81,10 @@ export default function PuzzleGenerator() {
   const [selectedVersion,  setSelectedVersion]  = useState(null);   // chosen version id
   const [otherVersionText, setOtherVersionText] = useState("");
 
+  // ── Item 6: generated puzzle links ────────────────────────────────────────
+  const [generatedPuzzle, setGeneratedPuzzle] = useState(null); // {title, studentUrl, teacherUrl, playPath}
+  const [copiedLink,      setCopiedLink]      = useState("");   // "student" | "teacher" | ""
+
   // ── Persist prefs whenever they change ─────────────────────────────────
   useEffect(() => {
     savePrefs({ inputMode, grade, faith, language, bilingualMode });
@@ -101,6 +105,16 @@ export default function PuzzleGenerator() {
   }, []);
 
   const seriesBooks = SERIES_DATA[selectedSeries]?.books || [];
+
+  function copyLink(which, url) {
+    navigator.clipboard?.writeText(url).then(() => {
+      setCopiedLink(which);
+      setTimeout(() => setCopiedLink(""), 2000);
+    }).catch(() => {
+      setCopiedLink(which + "-fail");
+      setTimeout(() => setCopiedLink(""), 2500);
+    });
+  }
 
   function toggleBook(book) {
     setSelectedBooks(prev =>
@@ -207,7 +221,7 @@ export default function PuzzleGenerator() {
         return;
       }
 
-      const layout = buildLayout(data.words);
+      const layout = buildLayout(data.words, grade);
 
       if (!layout) {
         setError("Couldn't build a grid from this content. Try a different chapter or paste the text directly.");
@@ -224,7 +238,16 @@ export default function PuzzleGenerator() {
         words: layout.words,
       };
 
-      navigate("/play?p=" + encodePuzzle(puzzleData));
+      // Item 6: show confirmation screen with both student and teacher links
+      const pParam = encodePuzzle(puzzleData);
+      const origin = window.location.origin;
+      setGeneratedPuzzle({
+        title:      puzzleData.title,
+        studentUrl: `${origin}/play?p=${pParam}`,
+        teacherUrl: `${origin}/play?p=${pParam}&t=1`,
+        playPath:   `/play?p=${pParam}`,
+      });
+      setLoading(false);
     } catch (err) {
       console.error(err);
       setError("Could not generate puzzle. Please try again.");
@@ -292,7 +315,87 @@ export default function PuzzleGenerator() {
           Name any book and chapter, paste your own text, or drop in a URL. StoryClue builds the puzzle in seconds.
         </p>
 
-        <form onSubmit={handleGenerate}>
+        {/* ── Item 6: Puzzle-ready confirmation screen ──────────────── */}
+        {generatedPuzzle && (
+          <div style={{ animation:"fadeIn .4s ease" }}>
+            <style>{`@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}`}</style>
+            <div style={{ background:"#e8f4d8", border:"2px solid #4a8a2a", borderRadius:"10px", padding:"22px 20px", marginBottom:"28px" }}>
+              <div style={{ fontSize:"2rem", marginBottom:"8px" }}>🎉</div>
+              <h2 style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"1.4rem", color:"#2d4a18", margin:"0 0 6px" }}>
+                Puzzle Ready!
+              </h2>
+              <div style={{ fontFamily:"Lora,serif", fontSize:"14px", color:"#4a6a28", marginBottom:"20px", fontStyle:"italic" }}>
+                {generatedPuzzle.title}
+              </div>
+
+              {/* Student Link */}
+              <div style={{ marginBottom:"16px" }}>
+                <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"13px", color:"#2d4a18", marginBottom:"6px" }}>
+                  🎒 Student Link
+                </div>
+                <div style={{ display:"flex", gap:"6px", alignItems:"center" }}>
+                  <input
+                    readOnly
+                    value={generatedPuzzle.studentUrl}
+                    style={{ flex:1, padding:"8px 10px", border:"1.5px solid #b8d898", borderRadius:"4px", fontFamily:"Lora,Georgia,serif", fontSize:"12px", background:"#fffef5", color:"#2c1a08", outline:"none", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}
+                    onClick={e => e.target.select()}
+                  />
+                  <button
+                    onClick={() => copyLink("student", generatedPuzzle.studentUrl)}
+                    style={{ padding:"8px 12px", background: copiedLink==="student" ? "#4a8a2a" : "#3a6a1a", color:"#f0ead8", border:"none", borderRadius:"4px", fontFamily:"Lora,serif", fontSize:"12px", fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", flexShrink:0 }}
+                  >
+                    {copiedLink === "student" ? "✓ Copied" : "Copy"}
+                  </button>
+                  <button
+                    onClick={() => navigate(generatedPuzzle.playPath)}
+                    style={{ padding:"8px 12px", background:"#3a6a1a", color:"#f0ead8", border:"none", borderRadius:"4px", fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"12px", cursor:"pointer", whiteSpace:"nowrap", flexShrink:0, boxShadow:"2px 2px 0 #1a3a08" }}
+                  >
+                    ▶ Play
+                  </button>
+                </div>
+              </div>
+
+              {/* Teacher Link */}
+              <div style={{ background:"#fffbe8", border:"1.5px solid #d4a020", borderRadius:"6px", padding:"12px 14px" }}>
+                <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"13px", color:"#7a5000", marginBottom:"4px" }}>
+                  🔑 Teacher Link — <span style={{ fontWeight:400 }}>only share this with yourself</span>
+                </div>
+                <div style={{ fontFamily:"Lora,serif", fontSize:"11px", color:"#9a7030", marginBottom:"8px" }}>
+                  This link unlocks Answer Key printing. Never share it with students.
+                </div>
+                <div style={{ display:"flex", gap:"6px", alignItems:"center" }}>
+                  <input
+                    readOnly
+                    value={generatedPuzzle.teacherUrl}
+                    style={{ flex:1, padding:"8px 10px", border:"1.5px solid #d4a020", borderRadius:"4px", fontFamily:"Lora,Georgia,serif", fontSize:"12px", background:"#fffef5", color:"#2c1a08", outline:"none", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}
+                    onClick={e => e.target.select()}
+                  />
+                  <button
+                    onClick={() => copyLink("teacher", generatedPuzzle.teacherUrl)}
+                    style={{ padding:"8px 12px", background: copiedLink==="teacher" ? "#8a7000" : "#c0900a", color:"#fff", border:"none", borderRadius:"4px", fontFamily:"Lora,serif", fontSize:"12px", fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", flexShrink:0 }}
+                  >
+                    {copiedLink === "teacher" ? "✓ Copied" : "Copy"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setGeneratedPuzzle(null);
+                setVersionCheckDone(false);
+                setVersionData(null);
+                setSelectedVersion(null);
+                setOtherVersionText("");
+              }}
+              style={{ width:"100%", padding:"12px", background:"transparent", border:"2px solid #3a6a1a", color:"#3a6a1a", borderRadius:"6px", fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"14px", cursor:"pointer", letterSpacing:"0.5px" }}
+            >
+              ✦ Generate Another Puzzle
+            </button>
+          </div>
+        )}
+
+        <form onSubmit={handleGenerate} style={{ display: generatedPuzzle ? "none" : "block" }}>
 
           {/* ── Mode Toggle ─────────────────────────────────────────────── */}
           <div style={{ marginBottom:"24px" }}>

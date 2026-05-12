@@ -27,6 +27,8 @@ export default function CrosswordPuzzle() {
     return decodePuzzle(p);
   })();
 
+  const isTeacher = searchParams.get("t") === "1";
+
   if (!puzzleData) {
     return (
       <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", height:"100vh", background:"#faf7f0", fontFamily:"Georgia,serif" }}>
@@ -40,10 +42,10 @@ export default function CrosswordPuzzle() {
     );
   }
 
-  return <PuzzleBoard {...puzzleData} />;
+  return <PuzzleBoard {...puzzleData} isTeacher={isTeacher} />;
 }
 
-function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) {
+function PuzzleBoard({ title, grade, language = "english", rows, cols, words, isTeacher = false }) {
   const navigate = useNavigate();
   const SOLUTION  = buildGrid(words, rows, cols);
   const NUMBERING = buildNumbering(words, rows, cols);
@@ -76,6 +78,10 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
 
   // ── Reveal-confirm state ──────────────────────────────────────────────────
   const [showRevealConfirm, setShowRevealConfirm] = useState(false);
+
+  // ── Print state (Item 5) ──────────────────────────────────────────────────
+  const [printMode,       setPrintMode]       = useState(null);  // "student" | "answer-key"
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
 
   // ── Vocab study modal state ───────────────────────────────────────────────
   const [showVocabModal,  setShowVocabModal]  = useState(false);
@@ -131,6 +137,16 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
       return () => clearTimeout(timer);
     }
   }, [won, revealed, feedbackShown, showVocabModal]);
+
+  // Item 5: trigger window.print() after React re-renders with the chosen printMode
+  useEffect(() => {
+    if (!printMode) return;
+    const t = setTimeout(() => {
+      window.print();
+      setTimeout(() => setPrintMode(null), 300);
+    }, 80);
+    return () => clearTimeout(t);
+  }, [printMode]);
 
   // Close hint menu on outside click
   useEffect(() => {
@@ -305,6 +321,11 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
     navigator.clipboard?.writeText(window.location.href).then(() => {
       setShareMsg("Copied!"); setTimeout(() => setShareMsg(""), 2000);
     }).catch(() => { setShareMsg("Copy URL from browser"); setTimeout(() => setShareMsg(""), 3000); });
+  }
+
+  // Item 5: set print mode → useEffect fires → window.print()
+  function triggerPrint(mode) {
+    setPrintMode(mode);
   }
 
   function toggleFullscreen() {
@@ -491,6 +512,11 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
 
         /* ── PRINT STYLES ── */
         .print-only{display:none}
+        /* Watermark — rotated ghost text centered on every printed page */
+        .print-wm{display:none}
+        @media print{
+          .print-wm{display:block;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-40deg);font-size:72px;font-weight:900;font-family:Arial,sans-serif;opacity:.06;color:#000;white-space:nowrap;z-index:9999;pointer-events:none;letter-spacing:4px}
+        }
         @media print{
           html,body,#root{height:auto!important;overflow:visible!important}
           .puzzle-root{position:static!important}
@@ -506,20 +532,40 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
         }
       `}</style>
 
-      {/* ══ PRINT-ONLY WORKSHEET ══════════════════════════════════════════ */}
+      {/* ══ PRINT-ONLY WORKSHEET (Items 5 + 6) ══════════════════════════ */}
+      {/* Watermark — fixed position repeats on every printed page */}
+      <div className="print-wm">
+        {printMode === "answer-key" ? "ANSWER KEY" : "STUDENT"}
+      </div>
+
       <div className="print-only" style={{ fontFamily:"Arial,sans-serif", padding:"0" }}>
+        {/* Header — different for student vs answer-key */}
         <div style={{ marginBottom:"14px", borderBottom:"2px solid #000", paddingBottom:"10px" }}>
-          <div style={{ fontSize:"18px", fontWeight:"bold", fontFamily:"Georgia,serif", marginBottom:"6px" }}>{title}</div>
-          <div style={{ fontSize:"11px", color:"#555", marginBottom:"10px" }}>
-            {gradeLabel} · {words.length} Words · StoryClue.ai
-            {isSpanish && " · AI-generated Spanish content — recommend review by fluent speaker"}
-          </div>
-          <div style={{ display:"flex", gap:"40px", fontSize:"12px" }}>
-            <span>Name: <span style={{ display:"inline-block", width:"180px", borderBottom:"1px solid #000" }}>&nbsp;</span></span>
-            <span>Grade: <span style={{ display:"inline-block", width:"60px", borderBottom:"1px solid #000" }}>&nbsp;</span></span>
-            <span>Date: <span style={{ display:"inline-block", width:"100px", borderBottom:"1px solid #000" }}>&nbsp;</span></span>
-          </div>
+          {printMode === "answer-key" ? (
+            <>
+              <div style={{ fontSize:"20px", fontWeight:"bold", fontFamily:"Georgia,serif", marginBottom:"4px" }}>{title} — Answer Key</div>
+              <div style={{ fontSize:"11px", color:"#555" }}>
+                {gradeLabel} · {words.length} Words · StoryClue.ai
+                {isSpanish && " · AI-generated Spanish content"}
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize:"18px", fontWeight:"bold", fontFamily:"Georgia,serif", marginBottom:"6px" }}>{title}</div>
+              <div style={{ fontSize:"11px", color:"#555", marginBottom:"10px" }}>
+                {gradeLabel} · {words.length} Words · StoryClue.ai
+                {isSpanish && " · AI-generated Spanish content — recommend review by fluent speaker"}
+              </div>
+              <div style={{ display:"flex", gap:"40px", fontSize:"12px" }}>
+                <span>Name: <span style={{ display:"inline-block", width:"180px", borderBottom:"1px solid #000" }}>&nbsp;</span></span>
+                <span>Grade: <span style={{ display:"inline-block", width:"60px", borderBottom:"1px solid #000" }}>&nbsp;</span></span>
+                <span>Date: <span style={{ display:"inline-block", width:"100px", borderBottom:"1px solid #000" }}>&nbsp;</span></span>
+              </div>
+            </>
+          )}
         </div>
+
+        {/* Grid — blank for student, filled for answer key */}
         <div style={{ marginBottom:"16px", lineHeight:0 }}>
           {Array.from({ length:rows }, (_,r) => (
             <div key={r} style={{ display:"flex", lineHeight:0 }}>
@@ -530,12 +576,19 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
                 return (
                   <div key={c} className="p-cell">
                     {num && <span className="p-num">{num}</span>}
+                    {printMode === "answer-key" && (
+                      <span style={{ fontSize:`${Math.max(7, PRINT_CS / 2.5)}px`, fontWeight:"bold", fontFamily:"Arial,sans-serif", position:"relative", zIndex:1 }}>
+                        {letter}
+                      </span>
+                    )}
                   </div>
                 );
               })}
             </div>
           ))}
         </div>
+
+        {/* Clues — always shown */}
         <div style={{ display:"flex", gap:"32px", marginTop:"12px", borderTop:"1px solid #ccc", paddingTop:"10px" }}>
           <div style={{ flex:1 }}>
             <div style={{ fontSize:"13px", fontWeight:"bold", fontFamily:"Georgia,serif", marginBottom:"8px", textTransform:"uppercase", letterSpacing:"1px", borderBottom:"1px solid #ccc", paddingBottom:"4px" }}>Across</div>
@@ -619,7 +672,13 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
           <button className="btn bo" onClick={() => setShowRevealConfirm(true)} style={{ padding:"4px 12px", fontSize:"12px" }}>Show Answer</button>
           <button className="btn bo" onClick={reset} style={{ padding:"4px 12px", fontSize:"12px" }}>Restart</button>
           <button className="btn bo" onClick={() => navigate("/create")} style={{ padding:"4px 12px", fontSize:"12px" }}>New Puzzle</button>
-          <button className="btn bo" onClick={() => window.print()} style={{ padding:"4px 10px", fontSize:"12px" }}>🖨️ Print</button>
+          <button
+            className="btn bo"
+            onClick={() => isTeacher ? setShowPrintDialog(true) : triggerPrint("student")}
+            style={{ padding:"4px 10px", fontSize:"12px" }}
+          >
+            🖨️ Print
+          </button>
           <button className="btn bo" onClick={share} style={{ padding:"4px 10px", fontSize:"12px" }}>🔗 Share</button>
           {/* Reader Mode: optional word list after reveal */}
           {revealed && grade === "adult" && (
@@ -796,6 +855,45 @@ function PuzzleBoard({ title, grade, language = "english", rows, cols, words }) 
           onContinue={handleVocabContinue}
           onRestart={handleVocabRestart}
         />
+      )}
+
+      {/* ══ PRINT DIALOG (Item 5 — teacher mode only) ═══════════════════ */}
+      {showPrintDialog && (
+        <div className="confirm-overlay" onClick={() => setShowPrintDialog(false)}>
+          <div className="confirm-box" onClick={e => e.stopPropagation()} style={{ maxWidth:"380px" }}>
+            <div style={{ fontSize:"2rem", marginBottom:"0.5rem" }}>🖨️</div>
+            <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#2D5A1A", margin:"0 0 0.5rem", fontSize:"1.3rem" }}>
+              Print Options
+            </h2>
+            <p style={{ color:"#666", marginBottom:"1.5rem", fontFamily:"Lora,serif", fontSize:"0.9rem", lineHeight:1.5 }}>
+              Choose what to print:
+            </p>
+            <div style={{ display:"flex", gap:"12px" }}>
+              <button
+                onClick={() => { setShowPrintDialog(false); triggerPrint("student"); }}
+                style={{ flex:1, padding:"16px 10px", background:"#f4efe4", border:"2px solid #c8b888", borderRadius:"8px", cursor:"pointer", fontFamily:"Lora,Georgia,serif", textAlign:"center" }}
+              >
+                <div style={{ fontSize:"1.6rem", marginBottom:"6px" }}>📄</div>
+                <div style={{ fontWeight:700, fontSize:"0.95rem", color:"#2c1a08", marginBottom:"4px" }}>Student Worksheet</div>
+                <div style={{ fontSize:"0.78rem", color:"#8a7a50" }}>Blank grid + clues<br/>STUDENT watermark</div>
+              </button>
+              <button
+                onClick={() => { setShowPrintDialog(false); triggerPrint("answer-key"); }}
+                style={{ flex:1, padding:"16px 10px", background:"#fffbe8", border:"2px solid #d4a020", borderRadius:"8px", cursor:"pointer", fontFamily:"Lora,Georgia,serif", textAlign:"center" }}
+              >
+                <div style={{ fontSize:"1.6rem", marginBottom:"6px" }}>🔑</div>
+                <div style={{ fontWeight:700, fontSize:"0.95rem", color:"#7a5000", marginBottom:"4px" }}>Answer Key</div>
+                <div style={{ fontSize:"0.78rem", color:"#9a7030" }}>Filled grid + clues<br/>ANSWER KEY watermark</div>
+              </button>
+            </div>
+            <button
+              onClick={() => setShowPrintDialog(false)}
+              style={{ marginTop:"1rem", background:"none", border:"none", color:"#888", fontFamily:"Lora,serif", fontSize:"0.9rem", cursor:"pointer", textDecoration:"underline" }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
 
       {/* ══ FEEDBACK MODAL ═══════════════════════════════════════════════ */}
