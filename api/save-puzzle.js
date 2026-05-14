@@ -37,13 +37,17 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { title, grade, faith, language, rows, cols, words } = req.body || {};
+  const { title, grade, faith, language, rows, cols, words, phonicsMode, pictureMode } = req.body || {};
 
   if (!title || !Array.isArray(words) || !rows || !cols) {
     return res.status(400).json({ error: "Missing required puzzle data" });
   }
 
-  const puzzleJson = JSON.stringify({ title, grade, faith, language, rows, cols, words });
+  const puzzleJson = JSON.stringify({
+    title, grade, faith, language, rows, cols, words,
+    phonicsMode: !!phonicsMode,
+    pictureMode: !!pictureMode,
+  });
 
   try {
     // Auto-create table on first use (safe to run every time — IF NOT EXISTS)

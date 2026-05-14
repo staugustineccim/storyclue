@@ -27,6 +27,7 @@ export default async function handler(req, res) {
     inputMode, bookRef, chapterText, urlRef,
     grade = "3", faith, language = "english", bilingualMode,
     seriesMode, selectedBooks, seriesName, currentChapter,
+    phonicsMode = false, pictureMode = false,
   } = req.body || {};
 
   const gradeDesc = GRADE_DESCRIPTIONS[grade] || GRADE_DESCRIPTIONS["3"];
@@ -55,6 +56,23 @@ export default async function handler(req, res) {
       seriesNote += ` The user is currently on Chapter ${Number(currentChapter)} and has NOT read beyond it. Do NOT reference any events, character deaths, plot twists, new characters, or vocabulary introduced after Chapter ${Number(currentChapter)}.`;
     }
     seriesNote += ` This spoiler protection is critical — never reference anything from unread books or unread chapters.`;
+  }
+
+  // ── Phonics Mode (K-2 only) ─────────────────────────────────────────────
+  let phonicsNote = "";
+  if (phonicsMode && ["k","1","2"].includes(String(grade))) {
+    const pg = {
+      k:   "PHONICS CLUES — Kindergarten: Write ALL clues as beginning sounds or rhymes ONLY. Examples: 'Starts with the /fff/ sound', 'Rhymes with PIG', 'Begins like the word FARM'. Use slashes around sounds like /fff/ /sss/ /mmm/. Do NOT use definitions.",
+      "1": "PHONICS CLUES — 1st Grade: Write ALL clues using beginning sounds, ending sounds, and simple blends. Examples: 'Starts with the /wuh/ sound and has 6 letters', 'Ends with the /nt/ sound like hunt', 'Starts with the blend /sp/'. Include letter count when helpful.",
+      "2": "PHONICS CLUES — 2nd Grade: Write ALL clues using vowel sounds, digraphs, and word patterns. Examples: 'Has the long /ēē/ sound in the middle', 'Contains the /ch/ digraph', 'Follows the silent-e pattern like CAKE'. Include letter count when helpful.",
+    };
+    phonicsNote = `\n${pg[grade] || pg["2"]} Every single clue must be a phonics/sound hint — absolutely no definition-based clues.`;
+  }
+
+  // ── Picture Mode (K-2 only) ──────────────────────────────────────────────
+  let pictureNote = "";
+  if (pictureMode && ["k","1","2"].includes(String(grade))) {
+    pictureNote = `\nPICTURE MODE: For every word, also include an "emoji" field — a single emoji that clearly pictures the word (e.g. BARN→"🏚️", PIG→"🐷", SPIDER→"🕷️", FERN→"🌿", APPLE→"🍎"). Choose the most obvious emoji a 5-7 year old would instantly recognize. If no clear emoji exists, use "🔤". Update the JSON structure to: { "word": "EXAMPLE", "clue": "...", "emoji": "🔤" }`;
   }
 
   // ── Language / Spanish / Bilingual ──────────────────────────────────────
@@ -118,7 +136,7 @@ export default async function handler(req, res) {
 
     userPrompt = `Create a crossword puzzle vocabulary list from your knowledge of: "${bookRef}"
 
-Grade level for clues: ${gradeDesc}${faithNote}${seriesNote}${languageNote}
+Grade level for clues: ${gradeDesc}${faithNote}${seriesNote}${languageNote}${phonicsNote}${pictureNote}
 
 Instructions:
 - Use your knowledge of this text, chapter, or topic to identify 20 to 25 important vocabulary words
@@ -155,7 +173,7 @@ Return this exact JSON structure with no other text:
 ${resolvedText.slice(0, 6000)}
 """
 
-Grade level for clues: ${gradeDesc}${faithNote}${seriesNote}${languageNote}
+Grade level for clues: ${gradeDesc}${faithNote}${seriesNote}${languageNote}${phonicsNote}${pictureNote}
 
 Instructions:
 - Extract 20 to 25 vocabulary words from the text above

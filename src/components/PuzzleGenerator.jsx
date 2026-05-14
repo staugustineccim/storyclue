@@ -81,6 +81,10 @@ export default function PuzzleGenerator() {
   const [selectedVersion,  setSelectedVersion]  = useState(null);   // chosen version id
   const [otherVersionText, setOtherVersionText] = useState("");
 
+  // ── K-2 Early Learner features ────────────────────────────────────────────
+  const [phonicsMode, setPhonicsMode] = useState(false);
+  const [pictureMode, setPictureMode] = useState(false);
+
   // ── Item 6: generated puzzle links ────────────────────────────────────────
   const [generatedPuzzle, setGeneratedPuzzle] = useState(null); // {title, studentUrl, teacherUrl, playPath}
   const [copiedLink,      setCopiedLink]      = useState("");   // "student" | "teacher" | ""
@@ -97,6 +101,14 @@ export default function PuzzleGenerator() {
     setSelectedVersion(null);
     setOtherVersionText("");
   }, [bookRef, grade]);
+
+  // Reset K-2 features when grade moves above 2nd
+  useEffect(() => {
+    if (!["k","1","2"].includes(grade)) {
+      setPhonicsMode(false);
+      setPictureMode(false);
+    }
+  }, [grade]);
 
   useEffect(() => {
     if (searchParams.get("demo") === "cw") {
@@ -186,6 +198,7 @@ export default function PuzzleGenerator() {
     setLoading(true);
 
     try {
+      const isK2 = ["k","1","2"].includes(grade);
       const body = {
         inputMode,
         bookRef: resolvedBookRef,
@@ -199,6 +212,8 @@ export default function PuzzleGenerator() {
         selectedBooks: seriesMode ? selectedBooks : [],
         seriesName: seriesMode ? SERIES_DATA[selectedSeries]?.name : "",
         currentChapter: seriesMode ? currentChapter : "",
+        phonicsMode: isK2 && phonicsMode,
+        pictureMode: isK2 && pictureMode,
       };
 
       const res = await fetch("/api/generate", {
@@ -243,13 +258,15 @@ export default function PuzzleGenerator() {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          title:    puzzleData.title,
+          title:       puzzleData.title,
           grade,
           faith,
-          language: data.language || "english",
-          rows:     layout.rows,
-          cols:     layout.cols,
-          words:    layout.words,
+          language:    data.language || "english",
+          rows:        layout.rows,
+          cols:        layout.cols,
+          words:       layout.words,
+          phonicsMode: isK2 && phonicsMode,
+          pictureMode: isK2 && pictureMode,
         }),
       });
       const saveData = await saveRes.json();
@@ -543,6 +560,43 @@ export default function PuzzleGenerator() {
               ))}
             </div>
           </div>
+
+          {/* ── K-2 Early Learner Features ──────────────────────────────── */}
+          {["k","1","2"].includes(grade) && (
+            <div style={{ marginBottom:"24px", background:"#f0fdf4", border:"2px solid #66bb6a", borderRadius:"8px", padding:"16px" }}>
+              <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"14px", color:"#2d4a18", marginBottom:"12px" }}>
+                ✨ Early Learner Features — {grade === "k" ? "Kindergarten" : grade === "1" ? "1st Grade" : "2nd Grade"}
+              </div>
+
+              {/* Phonics Mode */}
+              <label style={{ display:"flex", alignItems:"flex-start", gap:"10px", cursor:"pointer", marginBottom:"12px" }}>
+                <input type="checkbox" checked={phonicsMode} onChange={e => setPhonicsMode(e.target.checked)}
+                  style={{ accentColor:"#3a6a1a", width:"16px", height:"16px", marginTop:"3px", flexShrink:0, cursor:"pointer" }} />
+                <div>
+                  <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"13px", color:"#2d4a18" }}>🔤 Phonics Mode</div>
+                  <div style={{ fontFamily:"Lora,serif", fontSize:"11px", color:"#4a6a28", marginTop:"2px", lineHeight:1.5 }}>
+                    Sound-based clues for early readers — rhymes, beginning sounds, and phonics patterns instead of definitions.
+                    {grade === "k" && " (K: beginning sounds & rhymes)"}
+                    {grade === "1" && " (1st: ending sounds & blends)"}
+                    {grade === "2" && " (2nd: vowel sounds & digraphs)"}
+                  </div>
+                </div>
+              </label>
+
+              {/* Picture Mode */}
+              <label style={{ display:"flex", alignItems:"flex-start", gap:"10px", cursor:"pointer" }}>
+                <input type="checkbox" checked={pictureMode} onChange={e => setPictureMode(e.target.checked)}
+                  style={{ accentColor:"#3a6a1a", width:"16px", height:"16px", marginTop:"3px", flexShrink:0, cursor:"pointer" }} />
+                <div>
+                  <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"13px", color:"#2d4a18" }}>🖼️ Picture Mode</div>
+                  <div style={{ fontFamily:"Lora,serif", fontSize:"11px", color:"#4a6a28", marginTop:"2px", lineHeight:1.5 }}>
+                    Adds a picture emoji to each clue. Perfect for children still developing reading fluency (ages 5–7).
+                    Works together with Phonics Mode.
+                  </div>
+                </div>
+              </label>
+            </div>
+          )}
 
           {/* ── Faith Tradition ─────────────────────────────────────────── */}
           <div style={{ marginBottom:"24px" }}>
