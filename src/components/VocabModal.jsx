@@ -13,9 +13,21 @@ function getBestVoice(grade) {
   if (!voices.length) return null;
   const isEarly = ["k","1","2"].includes(grade);
   const isLower = ["k","1","2","3","4","5"].includes(grade);
-  const earlyPrefs = ["Google US English Female","Samantha","Karen","Moira","Victoria","Fiona","Google UK English Female","Microsoft Zira","Microsoft Jenny"];
-  const lowerPrefs = ["Google US English Female","Samantha","Microsoft Jenny","Microsoft Zira","Google UK English Female","Karen"];
-  const upperPrefs = ["Google US English","Alex","Microsoft David","Google US English Male"];
+  const earlyPrefs = [
+    "Samantha","Google US English Female",
+    "Microsoft Jenny Online (Natural)","Microsoft Aria Online (Natural)",
+    "Karen","Moira","Victoria","Google UK English Female","Microsoft Jenny","Microsoft Zira",
+  ];
+  const lowerPrefs = [
+    "Samantha","Google US English Female",
+    "Microsoft Jenny Online (Natural)","Microsoft Aria Online (Natural)",
+    "Microsoft Jenny","Google UK English Female","Karen","Microsoft Zira",
+  ];
+  const upperPrefs = [
+    "Google US English","Alex",
+    "Microsoft Guy Online (Natural)","Microsoft Davis Online (Natural)",
+    "Microsoft David","Google US English Male",
+  ];
   const prefs = isEarly ? earlyPrefs : isLower ? lowerPrefs : upperPrefs;
   for (const name of prefs) {
     const v = voices.find(v => v.name === name);
@@ -35,9 +47,12 @@ function speakText(text, grade, muted) {
   const utt   = new SpeechSynthesisUtterance(text);
   const voice = getBestVoice(gradeStr);
   if (voice) utt.voice = voice;
-  utt.lang  = "en-US";
-  utt.rate  = isEarly ? 0.80 : isLower ? 0.90 : 1.0;
-  utt.pitch = isEarly ? 1.15 : isLower ? 1.05 : 1.0;
+  utt.lang   = "en-US";
+  utt.volume = 0.92;
+  // Keep pitch near 1.0 — high pitch is what causes the robotic/squeaky quality.
+  // Warmth comes from voice selection + slower, deliberate pacing.
+  utt.rate  = isEarly ? 0.76 : isLower ? 0.88 : 0.95;
+  utt.pitch = isEarly ? 1.02 : isLower ? 1.0  : 1.0;
   window.speechSynthesis.speak(utt);
 }
 

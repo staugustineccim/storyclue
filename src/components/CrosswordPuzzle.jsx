@@ -32,31 +32,35 @@ function getBestVoice(grade) {
   const isLower = ["k","1","2","3","4","5"].includes(grade);
 
   // Scored preference lists — first match wins
-  // K-2: warm female voices known to sound friendly to children
+  // Prioritise voices known to sound warm and natural, not robotic.
+  // Windows 11 "Online (Natural)" voices are significantly better than the old ones.
   const earlyPrefs = [
-    "Google US English Female",
-    "Samantha",                  // iOS/macOS — clear and friendly
-    "Karen",                     // macOS Australian — very clear
-    "Moira",                     // macOS Irish
-    "Victoria",                  // macOS
-    "Fiona",                     // macOS Scottish
+    "Samantha",                           // iOS/macOS — genuinely warm, not robotic
+    "Google US English Female",           // Chrome — clear and natural
+    "Microsoft Jenny Online (Natural)",   // Windows 11 — best natural female
+    "Microsoft Aria Online (Natural)",    // Windows 11 — warm female
+    "Karen",                              // macOS Australian — very clear
+    "Moira",                              // macOS Irish
+    "Victoria",                           // macOS
     "Google UK English Female",
-    "Microsoft Zira",            // Windows — friendly female
-    "Microsoft Jenny",
+    "Microsoft Jenny",                    // Windows older
+    "Microsoft Zira",                     // Windows last resort
   ];
-  // 3-5: warm adult voices
   const lowerPrefs = [
-    "Google US English Female",
     "Samantha",
+    "Google US English Female",
+    "Microsoft Jenny Online (Natural)",
+    "Microsoft Aria Online (Natural)",
     "Microsoft Jenny",
-    "Microsoft Zira",
     "Google UK English Female",
     "Karen",
+    "Microsoft Zira",
   ];
-  // 6+: clear standard voice
   const upperPrefs = [
     "Google US English",
-    "Alex",                      // macOS — very clear
+    "Alex",                               // macOS — very clear
+    "Microsoft Guy Online (Natural)",     // Windows 11 natural male
+    "Microsoft Davis Online (Natural)",
     "Microsoft David",
     "Google US English Male",
   ];
@@ -87,9 +91,12 @@ function speakTextGraded(text, grade, muted) {
   const utt   = new SpeechSynthesisUtterance(text);
   const voice = getBestVoice(gradeStr);
   if (voice) utt.voice = voice;
-  utt.lang  = "en-US";
-  utt.rate  = isEarly ? 0.80 : isLower ? 0.90 : 1.0;
-  utt.pitch = isEarly ? 1.15 : isLower ? 1.05 : 1.0;
+  utt.lang   = "en-US";
+  utt.volume = 0.92;
+  // Pitch stays near 1.0 — boosting pitch causes the robotic/squeaky effect.
+  // Warmth comes from voice selection + slower, deliberate rate.
+  utt.rate  = isEarly ? 0.76 : isLower ? 0.88 : 0.95;
+  utt.pitch = isEarly ? 1.02 : isLower ? 1.0  : 1.0;
   window.speechSynthesis.speak(utt);
 }
 
