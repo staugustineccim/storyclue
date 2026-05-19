@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useSearchParams, useNavigate, useParams } from "react-router-dom";
 import { decodePuzzle } from "../utils/urlEncoder";
 import { buildGrid, buildNumbering } from "../utils/layoutBuilder";
@@ -18,7 +18,64 @@ const GRADE_LABELS = {
 
 const MAX_HINTS = 3;
 
-// Web Speech API helper
+// ── Grade-tiered TTS ──────────────────────────────────────────────────────────
+// K-2: Google Cloud Neural2 (warm child-friendly voice) → Web Speech fallback
+// 3-5: Google Cloud Neural2 (warm adult female) → Web Speech fallback
+// 6+:  Web Speech API only (no endpoint call)
+const _ttsCache = new Map(); // simple in-memory cache so same phrase isn't re-fetched
+
+async function speakTextGraded(text, grade, muted) {
+  if (muted || !text) return;
+  const gradeStr = String(grade);
+  const useGoogleTTS = ["k","1","2","3","4","5"].includes(gradeStr);
+
+  if (useGoogleTTS) {
+    const cacheKey = `${gradeStr}:${text}`;
+    try {
+      let audioBase64 = _ttsCache.get(cacheKey);
+      if (!audioBase64) {
+        const r = await fetch("/api/tts", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ text, grade: gradeStr }),
+        });
+        if (r.status === 204 || r.status === 501 || !r.ok) {
+          // Google TTS not configured or not needed for this grade — fall back
+          speakTextWeb(text, gradeStr);
+          return;
+        }
+        const d = await r.json();
+        audioBase64 = d.audioBase64;
+        if (audioBase64) _ttsCache.set(cacheKey, audioBase64);
+      }
+      if (audioBase64) {
+        const binary = atob(audioBase64);
+        const bytes  = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const blob = new Blob([bytes], { type: "audio/mp3" });
+        const url  = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.onended = () => URL.revokeObjectURL(url);
+        audio.play().catch(() => speakTextWeb(text, gradeStr));
+        return;
+      }
+    } catch { /* fall through to Web Speech */ }
+  }
+  speakTextWeb(text, gradeStr);
+}
+
+// Web Speech API fallback
+function speakTextWeb(text, grade) {
+  if (!window.speechSynthesis) return;
+  const isEarly = ["k","1","2"].includes(grade);
+  window.speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.rate  = isEarly ? 0.82 : 1.0;
+  utt.pitch = isEarly ? 1.1  : 1.0;
+  window.speechSynthesis.speak(utt);
+}
+
+// Legacy synchronous helper kept for celebration phrases (no grade/muted context needed)
 function speakText(text, rate = 1.0, pitch = 1.0) {
   if (!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
@@ -26,6 +83,26 @@ function speakText(text, rate = 1.0, pitch = 1.0) {
   utt.rate  = rate;
   utt.pitch = pitch;
   window.speechSynthesis.speak(utt);
+}
+
+// Web Audio API celebration sounds — no external files needed
+function playCelebrationSound(type = "word") {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const notes = type === "win"
+      ? [{ f:261.63, t:0 }, { f:329.63, t:0.14 }, { f:392, t:0.28 }, { f:523.25, t:0.44 }]
+      : [{ f:392, t:0 }, { f:523.25, t:0.14 }, { f:659.25, t:0.28 }];
+    notes.forEach(({ f, t }) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = f; osc.type = "sine";
+      gain.gain.setValueAtTime(0.22, ctx.currentTime + t);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.48);
+      osc.start(ctx.currentTime + t);
+      osc.stop(ctx.currentTime + t + 0.5);
+    });
+  } catch { /* silently fail — AudioContext may be unavailable */ }
 }
 
 // Confetti piece generator
@@ -145,6 +222,12 @@ function PuzzleBoard({
   const [confettiPieces, setConfettiPieces] = useState([]);
   const [mascotMood,     setMascotMood]     = useState("idle"); // "idle"|"happy"|"encouraging"
 
+  // ── Audio / mute ──────────────────────────────────────────────────────────
+  const [muted, setMuted] = useState(() => localStorage.getItem("sc-muted") === "1");
+
+  // ── Picture mode: Wikipedia images ───────────────────────────────────────
+  const [wordImages, setWordImages] = useState({}); // { "WORD": "https://..." }
+
   // ── Context review (Item 6) ───────────────────────────────────────────────
   const [showContextReview, setShowContextReview] = useState(false);
   const [contextSentences,  setContextSentences]  = useState(null);
@@ -159,8 +242,25 @@ function PuzzleBoard({
   const userExitedFsRef   = useRef(false);
   const mascotTimerRef    = useRef(null);
   const completedWordsRef = useRef(new Set());
+  const mutedRef          = useRef(muted);
 
   // ── Effects ───────────────────────────────────────────────────────────────
+
+  // Keep muted ref in sync so closure-based effects always see current value
+  useEffect(() => { mutedRef.current = muted; }, [muted]);
+
+  // Picture mode: fetch Wikipedia thumbnail images for vocabulary words
+  useEffect(() => {
+    if (!pictureMode || !words.length) return;
+    fetch("/api/get-images", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ words: words.map(w => w.answer) }),
+    })
+      .then(r => r.json())
+      .then(data => { if (data.images) setWordImages(data.images); })
+      .catch(() => { /* silently fail — emoji is the fallback */ });
+  }, []); // eslint-disable-line
 
   // Puzzle timer
   useEffect(() => {
@@ -193,6 +293,21 @@ function PuzzleBoard({
   useEffect(() => {
     activeClueRef.current?.scrollIntoView({ behavior:"auto", block:"center" });
   }, [activeWord]);
+
+  // ── Auto-win detection ────────────────────────────────────────────────────
+  // Fires immediately when the last correct letter is entered — no need to
+  // click Check. Guards: not already won, not revealed, timer must be running
+  // (timer starts on first keypress, so this never fires on initial load).
+  useEffect(() => {
+    if (won || revealed || !timerActive) return;
+    const allSolved = SOLUTION.every((row, r) =>
+      row.every((cell, c) => !cell || cells[r][c] === cell)
+    );
+    if (allSolved) {
+      setWon(true);
+      setTimerActive(false);
+    }
+  }, [cells]); // eslint-disable-line
 
   // Feedback modal timing
   useEffect(() => {
@@ -231,8 +346,11 @@ function PuzzleBoard({
     }
     if (newCompletion) {
       triggerConfetti();
+      playCelebrationSound("word");
       const phrases = ["Great job!", "You got it!", "Wonderful!", "Keep going!"];
-      setTimeout(() => speakText(phrases[Math.floor(Math.random() * phrases.length)], 0.9, 1.2), 200);
+      setTimeout(() => {
+        if (!mutedRef.current) speakText(phrases[Math.floor(Math.random() * phrases.length)], 0.9, 1.2);
+      }, 200);
     }
   }, [cells]); // eslint-disable-line
 
@@ -240,7 +358,10 @@ function PuzzleBoard({
   useEffect(() => {
     if (won && isEarlyLearner) {
       triggerConfetti();
-      setTimeout(() => speakText("You did it! Amazing work! You solved the puzzle!", 0.85, 1.2), 600);
+      playCelebrationSound("win");
+      setTimeout(() => {
+        if (!mutedRef.current) speakText("You did it! Amazing work! You solved the puzzle!", 0.85, 1.2);
+      }, 600);
     }
   }, [won]); // eslint-disable-line
 
@@ -450,6 +571,15 @@ function PuzzleBoard({
     completedWordsRef.current = new Set();
   }
 
+  function toggleMute() {
+    setMuted(m => {
+      const next = !m;
+      localStorage.setItem("sc-muted", next ? "1" : "0");
+      if (next) window.speechSynthesis?.cancel();
+      return next;
+    });
+  }
+
   function share() {
     navigator.clipboard?.writeText(window.location.href).then(() => {
       setShareMsg("Copied!"); setTimeout(() => setShareMsg(""), 2000);
@@ -572,7 +702,7 @@ function PuzzleBoard({
         .cnum{position:absolute;top:2px;left:2px;font-size:var(--ns);color:#5a4010;font-weight:700;font-family:Lora,Georgia,serif;pointer-events:none;z-index:2;line-height:1;}
 
         /* ── K-2 Early Learner overrides ─────────────────────────────────── */
-        .el-grid{--cs:50px;--fs:22px}
+        .el-grid{--cs:50px;--fs:22px;--ns:12px}
         @media(max-width:480px){.el-grid{--cs:38px;--fs:18px}}
         .el-grid .ci{border-radius:10px!important;border:2.5px solid #81c784!important;background:#f1f8e9!important;}
         .el-grid .cwrap{border-radius:10px!important;overflow:visible}
@@ -785,7 +915,8 @@ function PuzzleBoard({
               {pictureMode && <span style={{ marginLeft:"6px", fontSize:"11px", background:"rgba(255,255,255,.2)", borderRadius:"10px", padding:"1px 7px" }}>🖼️ Pictures</span>}
             </div>
             <div className="hdr-sub" style={{ fontSize:"10px", color: isEarlyLearner ? "#a5d6a7" : "#a8d890", fontStyle:"italic", letterSpacing:"1px" }}>
-              {gradeLabel ? `${gradeLabel} · ` : ""}{words.length} Words{isSpanish ? " · 🇪🇸 Spanish" : ""}
+              {gradeLabel ? `${gradeLabel} · ` : ""}{words.length} Words{isSpanish ? " · 🇪🇸 Spanish" : ""}{" · "}
+              <span style={{ color:"#81c784" }}>🛡️ Safe for K-12</span>
             </div>
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:"12px", flexShrink:0 }}>
@@ -828,6 +959,9 @@ function PuzzleBoard({
           <button className="btn bo" onClick={() => isTeacher ? setShowPrintDialog(true) : triggerPrint("student")}
             style={{ padding:"4px 10px", fontSize:"12px" }}>🖨️ Print</button>
           <button className="btn bo" onClick={share} style={{ padding:"4px 10px", fontSize:"12px" }}>🔗 Share</button>
+          <button className="btn bo" onClick={toggleMute} style={{ padding:"4px 10px", fontSize:"14px" }} title={muted ? "Unmute audio" : "Mute audio"}>
+            {muted ? "🔇" : "🔊"}
+          </button>
 
           {/* Reader Mode: optional word list after reveal */}
           {revealed && grade === "adult" && (
@@ -860,9 +994,14 @@ function PuzzleBoard({
                 {activeWord.number} {activeWord.orientation.toUpperCase()}
               </span>
 
-              {/* Picture mode: show emoji prominently */}
-              {pictureMode && activeWord.emoji && activeWord.emoji !== "🔤" && (
-                <span style={{ fontSize:"1.6rem", flexShrink:0 }}>{activeWord.emoji}</span>
+              {/* Picture mode: Wikipedia image with emoji fallback */}
+              {pictureMode && (
+                wordImages[activeWord.answer]
+                  ? <img src={wordImages[activeWord.answer]} alt={activeWord.answer}
+                      style={{ width:"44px", height:"44px", objectFit:"cover", borderRadius:"6px", flexShrink:0, border:"1.5px solid rgba(255,255,255,.3)" }} />
+                  : activeWord.emoji && activeWord.emoji !== "🔤"
+                    ? <span style={{ fontSize:"1.6rem", flexShrink:0 }}>{activeWord.emoji}</span>
+                    : null
               )}
 
               <span className="clue-bar-text" style={{ fontFamily:"Lora,serif", fontSize:"14px", color:"#f0ead8", lineHeight:1.35, fontWeight:600, flex:1, minWidth:0 }}>
@@ -872,7 +1011,7 @@ function PuzzleBoard({
 
               {/* Audio button — always visible, auto-played for K-2 via VocabModal; here it's on-demand */}
               <button
-                onClick={e => { e.stopPropagation(); speakText(getClue(activeWord), isEarlyLearner ? 0.82 : 1.0, isEarlyLearner ? 1.1 : 1.0); }}
+                onClick={e => { e.stopPropagation(); speakTextGraded(getClue(activeWord), grade, muted); }}
                 title="Read clue aloud"
                 style={{ background:"rgba(255,255,255,.15)", border:"1px solid rgba(255,255,255,.35)", borderRadius:"5px", padding:"3px 8px", cursor:"pointer", fontSize:"14px", lineHeight:1, flexShrink:0 }}
               >
@@ -967,10 +1106,56 @@ function PuzzleBoard({
               <button className={`ctab${clueTab==="across"?" on":""}`} onClick={() => setClueTab("across")}>Across ({ACROSS.length})</button>
               <button className={`ctab${clueTab==="down"?" on":""}`}   onClick={() => setClueTab("down")}>Down ({DOWN.length})</button>
             </div>
-            <div style={{ overflowY:"auto", WebkitOverflowScrolling:"touch", flex:1, minHeight:0, padding:"4px 8px" }}>
+            <div style={{
+              overflowY:"auto", WebkitOverflowScrolling:"touch", flex:1, minHeight:0,
+              padding: pictureMode && isEarlyLearner ? "8px 4px" : "4px 8px",
+              display: pictureMode && isEarlyLearner ? "flex" : "block",
+              flexWrap: "wrap",
+              alignContent: "flex-start",
+              gap: pictureMode && isEarlyLearner ? "4px" : "0",
+            }}>
               {clueList.map(w => {
                 const isActive  = activeWord?.number === w.number && activeWord?.orientation === clueTab;
                 const isSimpler = !!simplerClues[wordKey(w)];
+                const isK2Pic   = pictureMode && isEarlyLearner;
+                const imgSrc    = wordImages[w.answer];
+                const emoji     = w.emoji && w.emoji !== "🔤" ? w.emoji : null;
+
+                if (isK2Pic) {
+                  // ── K-2 Picture Mode: large picture AS the clue, no text ──────
+                  return (
+                    <div
+                      key={`${clueTab}${w.number}`}
+                      ref={isActive ? activeClueRef : null}
+                      style={{
+                        display:"flex", flexDirection:"column", alignItems:"center",
+                        padding:"8px 4px", cursor:"pointer", borderRadius:"8px",
+                        background: isActive ? "#e8f0d8" : "transparent",
+                        border: `2px solid ${isActive ? "#2D5A1A" : "transparent"}`,
+                        margin:"4px 2px", transition:"all .15s",
+                      }}
+                      onClick={() => { setActiveWord(w); setClueTab(w.orientation); focusFirstEmpty(w); }}
+                    >
+                      {imgSrc ? (
+                        <img src={imgSrc} alt=""
+                          style={{ width:"72px", height:"72px", objectFit:"cover", borderRadius:"8px",
+                            border: isActive ? "2px solid #2D5A1A" : "2px solid #c8b888",
+                            boxShadow: isActive ? "0 2px 8px rgba(45,90,26,.3)" : "none" }} />
+                      ) : emoji ? (
+                        <div style={{ fontSize:"3.2rem", lineHeight:1 }}>{emoji}</div>
+                      ) : (
+                        <div style={{ fontSize:"11px", color:"#8a7a50", fontFamily:"Lora,serif",
+                          textAlign:"center", padding:"4px", lineHeight:1.4 }}>{getClue(w)}</div>
+                      )}
+                      <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700,
+                        fontSize:"11px", color: isActive ? "#2D5A1A" : "#6a5a30", marginTop:"4px" }}>
+                        {w.number}. {w.orientation === "across" ? "→" : "↓"}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // ── Standard clue display ──────────────────────────────────────
                 return (
                   <div
                     key={`${clueTab}${w.number}`}
@@ -979,9 +1164,14 @@ function PuzzleBoard({
                     onClick={() => { setActiveWord(w); setClueTab(w.orientation); focusFirstEmpty(w); }}
                   >
                     <span className="cn">{w.number}.</span>
-                    {/* Picture mode: show emoji before clue text */}
-                    {pictureMode && w.emoji && w.emoji !== "🔤" && (
-                      <span style={{ fontSize:"1.4rem", marginRight:"6px", verticalAlign:"middle" }}>{w.emoji}</span>
+                    {/* Picture mode: Wikipedia image thumbnail with emoji fallback */}
+                    {pictureMode && (
+                      imgSrc
+                        ? <img src={imgSrc} alt={w.answer}
+                            style={{ width:"26px", height:"26px", objectFit:"cover", borderRadius:"4px", marginRight:"6px", verticalAlign:"middle", border:"1px solid #c8b888" }} />
+                        : emoji
+                          ? <span style={{ fontSize:"1.4rem", marginRight:"6px", verticalAlign:"middle" }}>{emoji}</span>
+                          : null
                     )}
                     {getClue(w)}
                     {isSimpler && <span style={{ fontSize:"10px", color:"#8a7a30", marginLeft:"5px" }}>✏️</span>}
@@ -1045,6 +1235,7 @@ function PuzzleBoard({
           words={words}
           grade={grade}
           phonicsMode={phonicsMode}
+          muted={muted}
           continueAvailable={!continueUsed}
           readerMode={grade === "adult"}
           onContinue={handleVocabContinue}

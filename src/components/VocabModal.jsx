@@ -6,13 +6,53 @@ const STUDY_SECS = 45;
 const isEarlyGrade   = g => ["k","1","2","3","4","5"].includes(String(g));
 const isEarlyLearner = g => ["k","1","2"].includes(String(g));
 
-// ── Web Speech API helper ───────────────────────────────────────────────────
-function speakText(text, grade) {
+// ── Grade-tiered TTS (mirrors CrosswordPuzzle.jsx implementation) ────────────
+const _vocabTtsCache = new Map();
+
+async function speakText(text, grade, muted) {
+  if (muted || !text) return;
+  const gradeStr = String(grade);
+  const useGoogle = ["k","1","2","3","4","5"].includes(gradeStr);
+
+  if (useGoogle) {
+    const key = `${gradeStr}:${text}`;
+    try {
+      let b64 = _vocabTtsCache.get(key);
+      if (!b64) {
+        const r = await fetch("/api/tts", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ text, grade: gradeStr }),
+        });
+        if (r.status === 204 || r.status === 501 || !r.ok) {
+          speakTextWeb(text, gradeStr); return;
+        }
+        const d = await r.json();
+        b64 = d.audioBase64;
+        if (b64) _vocabTtsCache.set(key, b64);
+      }
+      if (b64) {
+        const bin = atob(b64);
+        const buf = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+        const url   = URL.createObjectURL(new Blob([buf], { type: "audio/mp3" }));
+        const audio = new Audio(url);
+        audio.onended = () => URL.revokeObjectURL(url);
+        audio.play().catch(() => speakTextWeb(text, gradeStr));
+        return;
+      }
+    } catch { /* fall through */ }
+  }
+  speakTextWeb(text, gradeStr);
+}
+
+function speakTextWeb(text, grade) {
   if (!window.speechSynthesis) return;
+  const isEarly = ["k","1","2"].includes(String(grade));
   window.speechSynthesis.cancel();
   const utt = new SpeechSynthesisUtterance(text);
-  utt.rate  = isEarlyLearner(grade) ? 0.82 : 1.0;
-  utt.pitch = isEarlyLearner(grade) ? 1.1  : 1.0;
+  utt.rate  = isEarly ? 0.82 : 1.0;
+  utt.pitch = isEarly ? 1.1  : 1.0;
   window.speechSynthesis.speak(utt);
 }
 
@@ -35,6 +75,7 @@ export default function VocabModal({
   readerMode   = false,
   grade        = "3",
   phonicsMode  = false,
+  muted        = false,
 }) {
   const early   = isEarlyLearner(grade);
   const lower   = isEarlyGrade(grade);   // K–5
@@ -60,6 +101,8 @@ export default function VocabModal({
 
   const autoRef  = useRef(null);
   const studyRef = useRef(null);
+  const mutedRef = useRef(muted);
+  useEffect(() => { mutedRef.current = muted; }, [muted]);
 
   // cleanup on unmount
   useEffect(() => () => {
@@ -76,13 +119,13 @@ export default function VocabModal({
     return () => clearTimeout(autoRef.current);
   }, [phase, cardIndex, speed]); // eslint-disable-line
 
-  // K-2: auto-speak when card changes
+  // K-2: auto-speak when card changes (graded TTS, respects mute)
   useEffect(() => {
     if (phase !== "cards" || !early) return;
     const w = words[cardIndex];
     if (!w) return;
     const text = `${w.answer}. ${w.clue}`;
-    const t = setTimeout(() => speakText(text, grade), 350);
+    const t = setTimeout(() => speakText(text, grade, mutedRef.current), 350);
     return () => clearTimeout(t);
   }, [cardIndex, phase]); // eslint-disable-line
 
@@ -160,7 +203,7 @@ export default function VocabModal({
   function speakCurrent() {
     const w = words[cardIndex];
     if (!w) return;
-    speakText(`${w.answer}. ${w.clue}`, grade);
+    speakText(`${w.answer}. ${w.clue}`, grade, muted);
   }
 
   // ── Derived values ───────────────────────────────────────────────────────

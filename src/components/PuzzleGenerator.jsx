@@ -230,7 +230,7 @@ export default function PuzzleGenerator() {
         return;
       }
 
-      if (!data.words || data.words.length < 10) {
+      if (!data.words || data.words.length < 3) {
         setError("No vocabulary found. Try being more specific about the book and chapter.");
         setLoading(false);
         return;
@@ -338,9 +338,14 @@ export default function PuzzleGenerator() {
       {/* Header */}
       <div style={{ background:"linear-gradient(135deg,#2d4a18,#4a7a22)", padding:"14px 20px", borderBottom:"3px solid #8a7a30", display:"flex", alignItems:"center", gap:"14px" }}>
         <button onClick={() => navigate("/")} style={{ background:"none", border:"none", cursor:"pointer", fontSize:"28px", padding:0 }}>🕷️</button>
-        <div>
+        <div style={{ flex:1 }}>
           <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"20px", color:"#f0ead8", lineHeight:1.1 }}>StoryClue</div>
           <div style={{ fontSize:"11px", color:"#a8d890", fontStyle:"italic" }}>AI Generated Crossword Puzzle Maker</div>
+        </div>
+        {/* Safety badge */}
+        <div style={{ background:"rgba(255,255,255,.15)", border:"1.5px solid rgba(255,255,255,.4)", borderRadius:"20px", padding:"4px 10px", display:"flex", alignItems:"center", gap:"5px", flexShrink:0 }}>
+          <span style={{ fontSize:"13px" }}>🛡️</span>
+          <span style={{ fontFamily:"Lora,serif", fontSize:"10px", color:"#f0ead8", fontWeight:600, lineHeight:1.2 }}>Safe for<br/>K-12</span>
         </div>
       </div>
 
@@ -349,7 +354,7 @@ export default function PuzzleGenerator() {
           Create Your Crossword
         </h1>
         <p style={{ fontFamily:"Lora,serif", fontSize:"15px", color:"#6a5a30", marginBottom:"28px", fontStyle:"italic" }}>
-          Name any book and chapter, paste your own text, or drop in a URL. StoryClue builds the puzzle in seconds.
+          Name any book and chapter, paste your own text, drop in a URL, or paste a YouTube video link. StoryClue builds the puzzle in seconds.
         </p>
 
         {/* ── Item 6: Puzzle-ready confirmation screen ──────────────── */}
@@ -458,7 +463,7 @@ export default function PuzzleGenerator() {
               </button>
               <button type="button" className={`mode-btn${inputMode==="url"?" on":""}`}
                 onClick={() => setInputMode("url")}>
-                🌐 Paste a URL
+                🌐 URL or YouTube
               </button>
             </div>
           </div>
@@ -512,19 +517,29 @@ export default function PuzzleGenerator() {
           {/* ── URL MODE ────────────────────────────────────────────────── */}
           {inputMode === "url" && (
             <div style={{ marginBottom:"24px" }}>
-              <label style={labelStyle}>Article or Web Page URL</label>
+              <label style={labelStyle}>URL, YouTube Video, or Web Page</label>
               <input
                 type="url"
                 value={urlRef}
                 onChange={e => setUrlRef(e.target.value)}
-                placeholder="https://example.com/article"
-                style={{ ...inputStyle, fontSize:"15px", padding:"12px 14px" }}
+                placeholder="Paste anything — a YouTube video, sermon, article, Wikipedia page, or any URL"
+                style={{ ...inputStyle, fontSize:"14px", padding:"12px 14px" }}
               />
               <div style={{ marginTop:"10px", padding:"10px 12px", background:"#e8f0d8", borderRadius:"4px", border:"1px solid #b8d898" }}>
-                <div style={{ fontFamily:"Lora,serif", fontSize:"12px", color:"#3a5a18", lineHeight:1.6 }}>
-                  StoryClue will fetch the article and extract the text automatically. <strong>Note:</strong> Some websites block outside access — if that happens, copy and paste the article text directly using the Paste option instead.
+                <div style={{ fontFamily:"Lora,serif", fontSize:"12px", color:"#3a5a18", lineHeight:1.7 }}>
+                  <strong>YouTube videos</strong> (sermons, lectures, documentaries) — StoryClue extracts the captions automatically.<br/>
+                  <strong>Web articles</strong> — StoryClue fetches and reads the page text.<br/>
+                  <strong>Vimeo videos</strong> — title and description are used for puzzle generation.<br/>
+                  <span style={{ color:"#7a5500" }}>Note: If a site blocks access, paste the text directly using the Paste option instead.</span>
                 </div>
               </div>
+              {urlRef.trim() && /youtube\.com|youtu\.be/.test(urlRef) && (
+                <div style={{ marginTop:"8px", padding:"8px 12px", background:"#fff3e0", border:"1px solid #ffb74d", borderRadius:"4px" }}>
+                  <div style={{ fontFamily:"Lora,serif", fontSize:"12px", color:"#e65100" }}>
+                    📺 YouTube video detected — StoryClue will extract the captions automatically.
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
