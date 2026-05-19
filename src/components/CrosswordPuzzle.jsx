@@ -5,6 +5,7 @@ import { buildGrid, buildNumbering } from "../utils/layoutBuilder";
 import FeedbackModal from "./FeedbackModal";
 import VocabModal from "./VocabModal";
 import ContextReviewModal from "./ContextReviewModal";
+import { trackEvent } from "../utils/analytics";
 
 function formatTime(s) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -336,6 +337,12 @@ function PuzzleBoard({
     if (allSolved) {
       setWon(true);
       setTimerActive(false);
+      trackEvent("puzzle_completed", {
+        book_title:          title,
+        grade_level:         grade,
+        time_taken_seconds:  seconds,
+        mistake_count:       mistakes,
+      });
     }
   }, [cells]); // eslint-disable-line
 
@@ -564,6 +571,11 @@ function PuzzleBoard({
     setShowRevealConfirm(false);
     setTimerActive(false);
     setChecked(false);
+    trackEvent("show_answer_clicked", {
+      book_title:         title,
+      grade_level:        grade,
+      time_taken_seconds: seconds,
+    });
     if (grade === "adult") {
       setCells(SOLUTION.map(row => row.map(c => c || "")));
       setRevealed(true);
@@ -614,6 +626,7 @@ function PuzzleBoard({
     navigator.clipboard?.writeText(window.location.href).then(() => {
       setShareMsg("Copied!"); setTimeout(() => setShareMsg(""), 2000);
     }).catch(() => { setShareMsg("Copy URL from browser"); setTimeout(() => setShareMsg(""), 3000); });
+    trackEvent("puzzle_shared", { book_title: title, grade_level: grade, source: "play_page" });
   }
 
   function triggerPrint(mode) { setPrintMode(mode); }
@@ -643,6 +656,7 @@ function PuzzleBoard({
         setHintMsg(`Letter revealed! (${hintsLeft - 1} hint${hintsLeft - 1 !== 1 ? "s" : ""} left)`);
         setTimeout(() => setHintMsg(""), 3000);
         setShowHintMenu(false);
+        trackEvent("hint_used", { hint_type: "letter", grade_level: grade, book_title: title });
         return;
       }
     }
@@ -669,6 +683,7 @@ function PuzzleBoard({
         setSimplerClues(prev => ({ ...prev, [key]: data.clue }));
         setHintsLeft(h => h - 1);
         setHintMsg(`Clue simplified! (${hintsLeft - 1} hint${hintsLeft - 1 !== 1 ? "s" : ""} left)`);
+        trackEvent("hint_used", { hint_type: "simpler_clue", grade_level: grade, book_title: title });
       } else { setHintMsg("Couldn't simplify that clue. Try again."); }
     } catch { setHintMsg("Couldn't reach the server. Try again."); }
     setHintLoading(false);

@@ -13,6 +13,7 @@ export default function App() {
       <Route path="/play" element={<CrosswordPuzzle />} />
       <Route path="/play/:slug" element={<CrosswordPuzzle />} />
       <Route path="/admin" element={<AdminDashboard />} />
+      <Route path="/marketing-admin" element={<AdminDashboard />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { trackEvent } from "../utils/analytics";
 
 export default function FeedbackModal({ puzzleTitle, grade, wasRevealed, onClose }) {
   const [step, setStep] = useState("rating"); // "rating" | "followup" | "thanks"
@@ -47,6 +48,12 @@ export default function FeedbackModal({ puzzleTitle, grade, wasRevealed, onClose
         }),
       });
     } catch { /* non-blocking */ }
+    trackEvent("feedback_submitted", {
+      stars,
+      would_pay:   answer,
+      grade_level: grade,
+      was_revealed: wasRevealed,
+    });
     setStep("thanks");
   }
 

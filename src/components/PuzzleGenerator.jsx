@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { buildLayout } from "../utils/layoutBuilder";
 import { buildDemoData, getDemoUrl, SERIES_DATA } from "../utils/demoData";
 import { savePrefs, loadPrefs } from "../utils/prefs";
+import { trackEvent } from "../utils/analytics";
 
 const GRADE_GROUPS = [
   { label: "Early Learners", grades: [
@@ -126,6 +127,14 @@ export default function PuzzleGenerator() {
       setCopiedLink(which + "-fail");
       setTimeout(() => setCopiedLink(""), 2500);
     });
+    // Track every share click (both student and teacher links)
+    if (generatedPuzzle) {
+      trackEvent("puzzle_shared", {
+        book_title:  generatedPuzzle.title,
+        grade_level: grade,
+        link_type:   which, // "student" | "teacher"
+      });
+    }
   }
 
   function toggleBook(book) {
@@ -284,6 +293,16 @@ export default function PuzzleGenerator() {
         playPath:   `/play/${saveData.slug}`,
         slug:       saveData.slug,
       });
+
+      // Track puzzle generation
+      trackEvent("puzzle_generated", {
+        book_title:      puzzleData.title,
+        grade_level:     grade,
+        faith_tradition: faith,
+        language:        data.language || "english",
+        input_method:    inputMode,
+      });
+
       setLoading(false);
     } catch (err) {
       console.error(err);
