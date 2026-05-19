@@ -104,7 +104,6 @@ function speakTextGraded(text, grade, muted) {
 function speakTextWeb(text, grade) {
   speakTextGraded(text, grade || "3", false);
 }
-}
 
 // Legacy synchronous helper kept for celebration phrases (no grade/muted context needed)
 function speakText(text, rate = 1.0, pitch = 1.0) {
