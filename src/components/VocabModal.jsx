@@ -6,53 +6,38 @@ const STUDY_SECS = 45;
 const isEarlyGrade   = g => ["k","1","2","3","4","5"].includes(String(g));
 const isEarlyLearner = g => ["k","1","2"].includes(String(g));
 
-// ── Grade-tiered TTS (mirrors CrosswordPuzzle.jsx implementation) ────────────
-const _vocabTtsCache = new Map();
-
-async function speakText(text, grade, muted) {
-  if (muted || !text) return;
-  const gradeStr = String(grade);
-  const useGoogle = ["k","1","2","3","4","5"].includes(gradeStr);
-
-  if (useGoogle) {
-    const key = `${gradeStr}:${text}`;
-    try {
-      let b64 = _vocabTtsCache.get(key);
-      if (!b64) {
-        const r = await fetch("/api/tts", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ text, grade: gradeStr }),
-        });
-        if (r.status === 204 || r.status === 501 || !r.ok) {
-          speakTextWeb(text, gradeStr); return;
-        }
-        const d = await r.json();
-        b64 = d.audioBase64;
-        if (b64) _vocabTtsCache.set(key, b64);
-      }
-      if (b64) {
-        const bin = atob(b64);
-        const buf = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-        const url   = URL.createObjectURL(new Blob([buf], { type: "audio/mp3" }));
-        const audio = new Audio(url);
-        audio.onended = () => URL.revokeObjectURL(url);
-        audio.play().catch(() => speakTextWeb(text, gradeStr));
-        return;
-      }
-    } catch { /* fall through */ }
+// ── Smart Web Speech voice picker (same logic as CrosswordPuzzle.jsx) ────────
+function getBestVoice(grade) {
+  if (!window.speechSynthesis) return null;
+  const voices  = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+  const isEarly = ["k","1","2"].includes(grade);
+  const isLower = ["k","1","2","3","4","5"].includes(grade);
+  const earlyPrefs = ["Google US English Female","Samantha","Karen","Moira","Victoria","Fiona","Google UK English Female","Microsoft Zira","Microsoft Jenny"];
+  const lowerPrefs = ["Google US English Female","Samantha","Microsoft Jenny","Microsoft Zira","Google UK English Female","Karen"];
+  const upperPrefs = ["Google US English","Alex","Microsoft David","Google US English Male"];
+  const prefs = isEarly ? earlyPrefs : isLower ? lowerPrefs : upperPrefs;
+  for (const name of prefs) {
+    const v = voices.find(v => v.name === name);
+    if (v) return v;
   }
-  speakTextWeb(text, gradeStr);
+  const enUs = voices.filter(v => v.lang?.startsWith("en"));
+  if (isLower) { const f = enUs.find(v => /female|woman|girl/i.test(v.name)); if (f) return f; }
+  return enUs[0] || voices[0] || null;
 }
 
-function speakTextWeb(text, grade) {
-  if (!window.speechSynthesis) return;
-  const isEarly = ["k","1","2"].includes(String(grade));
+function speakText(text, grade, muted) {
+  if (muted || !text || !window.speechSynthesis) return;
+  const gradeStr = String(grade);
+  const isEarly  = ["k","1","2"].includes(gradeStr);
+  const isLower  = ["k","1","2","3","4","5"].includes(gradeStr);
   window.speechSynthesis.cancel();
-  const utt = new SpeechSynthesisUtterance(text);
-  utt.rate  = isEarly ? 0.82 : 1.0;
-  utt.pitch = isEarly ? 1.1  : 1.0;
+  const utt   = new SpeechSynthesisUtterance(text);
+  const voice = getBestVoice(gradeStr);
+  if (voice) utt.voice = voice;
+  utt.lang  = "en-US";
+  utt.rate  = isEarly ? 0.80 : isLower ? 0.90 : 1.0;
+  utt.pitch = isEarly ? 1.15 : isLower ? 1.05 : 1.0;
   window.speechSynthesis.speak(utt);
 }
 

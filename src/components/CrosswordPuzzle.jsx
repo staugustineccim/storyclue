@@ -18,61 +18,85 @@ const GRADE_LABELS = {
 
 const MAX_HINTS = 3;
 
-// ── Grade-tiered TTS ──────────────────────────────────────────────────────────
-// K-2: Google Cloud Neural2 (warm child-friendly voice) → Web Speech fallback
-// 3-5: Google Cloud Neural2 (warm adult female) → Web Speech fallback
-// 6+:  Web Speech API only (no endpoint call)
-const _ttsCache = new Map(); // simple in-memory cache so same phrase isn't re-fetched
+// ── Smart Web Speech voice picker — no API key needed ─────────────────────────
+// Ranks available browser voices to find the warmest/clearest for each grade tier.
+// Chrome has "Google US English", iOS has "Samantha", etc. — we pick the best one.
+let _voiceCache = null;
 
-async function speakTextGraded(text, grade, muted) {
-  if (muted || !text) return;
-  const gradeStr = String(grade);
-  const useGoogleTTS = ["k","1","2","3","4","5"].includes(gradeStr);
+function getBestVoice(grade) {
+  if (!window.speechSynthesis) return null;
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
 
-  if (useGoogleTTS) {
-    const cacheKey = `${gradeStr}:${text}`;
-    try {
-      let audioBase64 = _ttsCache.get(cacheKey);
-      if (!audioBase64) {
-        const r = await fetch("/api/tts", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ text, grade: gradeStr }),
-        });
-        if (r.status === 204 || r.status === 501 || !r.ok) {
-          // Google TTS not configured or not needed for this grade — fall back
-          speakTextWeb(text, gradeStr);
-          return;
-        }
-        const d = await r.json();
-        audioBase64 = d.audioBase64;
-        if (audioBase64) _ttsCache.set(cacheKey, audioBase64);
-      }
-      if (audioBase64) {
-        const binary = atob(audioBase64);
-        const bytes  = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        const blob = new Blob([bytes], { type: "audio/mp3" });
-        const url  = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audio.onended = () => URL.revokeObjectURL(url);
-        audio.play().catch(() => speakTextWeb(text, gradeStr));
-        return;
-      }
-    } catch { /* fall through to Web Speech */ }
+  const isEarly = ["k","1","2"].includes(grade);
+  const isLower = ["k","1","2","3","4","5"].includes(grade);
+
+  // Scored preference lists — first match wins
+  // K-2: warm female voices known to sound friendly to children
+  const earlyPrefs = [
+    "Google US English Female",
+    "Samantha",                  // iOS/macOS — clear and friendly
+    "Karen",                     // macOS Australian — very clear
+    "Moira",                     // macOS Irish
+    "Victoria",                  // macOS
+    "Fiona",                     // macOS Scottish
+    "Google UK English Female",
+    "Microsoft Zira",            // Windows — friendly female
+    "Microsoft Jenny",
+  ];
+  // 3-5: warm adult voices
+  const lowerPrefs = [
+    "Google US English Female",
+    "Samantha",
+    "Microsoft Jenny",
+    "Microsoft Zira",
+    "Google UK English Female",
+    "Karen",
+  ];
+  // 6+: clear standard voice
+  const upperPrefs = [
+    "Google US English",
+    "Alex",                      // macOS — very clear
+    "Microsoft David",
+    "Google US English Male",
+  ];
+
+  const prefs = isEarly ? earlyPrefs : isLower ? lowerPrefs : upperPrefs;
+
+  // Try exact name matches first
+  for (const name of prefs) {
+    const v = voices.find(v => v.name === name);
+    if (v) return v;
   }
-  speakTextWeb(text, gradeStr);
+  // Fall back: any en-US female voice for K-5, any en-US for 6+
+  const enUs = voices.filter(v => v.lang?.startsWith("en"));
+  if (isLower) {
+    const female = enUs.find(v => /female|woman|girl/i.test(v.name));
+    if (female) return female;
+  }
+  return enUs[0] || voices[0] || null;
 }
 
-// Web Speech API fallback
-function speakTextWeb(text, grade) {
-  if (!window.speechSynthesis) return;
-  const isEarly = ["k","1","2"].includes(grade);
+function speakTextGraded(text, grade, muted) {
+  if (muted || !text || !window.speechSynthesis) return;
+  const gradeStr = String(grade);
+  const isEarly  = ["k","1","2"].includes(gradeStr);
+  const isLower  = ["k","1","2","3","4","5"].includes(gradeStr);
+
   window.speechSynthesis.cancel();
-  const utt = new SpeechSynthesisUtterance(text);
-  utt.rate  = isEarly ? 0.82 : 1.0;
-  utt.pitch = isEarly ? 1.1  : 1.0;
+  const utt   = new SpeechSynthesisUtterance(text);
+  const voice = getBestVoice(gradeStr);
+  if (voice) utt.voice = voice;
+  utt.lang  = "en-US";
+  utt.rate  = isEarly ? 0.80 : isLower ? 0.90 : 1.0;
+  utt.pitch = isEarly ? 1.15 : isLower ? 1.05 : 1.0;
   window.speechSynthesis.speak(utt);
+}
+
+// Alias kept for celebration phrases called without grade context
+function speakTextWeb(text, grade) {
+  speakTextGraded(text, grade || "3", false);
+}
 }
 
 // Legacy synchronous helper kept for celebration phrases (no grade/muted context needed)
