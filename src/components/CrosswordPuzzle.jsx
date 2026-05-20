@@ -747,8 +747,10 @@ function PuzzleBoard({
         .cnum{position:absolute;top:2px;left:2px;font-size:var(--ns);color:#5a4010;font-weight:700;font-family:Lora,Georgia,serif;pointer-events:none;z-index:2;line-height:1;}
 
         /* ── K-2 Early Learner overrides ─────────────────────────────────── */
+        /* Cells stay ≥50px on all screen sizes — outer pane is overflow-x:auto  */
+        /* so wide grids scroll rather than shrinking cells below finger-tap size */
         .el-grid{--cs:50px;--fs:22px;--ns:12px}
-        @media(max-width:480px){.el-grid{--cs:38px;--fs:18px}}
+        @media(max-width:480px){.el-grid{--cs:44px;--fs:19px;--ns:12px}}
         .el-grid .ci{border-radius:10px!important;border:2.5px solid #81c784!important;background:#f1f8e9!important;}
         .el-grid .cwrap{border-radius:10px!important;overflow:visible}
         .el-grid .blk{border-radius:10px!important;background:#a5d6a7!important;}

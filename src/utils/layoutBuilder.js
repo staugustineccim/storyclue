@@ -157,7 +157,8 @@ function shuffle(arr) {
 export function buildLayout(apiWords, grade = "3") {
   const tier      = getTier(grade);
   const MAX_TRIES = tier === "full" ? 20 : 8;
-  const baseList  = apiWords.map(w => ({ answer: w.word.toUpperCase(), clue: w.clue }));
+  // Preserve all extra fields (emoji, etc.) — only normalise answer casing
+  const baseList  = apiWords.map(w => ({ ...w, answer: w.word.toUpperCase(), clue: w.clue }));
 
   let bestResult    = null;
   let bestViolCount = Infinity;
@@ -186,7 +187,10 @@ export function buildLayout(apiWords, grade = "3") {
     const { rows, cols } = output;
 
     // Library uses 1-indexed startx/starty — convert to 0-indexed
+    // Spread all fields first (preserves emoji, phonics hints, etc.)
+    // then override the positional fields with 0-indexed values
     const placed0 = placed.map(w => ({
+      ...w,
       answer:      w.answer,
       clue:        w.clue,
       orientation: w.orientation,
