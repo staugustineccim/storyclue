@@ -64,6 +64,8 @@ export default function PuzzleGenerator() {
   const [bookRef, setBookRef]           = useState("");
   const [text, setText]                 = useState("");
   const [urlRef, setUrlRef]             = useState("");
+  const [pdfStatus, setPdfStatus]       = useState(""); // "", "loading", "ready", "error"
+  const [pdfFileName, setPdfFileName]   = useState("");
   const [title, setTitle]               = useState("");
   const [grade, setGrade]               = useState(saved.grade       || "3");
   const [faith, setFaith]               = useState(saved.faith       || "none");
@@ -143,6 +145,49 @@ export default function PuzzleGenerator() {
     );
   }
 
+  // ── PDF extraction (PDF.js, runs entirely in browser) ────────────────────
+  async function loadPdfFile(file) {
+    if (!file || file.type !== "application/pdf") {
+      setPdfStatus("error");
+      return;
+    }
+    setPdfStatus("loading");
+    setPdfFileName(file.name);
+    try {
+      // Lazy-load PDF.js from the CDN — free, no API key, no server call
+      if (!window.pdfjsLib) {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement("script");
+          s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+          s.onload  = resolve;
+          s.onerror = reject;
+          document.head.appendChild(s);
+        });
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+          "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      }
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let allText = "";
+      for (let p = 1; p <= pdf.numPages; p++) {
+        const page    = await pdf.getPage(p);
+        const content = await page.getTextContent();
+        const pageText = content.items.map(i => i.str).join(" ");
+        allText += pageText + "\n";
+        if (allText.length > 60000) break; // cap at ~60k chars — more than enough
+      }
+      const extracted = allText.trim();
+      if (extracted.length < 50) {
+        setPdfStatus("error");
+        return;
+      }
+      setText(extracted);
+      setPdfStatus("ready");
+    } catch {
+      setPdfStatus("error");
+    }
+  }
+
   async function handleGenerate(e) {
     e.preventDefault();
     setError("");
@@ -150,6 +195,12 @@ export default function PuzzleGenerator() {
     if (inputMode === "paste" && text.trim().length < 50) {
       setError("Please paste at least a paragraph of text to generate a puzzle.");
       return;
+    }
+    if (inputMode === "pdf") {
+      if (pdfStatus !== "ready" || text.trim().length < 50) {
+        setError("Please upload a PDF first — or switch to Paste mode to type/paste text directly.");
+        return;
+      }
     }
     if (inputMode === "lookup" && bookRef.trim().length < 3) {
       setError("Please enter a book name or chapter reference.");
@@ -209,7 +260,8 @@ export default function PuzzleGenerator() {
     try {
       const isK2 = ["k","1","2"].includes(grade);
       const body = {
-        inputMode,
+        // PDF mode extracts text client-side — the server treats it as paste
+        inputMode: inputMode === "pdf" ? "paste" : inputMode,
         bookRef: resolvedBookRef,
         chapterText: text,
         urlRef: urlRef.trim(),
@@ -484,6 +536,10 @@ export default function PuzzleGenerator() {
                 onClick={() => setInputMode("url")}>
                 🌐 URL or YouTube
               </button>
+              <button type="button" className={`mode-btn${inputMode==="pdf"?" on":""}`}
+                onClick={() => setInputMode("pdf")}>
+                📄 Upload PDF
+              </button>
             </div>
           </div>
 
@@ -559,6 +615,84 @@ export default function PuzzleGenerator() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ── PDF MODE ────────────────────────────────────────────────── */}
+          {inputMode === "pdf" && (
+            <div style={{ marginBottom:"24px" }}>
+              <label style={labelStyle}>Upload a PDF</label>
+              <div style={{
+                border: "2px dashed #b8d898", borderRadius: "8px",
+                padding: "24px 20px", textAlign: "center",
+                background: pdfStatus === "ready" ? "#e8f5e9" : "#fafff5",
+                cursor: "pointer", transition: "background 0.2s",
+              }}
+                onClick={() => document.getElementById("pdf-file-input").click()}
+                onDragOver={e => e.preventDefault()}
+                onDrop={async e => {
+                  e.preventDefault();
+                  const file = e.dataTransfer.files[0];
+                  if (file) await loadPdfFile(file);
+                }}
+              >
+                {pdfStatus === "" && (
+                  <>
+                    <div style={{ fontSize:"2rem", marginBottom:"8px" }}>📄</div>
+                    <div style={{ fontFamily:"Lora,serif", fontSize:"14px", color:"#3a5a18", fontWeight:600 }}>
+                      Click to choose a PDF, or drag and drop it here
+                    </div>
+                    <div style={{ fontFamily:"Lora,serif", fontSize:"12px", color:"#7a8a6a", marginTop:"6px" }}>
+                      Sermons, chapters, articles, worksheets — any PDF up to 20 MB
+                    </div>
+                  </>
+                )}
+                {pdfStatus === "loading" && (
+                  <div style={{ fontFamily:"Lora,serif", fontSize:"14px", color:"#3a5a18" }}>
+                    ⏳ Reading PDF…
+                  </div>
+                )}
+                {pdfStatus === "ready" && (
+                  <>
+                    <div style={{ fontSize:"1.8rem", marginBottom:"6px" }}>✅</div>
+                    <div style={{ fontFamily:"Lora,serif", fontSize:"14px", color:"#1b5e20", fontWeight:600 }}>
+                      {pdfFileName}
+                    </div>
+                    <div style={{ fontFamily:"Lora,serif", fontSize:"12px", color:"#3a5a18", marginTop:"4px" }}>
+                      {text.length.toLocaleString()} characters extracted — ready to generate
+                    </div>
+                    <div style={{ fontFamily:"Lora,serif", fontSize:"12px", color:"#7a5500", marginTop:"6px" }}>
+                      Click to choose a different file
+                    </div>
+                  </>
+                )}
+                {pdfStatus === "error" && (
+                  <>
+                    <div style={{ fontSize:"1.8rem", marginBottom:"6px" }}>⚠️</div>
+                    <div style={{ fontFamily:"Lora,serif", fontSize:"14px", color:"#b71c1c" }}>
+                      Could not read that PDF. Try a different file or paste the text directly.
+                    </div>
+                  </>
+                )}
+                <input
+                  id="pdf-file-input"
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  style={{ display:"none" }}
+                  onChange={async e => {
+                    const file = e.target.files[0];
+                    if (file) await loadPdfFile(file);
+                    e.target.value = "";
+                  }}
+                />
+              </div>
+              <div style={{ marginTop:"10px", padding:"10px 12px", background:"#e8f0d8", borderRadius:"4px", border:"1px solid #b8d898" }}>
+                <div style={{ fontFamily:"Lora,serif", fontSize:"12px", color:"#3a5a18", lineHeight:1.6 }}>
+                  PDF text is extracted entirely <strong>in your browser</strong> — nothing is uploaded to a server.
+                  Works with sermons, textbook chapters, articles, and any text-based PDF.
+                  <em style={{ color:"#7a5500" }}> Scanned images without OCR text won't work.</em>
+                </div>
+              </div>
             </div>
           )}
 
@@ -842,7 +976,9 @@ export default function PuzzleGenerator() {
                 ? "Checking for version options..."
                 : inputMode === "url"
                   ? "Fetching article and writing clues... about 15 seconds."
-                  : `Claude is reading ${inputMode === "lookup" ? `"${bookRef}"` : "your text"} and writing clues... about 10 seconds.`}
+                  : inputMode === "pdf"
+                    ? `Claude is reading "${pdfFileName}" and writing clues... about 10 seconds.`
+                    : `Claude is reading ${inputMode === "lookup" ? `"${bookRef}"` : "your text"} and writing clues... about 10 seconds.`}
             </div>
           )}
         </form>
