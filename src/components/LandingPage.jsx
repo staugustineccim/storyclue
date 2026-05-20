@@ -104,7 +104,7 @@ export default function LandingPage() {
       {/* ── THREE INPUT MODES ─────────────────────────────────────────────── */}
       <section style={{ background:"#f0ead8", padding:"64px 24px", borderTop:"1px solid #e0d0b0", borderBottom:"1px solid #e0d0b0" }}>
         <div style={{ maxWidth:"760px", margin:"0 auto" }}>
-          <h2 className="section" style={{ textAlign:"center" }}>Three Ways to Create a Puzzle</h2>
+          <h2 className="section" style={{ textAlign:"center" }}>Four Ways to Create a Puzzle</h2>
           <p className="section-sub" style={{ textAlign:"center", margin:"0 auto 32px" }}>
             No matter where your content lives, StoryClue can build a puzzle from it.
           </p>
@@ -135,9 +135,18 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
+          <div className="input-mode">
+            <div className="input-mode-icon">📄</div>
+            <div>
+              <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"16px", color:D, marginBottom:"5px" }}>Upload a PDF</div>
+              <div style={{ fontFamily:"Lora,serif", fontSize:"14px", color:"#5a4a28", lineHeight:1.7 }}>
+                Drag and drop any PDF — sermon notes, textbook chapters, articles, worksheets. StoryClue extracts the text entirely in your browser (nothing is sent to a server) and builds a puzzle from it. Works with any text-based PDF.
+              </div>
+            </div>
+          </div>
           <div style={{ textAlign:"center", marginTop:"28px" }}>
             <button className="cta-btn cta-primary" onClick={() => navigate("/create")}>
-              Try All Three Modes Free
+              Try All Four Modes Free
             </button>
           </div>
         </div>

@@ -5,6 +5,38 @@ import { buildLayout } from "../utils/layoutBuilder";
 import { buildDemoData, getDemoUrl, SERIES_DATA } from "../utils/demoData";
 import { savePrefs, loadPrefs } from "../utils/prefs";
 import { trackEvent } from "../utils/analytics";
+import AudienceSelector from "./AudienceSelector";
+
+// ── Audience cookie helpers ────────────────────────────────────────────────
+// Audience values: "early-learner" | "elementary" | "middle-high" | "adult"
+const AUDIENCE_COOKIE = "sc_audience";
+const AUDIENCE_TTL_DAYS = 90;
+
+function getAudienceCookie() {
+  const m = document.cookie.match(new RegExp(`(?:^|;\\s*)${AUDIENCE_COOKIE}=([^;]+)`));
+  return m ? m[1] : null;
+}
+function setAudienceCookie(value) {
+  const exp = new Date(Date.now() + AUDIENCE_TTL_DAYS * 864e5).toUTCString();
+  document.cookie = `${AUDIENCE_COOKIE}=${value};expires=${exp};path=/;SameSite=Lax`;
+}
+function clearAudienceCookie() {
+  document.cookie = `${AUDIENCE_COOKIE}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+}
+
+// Grade lists per audience (mirrors GRADE_GROUPS structure keys)
+const AUDIENCE_GRADES = {
+  "early-learner": ["k", "1", "2"],
+  "elementary":    ["3", "4", "5"],
+  "middle-high":   ["6", "7", "8", "9-10", "11-12"],
+  "adult":         ["adult"],
+};
+const AUDIENCE_DEFAULT_GRADE = {
+  "early-learner": "k",
+  "elementary":    "3",
+  "middle-high":   "6",
+  "adult":         "adult",
+};
 
 const GRADE_GROUPS = [
   { label: "Early Learners", grades: [
@@ -56,6 +88,9 @@ const BOOK_EXAMPLES = [
 export default function PuzzleGenerator() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  // ── Audience — read from cookie (null = not yet chosen → show selector) ──
+  const [audience, setAudience] = useState(() => getAudienceCookie());
 
   // ── Load saved prefs as initial state ──────────────────────────────────
   const saved = loadPrefs() || {};
@@ -120,6 +155,36 @@ export default function PuzzleGenerator() {
   }, []);
 
   const seriesBooks = SERIES_DATA[selectedSeries]?.books || [];
+
+  // ── Audience selection ─────────────────────────────────────────────────────
+  function chooseAudience(aud) {
+    setAudienceCookie(aud);
+    setAudience(aud);
+    // Snap grade to audience default if current grade is outside this audience
+    const allowed = AUDIENCE_GRADES[aud] || [];
+    setGrade(prev => (allowed.includes(prev) ? prev : (AUDIENCE_DEFAULT_GRADE[aud] || "3")));
+    // Early learners start in lookup mode; others keep saved mode
+    if (aud === "early-learner") setInputMode("lookup");
+  }
+
+  function changeAudience() {
+    clearAudienceCookie();
+    setAudience(null);
+  }
+
+  // Derived audience properties
+  const allowedGrades   = audience ? (AUDIENCE_GRADES[audience] || []) : null;
+  const isEarlyAudience = audience === "early-learner";
+  const isAdultAudience = audience === "adult";
+  // Series Mode hidden for early learners
+  const showSeriesMode  = audience !== "early-learner";
+  // PDF upload hidden for early learners (they don't upload documents)
+  const showPdfMode     = audience !== "early-learner";
+
+  // ── Show audience selector if no audience chosen yet ──────────────────────
+  if (!audience) {
+    return <AudienceSelector onSelect={chooseAudience} />;
+  }
 
   function copyLink(which, url) {
     navigator.clipboard?.writeText(url).then(() => {
@@ -520,10 +585,38 @@ export default function PuzzleGenerator() {
 
         <form onSubmit={handleGenerate} style={{ display: generatedPuzzle ? "none" : "block" }}>
 
+          {/* ── Audience banner ─────────────────────────────────────────── */}
+          {(() => {
+            const AUDIENCE_LABEL = {
+              "early-learner": "🐣 Early Learners (K–2)",
+              "elementary":    "📚 Elementary (3rd–5th)",
+              "middle-high":   "🎒 Middle & High School (6th–12th)",
+              "adult":         "📖 Adult & Seniors",
+            };
+            return (
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                background: "#e8f0d8", border: "1px solid #b8d898", borderRadius: "8px",
+                padding: "8px 14px", marginBottom: "20px", flexWrap: "wrap", gap: "8px",
+              }}>
+                <span style={{ fontFamily:"Lora,serif", fontSize:"13px", color:"#2D5A1A", fontWeight:600 }}>
+                  {AUDIENCE_LABEL[audience] || audience}
+                </span>
+                <button type="button" onClick={changeAudience} style={{
+                  background: "none", border: "1px solid #8a7a5a", borderRadius: "4px",
+                  padding: "3px 10px", fontFamily:"Lora,serif", fontSize:"12px",
+                  color: "#5a4a28", cursor: "pointer",
+                }}>
+                  Change Audience
+                </button>
+              </div>
+            );
+          })()}
+
           {/* ── Mode Toggle ─────────────────────────────────────────────── */}
           <div style={{ marginBottom:"24px" }}>
             <label style={labelStyle}>How would you like to create your puzzle?</label>
-            <div style={{ display:"flex", gap:"8px" }}>
+            <div style={{ display:"flex", gap:"8px", flexWrap:"wrap" }}>
               <button type="button" className={`mode-btn${inputMode==="lookup"?" on":""}`}
                 onClick={() => setInputMode("lookup")}>
                 📚 Name a Book or Chapter
@@ -536,10 +629,12 @@ export default function PuzzleGenerator() {
                 onClick={() => setInputMode("url")}>
                 🌐 URL or YouTube
               </button>
-              <button type="button" className={`mode-btn${inputMode==="pdf"?" on":""}`}
-                onClick={() => setInputMode("pdf")}>
-                📄 Upload PDF
-              </button>
+              {showPdfMode && (
+                <button type="button" className={`mode-btn${inputMode==="pdf"?" on":""}`}
+                  onClick={() => setInputMode("pdf")}>
+                  📄 Upload PDF
+                </button>
+              )}
             </div>
           </div>
 
@@ -709,25 +804,37 @@ export default function PuzzleGenerator() {
           </div>
 
           {/* ── Grade Level ─────────────────────────────────────────────── */}
+          {/* Adult audience: grade is fixed to "adult" — no selector shown */}
+          {!isAdultAudience && (
           <div style={{ marginBottom:"24px" }}>
             <label style={labelStyle}>Grade Level for Clues</label>
             <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
-              {GRADE_GROUPS.map(group => (
-                <div key={group.label}>
-                  <div style={{ fontSize:"11px", color:"#8a7a5a", fontFamily:"Lora,serif", marginBottom:"5px", textTransform:"uppercase", letterSpacing:"0.5px" }}>{group.label}</div>
-                  <div style={{ display:"flex", flexWrap:"wrap", gap:"5px" }}>
-                    {group.grades.map(g => (
-                      <button type="button" key={g.key}
-                        className={`grade-btn${grade===g.key?" on":""}`}
-                        onClick={() => setGrade(g.key)}>
-                        {g.label}
-                      </button>
-                    ))}
+              {GRADE_GROUPS
+                // Filter groups to only show grades allowed by the current audience
+                .map(group => ({
+                  ...group,
+                  grades: allowedGrades
+                    ? group.grades.filter(g => allowedGrades.includes(g.key))
+                    : group.grades,
+                }))
+                .filter(group => group.grades.length > 0)
+                .map(group => (
+                  <div key={group.label}>
+                    <div style={{ fontSize:"11px", color:"#8a7a5a", fontFamily:"Lora,serif", marginBottom:"5px", textTransform:"uppercase", letterSpacing:"0.5px" }}>{group.label}</div>
+                    <div style={{ display:"flex", flexWrap:"wrap", gap:"5px" }}>
+                      {group.grades.map(g => (
+                        <button type="button" key={g.key}
+                          className={`grade-btn${grade===g.key?" on":""}`}
+                          onClick={() => setGrade(g.key)}>
+                          {g.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           </div>
+          )}
 
           {/* ── K-2 Early Learner Features ──────────────────────────────── */}
           {["k","1","2"].includes(grade) && (
@@ -813,8 +920,8 @@ export default function PuzzleGenerator() {
             )}
           </div>
 
-          {/* ── Series Mode ─────────────────────────────────────────────── */}
-          <div style={{ marginBottom:"28px", background:"#f4efe4", border:"1.5px solid #c8b888", borderRadius:"6px", padding:"16px" }}>
+          {/* ── Series Mode (hidden for Early Learners) ─────────────────── */}
+          {showSeriesMode && <div style={{ marginBottom:"28px", background:"#f4efe4", border:"1.5px solid #c8b888", borderRadius:"6px", padding:"16px" }}>
             <label style={{ display:"flex", alignItems:"center", gap:"10px", cursor:"pointer", marginBottom:0 }}>
               <input type="checkbox" checked={seriesMode} onChange={e => setSeriesMode(e.target.checked)}
                 style={{ accentColor:"#3a6a1a", width:"16px", height:"16px", cursor:"pointer" }} />
@@ -872,7 +979,7 @@ export default function PuzzleGenerator() {
                 </div>
               </div>
             )}
-          </div>
+          </div>}
 
           {/* ── Items 11 & 12: Version picker & grade advisory ──────────── */}
           {versionData && inputMode === "lookup" && (
