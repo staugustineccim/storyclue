@@ -160,6 +160,11 @@ export function buildLayout(apiWords, grade = "3") {
   // Preserve all extra fields (emoji, etc.) — only normalise answer casing
   const baseList  = apiWords.map(w => ({ ...w, answer: w.word.toUpperCase(), clue: w.clue }));
 
+  // Minimum placed words — must be grade-aware.
+  // K=8 max, 1st=10, 2nd=12 — they can NEVER reach 15, so use 60% of
+  // input words (floor 4) as a sensible minimum for small puzzles.
+  const MIN_PLACED = Math.max(4, Math.floor(baseList.length * 0.6));
+
   let bestResult    = null;
   let bestViolCount = Infinity;
 
@@ -174,7 +179,7 @@ export function buildLayout(apiWords, grade = "3") {
     let placed = output.result.filter(w => w.orientation !== "none");
 
     // If too few words placed, retry the generator with a shorter list
-    if (placed.length < 15 && wordList.length > 15) {
+    if (placed.length < MIN_PLACED && wordList.length > MIN_PLACED) {
       try {
         const retry = CrosswordLayoutGenerator.generateLayout(wordList.slice(0, -3));
         const rp    = retry.result.filter(w => w.orientation !== "none");
@@ -182,7 +187,7 @@ export function buildLayout(apiWords, grade = "3") {
       } catch { /* keep original */ }
     }
 
-    if (placed.length < 15) continue;
+    if (placed.length < MIN_PLACED) continue;
 
     const { rows, cols } = output;
 
