@@ -6,6 +6,7 @@ import { buildDemoData, getDemoUrl, SERIES_DATA } from "../utils/demoData";
 import { savePrefs, loadPrefs } from "../utils/prefs";
 import { trackEvent } from "../utils/analytics";
 import AudienceSelector from "./AudienceSelector";
+import SongsLibrary from "./SongsLibrary";
 
 // ── Audience cookie helpers ────────────────────────────────────────────────
 // Audience values: "early-learner" | "elementary" | "middle-high" | "adult"
@@ -122,6 +123,25 @@ export default function PuzzleGenerator() {
   // ── K-2 Early Learner features ────────────────────────────────────────────
   const [phonicsMode, setPhonicsMode] = useState(false);
   const [pictureMode, setPictureMode] = useState(false);
+
+  // ── Songs & Rhymes ────────────────────────────────────────────────────────
+  const [selectedSong, setSelectedSong] = useState(null); // { id, title, emoji }
+  // Completed song IDs stored in localStorage — persist across sessions
+  const [completedSongIds, setCompletedSongIds] = useState(() => {
+    try {
+      const raw = localStorage.getItem("sc_songs_done");
+      return new Set(raw ? JSON.parse(raw) : []);
+    } catch { return new Set(); }
+  });
+
+  function markSongCompleted(songId) {
+    setCompletedSongIds(prev => {
+      const next = new Set(prev);
+      next.add(songId);
+      try { localStorage.setItem("sc_songs_done", JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  }
 
   // ── Item 6: generated puzzle links ────────────────────────────────────────
   const [generatedPuzzle, setGeneratedPuzzle] = useState(null); // {title, studentUrl, teacherUrl, playPath}
@@ -257,6 +277,12 @@ export default function PuzzleGenerator() {
     e.preventDefault();
     setError("");
 
+    if (inputMode === "songs") {
+      if (!selectedSong) {
+        setError("Please choose a song from the library first.");
+        return;
+      }
+    }
     if (inputMode === "paste" && text.trim().length < 50) {
       setError("Please paste at least a paragraph of text to generate a puzzle.");
       return;
@@ -325,10 +351,12 @@ export default function PuzzleGenerator() {
     try {
       const isK2 = ["k","1","2"].includes(grade);
       const body = {
-        // PDF mode extracts text client-side — the server treats it as paste
-        inputMode: inputMode === "pdf" ? "paste" : inputMode,
-        bookRef: resolvedBookRef,
+        // PDF/songs mode: both resolve to lookup on the server (no chapterText needed)
+        inputMode: inputMode === "pdf" ? "paste" : inputMode === "songs" ? "lookup" : inputMode,
+        bookRef: inputMode === "songs" ? selectedSong.title : resolvedBookRef,
         chapterText: text,
+        songsMode: inputMode === "songs",
+        songId: inputMode === "songs" ? selectedSong.id : null,
         urlRef: urlRef.trim(),
         grade,
         faith,
@@ -403,11 +431,13 @@ export default function PuzzleGenerator() {
       }
 
       const origin = window.location.origin;
+      // Songs puzzles append ?song=id so CrosswordPuzzle can show the reward card
+      const songParam = (inputMode === "songs" && selectedSong) ? `?song=${selectedSong.id}` : "";
       setGeneratedPuzzle({
         title:      puzzleData.title,
-        studentUrl: `${origin}/play/${saveData.slug}`,
+        studentUrl: `${origin}/play/${saveData.slug}${songParam}`,
         teacherUrl: `${origin}/play/${saveData.slug}?t=1`,
-        playPath:   `/play/${saveData.slug}`,
+        playPath:   `/play/${saveData.slug}${songParam}`,
         slug:       saveData.slug,
       });
 
@@ -617,6 +647,13 @@ export default function PuzzleGenerator() {
           <div style={{ marginBottom:"24px" }}>
             <label style={labelStyle}>How would you like to create your puzzle?</label>
             <div style={{ display:"flex", gap:"8px", flexWrap:"wrap" }}>
+              {/* Songs mode — Early Learner audience only */}
+              {isEarlyAudience && (
+                <button type="button" className={`mode-btn${inputMode==="songs"?" on":""}`}
+                  onClick={() => setInputMode("songs")}>
+                  🎵 Songs &amp; Rhymes
+                </button>
+              )}
               <button type="button" className={`mode-btn${inputMode==="lookup"?" on":""}`}
                 onClick={() => setInputMode("lookup")}>
                 📚 Name a Book or Chapter
@@ -637,6 +674,41 @@ export default function PuzzleGenerator() {
               )}
             </div>
           </div>
+
+          {/* ── SONGS MODE ──────────────────────────────────────────────── */}
+          {inputMode === "songs" && (
+            <div style={{ marginBottom:"24px" }}>
+              <label style={labelStyle}>Choose a Song</label>
+              <SongsLibrary
+                grade={grade}
+                faithTradition={faith}
+                completedIds={completedSongIds}
+                selectedId={selectedSong?.id}
+                onSelect={song => {
+                  setSelectedSong(song);
+                  // Pre-fill the title with the song name
+                  setTitle(`${song.title} — Crossword Puzzle`);
+                }}
+              />
+              {selectedSong && (
+                <div style={{
+                  marginTop:"12px", padding:"12px 16px",
+                  background:"#e8f5d8", border:"2px solid #66bb6a", borderRadius:"8px",
+                  display:"flex", alignItems:"center", gap:"12px",
+                }}>
+                  <span style={{ fontSize:"2rem" }}>{selectedSong.emoji}</span>
+                  <div>
+                    <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"14px", color:"#1b5e20" }}>
+                      Ready: {selectedSong.title}
+                    </div>
+                    <div style={{ fontFamily:"Lora,serif", fontSize:"12px", color:"#2e7d32", marginTop:"2px" }}>
+                      Clues will be fill-in-the-blank lyrics from the song
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── LOOKUP MODE ─────────────────────────────────────────────── */}
           {inputMode === "lookup" && (
@@ -1085,7 +1157,9 @@ export default function PuzzleGenerator() {
                   ? "Fetching article and writing clues... about 15 seconds."
                   : inputMode === "pdf"
                     ? `Claude is reading "${pdfFileName}" and writing clues... about 10 seconds.`
-                    : `Claude is reading ${inputMode === "lookup" ? `"${bookRef}"` : "your text"} and writing clues... about 10 seconds.`}
+                    : inputMode === "songs"
+                      ? `Claude is writing lyric clues for "${selectedSong?.title}"... about 10 seconds.`
+                      : `Claude is reading ${inputMode === "lookup" ? `"${bookRef}"` : "your text"} and writing clues... about 10 seconds.`}
             </div>
           )}
         </form>

@@ -291,6 +291,7 @@ export default async function handler(req, res) {
     grade = "3", faith, language = "english", bilingualMode,
     seriesMode, selectedBooks, seriesName, currentChapter,
     phonicsMode = false, pictureMode = false,
+    songsMode = false,
   } = req.body || {};
 
   const limits   = GRADE_LIMITS[grade]  || GRADE_LIMITS["3"];
@@ -339,6 +340,40 @@ export default async function handler(req, res) {
   let pictureNote = "";
   if (pictureMode && ["k","1","2"].includes(String(grade))) {
     pictureNote = `\nPICTURE MODE: For every word, also include an "emoji" field — a single emoji that clearly pictures the word (e.g. BARN→"🏚️", PIG→"🐷", SPIDER→"🕷️", FERN→"🌿", APPLE→"🍎"). Choose the most obvious emoji a 5-7 year old would instantly recognize. If no clear emoji exists, use "🔤". Update the JSON structure to: { "word": "EXAMPLE", "clue": "...", "emoji": "🔤" }`;
+  }
+
+  // ── Songs & Rhymes mode ──────────────────────────────────────────────────
+  let songsNote = "";
+  if (songsMode && ["k","1","2"].includes(String(grade))) {
+    // Override word length limit — songs use simple concrete words, max 6 letters
+    limits.maxLen = Math.min(limits.maxLen, 6);
+    const songTitle = bookRef?.trim() || "this song";
+    songsNote = `
+SONG CROSSWORD MODE — "${songTitle}":
+This is a children's song crossword. EVERY clue MUST be a fill-in-the-blank lyric pulled directly from the actual words of "${songTitle}".
+
+CLUE FORMAT — always use this exact pattern:
+  "[lyric leading up to the blank word] ___"
+  OR: "[lyric with blank in the middle] ___ [rest of line]"
+
+EXAMPLES for "Twinkle Twinkle Little Star":
+  STAR  → "Twinkle twinkle little ___"
+  SKY   → "Up above the world so high, like a diamond in the ___"
+  WORLD → "Up above the ___ so high"
+
+EXAMPLES for "Itsy Bitsy Spider":
+  SPIDER → "The itsy bitsy ___ climbed up the water spout"
+  RAIN   → "Down came the ___ and washed the spider out"
+  SUN    → "Out came the ___ and dried up all the rain"
+
+WORD SELECTION RULES for songs:
+1. Choose ONLY words that actually appear in the lyrics — concrete nouns and action verbs children recognize from singing
+2. Maximum ${limits.maxLen} letters per word — choose short familiar words: STAR, BOAT, RAIN, LAMB, CLOCK, WHEEL, FARM, DUCK
+3. Choose words a child will feel proud to know from singing the song — reward their existing knowledge
+4. NEVER write a clue that doesn't come from the actual lyrics of this specific song
+${phonicsMode ? `5. PHONICS + LYRIC: Each clue must ALSO include a phonics hint after the lyric fill-in. Format: "[lyric] ___ — [phonics hint]". Example: "Twinkle twinkle little ___ — rhymes with car and starts with /st/"` : ""}
+
+The child should fill in the answer word because they already know it from singing the song.`;
   }
 
   // ── Language / Spanish / Bilingual ────────────────────────────────────────
@@ -455,7 +490,7 @@ export default async function handler(req, res) {
 
     userPrompt = `Create a crossword puzzle vocabulary list from your knowledge of: "${bookRef}"
 
-Grade level for clues: ${gradeDesc}${faithNote}${seriesNote}${languageNote}${phonicsNote}${pictureNote}
+Grade level for clues: ${gradeDesc}${faithNote}${seriesNote}${languageNote}${phonicsNote}${pictureNote}${songsNote}
 
 Instructions:
 - Use your knowledge of this text, chapter, or topic to identify ${wci}
@@ -492,7 +527,7 @@ Return this exact JSON structure with no other text:
 ${resolvedText.slice(0, 6000)}
 """
 
-Grade level for clues: ${gradeDesc}${faithNote}${seriesNote}${languageNote}${phonicsNote}${pictureNote}
+Grade level for clues: ${gradeDesc}${faithNote}${seriesNote}${languageNote}${phonicsNote}${pictureNote}${songsNote}
 
 Instructions:
 - Extract ${wci} from the text above

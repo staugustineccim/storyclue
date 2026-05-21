@@ -159,6 +159,7 @@ export default function CrosswordPuzzle() {
   const [puzzleData, setPuzzleData] = useState(null);
 
   const isTeacher = searchParams.get("t") === "1";
+  const songId    = searchParams.get("song") || null; // set when puzzle came from Songs library
 
   useEffect(() => {
     if (slug) {
@@ -246,6 +247,7 @@ function PuzzleBoard({
   const [showPrintDialog,   setShowPrintDialog]   = useState(false);
   const [showVocabModal,    setShowVocabModal]     = useState(false);
   const [continueUsed,      setContinueUsed]      = useState(false);
+  const [showWordsLearned,  setShowWordsLearned]  = useState(false);
   const [clueBarExpanded,   setClueBarExpanded]   = useState(false);
 
   // ── K-2 Early Learner state ───────────────────────────────────────────────
@@ -343,6 +345,16 @@ function PuzzleBoard({
         time_taken_seconds:  seconds,
         mistake_count:       mistakes,
       });
+      // Songs puzzle: save completed song + show "Words Learned" card after celebration
+      if (songId) {
+        try {
+          const raw  = localStorage.getItem("sc_songs_done");
+          const done = new Set(raw ? JSON.parse(raw) : []);
+          done.add(songId);
+          localStorage.setItem("sc_songs_done", JSON.stringify([...done]));
+        } catch {}
+        setTimeout(() => setShowWordsLearned(true), 2800); // after confetti settles
+      }
     }
   }, [cells]); // eslint-disable-line
 
@@ -1337,6 +1349,70 @@ function PuzzleBoard({
           onClose={() => setShowFeedback(false)}
         />
       )}
+
+      {/* ── Words You Learned Today — songs puzzle reward card ── */}
+      {showWordsLearned && (() => {
+        const learnedWords = words.filter(w => w.orientation !== "none");
+        return (
+          <div style={{
+            position:"fixed", inset:0, background:"rgba(0,0,0,.6)",
+            display:"flex", alignItems:"center", justifyContent:"center",
+            zIndex:9999, padding:"16px",
+          }}>
+            <div style={{
+              background:"#FDFAF4", borderRadius:"20px",
+              padding:"2rem 2rem 2.5rem", maxWidth:"480px", width:"100%",
+              textAlign:"center", boxShadow:"0 24px 64px rgba(0,0,0,.35)",
+              fontFamily:"Lora,Georgia,serif", maxHeight:"90vh", overflowY:"auto",
+            }}>
+              <div style={{ fontSize:"3rem", marginBottom:"8px" }}>🌟</div>
+              <h2 style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"1.5rem", color:"#2D5A1A", marginBottom:"6px" }}>
+                Words You Learned Today!
+              </h2>
+              <p style={{ color:"#5a4a28", fontSize:"0.9rem", marginBottom:"20px" }}>
+                {title}
+              </p>
+
+              {/* Word cards grid */}
+              <div style={{
+                display:"grid",
+                gridTemplateColumns:"repeat(auto-fill,minmax(100px,1fr))",
+                gap:"10px", marginBottom:"24px",
+              }}>
+                {learnedWords.map(w => (
+                  <div key={w.answer} style={{
+                    background:"#f0fdf4", border:"2px solid #66bb6a",
+                    borderRadius:"12px", padding:"12px 8px",
+                    display:"flex", flexDirection:"column", alignItems:"center", gap:"6px",
+                  }}>
+                    {w.emoji && (
+                      <span style={{ fontSize:"2rem", lineHeight:1 }}>{w.emoji}</span>
+                    )}
+                    <span style={{
+                      fontFamily:"'Playfair Display',serif", fontWeight:900,
+                      fontSize:"14px", color:"#1b5e20", letterSpacing:"1px",
+                    }}>
+                      {w.answer}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={() => setShowWordsLearned(false)}
+                style={{
+                  background:"#2D5A1A", color:"#fff", border:"none",
+                  borderRadius:"10px", padding:"12px 32px", fontSize:"1rem",
+                  fontWeight:700, cursor:"pointer", fontFamily:"Lora,Georgia,serif",
+                  boxShadow:"3px 3px 0 #1a3a08",
+                }}
+              >
+                🎵 Amazing! Play Again
+              </button>
+            </div>
+          </div>
+        );
+      })()}
     </>
   );
 }
