@@ -106,8 +106,11 @@ function speakTextGraded(text, grade, muted) {
   utt.volume = 0.92;
   // Pitch stays near 1.0 — boosting pitch causes the robotic/squeaky effect.
   // Warmth comes from voice selection + slower, deliberate rate.
-  utt.rate  = isEarly ? 0.76 : isLower ? 0.88 : 0.95;
-  utt.pitch = isEarly ? 1.02 : isLower ? 1.0  : 1.0;
+  // Slightly higher pitch + slower rate for K-2 makes standard female voices
+  // sound warmer and more child-appropriate (true children's voices require
+  // Google Cloud TTS Neural2 Kids which would need a paid API key).
+  utt.rate  = isEarly ? 0.72 : isLower ? 0.88 : 0.95;
+  utt.pitch = isEarly ? 1.10 : isLower ? 1.02 : 1.0;
   window.speechSynthesis.speak(utt);
 }
 
@@ -147,16 +150,16 @@ function playCelebrationSound(type = "word") {
 }
 
 // Confetti piece generator
-function makeConfetti() {
-  const COLORS = ["#ff5252","#ffeb3b","#69f0ae","#448aff","#e91e63","#ff9800","#ab47bc","#26c6da"];
-  return Array.from({ length: 28 }, (_, i) => ({
+function makeConfetti(count = 80) {
+  const COLORS = ["#ff5252","#ffeb3b","#69f0ae","#448aff","#e91e63","#ff9800","#ab47bc","#26c6da","#ff6e40","#b2ff59","#ea80fc","#40c4ff"];
+  return Array.from({ length: count }, (_, i) => ({
     id:    i + Date.now(),
     left:  Math.random() * 100,
-    size:  7 + Math.random() * 9,
-    round: Math.random() > 0.45,
+    size:  8 + Math.random() * 14,
+    round: Math.random() > 0.35,
     color: COLORS[Math.floor(Math.random() * COLORS.length)],
-    dur:   1.3 + Math.random() * 0.9,
-    delay: Math.random() * 0.5,
+    dur:   2.0 + Math.random() * 1.5,
+    delay: Math.random() * 0.9,
   }));
 }
 
@@ -210,12 +213,12 @@ export default function CrosswordPuzzle() {
     );
   }
 
-  return <PuzzleBoard {...puzzleData} isTeacher={isTeacher} />;
+  return <PuzzleBoard {...puzzleData} isTeacher={isTeacher} songId={songId} />;
 }
 
 function PuzzleBoard({
   title, grade, language = "english", rows, cols, words, isTeacher = false,
-  phonicsMode = false, pictureMode = false,
+  phonicsMode = false, pictureMode = false, songId = null,
 }) {
   const navigate   = useNavigate();
   const SOLUTION   = buildGrid(words, rows, cols);
@@ -261,9 +264,12 @@ function PuzzleBoard({
   const [clueBarExpanded,   setClueBarExpanded]   = useState(false);
 
   // ── K-2 Early Learner state ───────────────────────────────────────────────
-  const [burstCells,     setBurstCells]     = useState(() => new Set());
-  const [confettiPieces, setConfettiPieces] = useState([]);
-  const [mascotMood,     setMascotMood]     = useState("idle"); // "idle"|"happy"|"encouraging"
+  const [burstCells,       setBurstCells]       = useState(() => new Set());
+  const [confettiPieces,   setConfettiPieces]   = useState([]);
+  const [mascotMood,       setMascotMood]       = useState("idle"); // "idle"|"happy"|"encouraging"
+  const [celebrateAllCells,setCelebrateAllCells]= useState(false);
+  // Song intro: shown once before first interaction when puzzle came from Songs library
+  const [showSongIntro,    setShowSongIntro]    = useState(Boolean(songId));
 
   // ── Audio / mute ──────────────────────────────────────────────────────────
   const [muted, setMuted] = useState(() => localStorage.getItem("sc-muted") === "1");
@@ -362,13 +368,14 @@ function PuzzleBoard({
     }
   }, [cells]); // eslint-disable-line
 
-  // Feedback modal timing
+  // Feedback modal timing — suppress entirely for K-2 (kids can't fill it out,
+  // and it was covering the win celebration at z-index:9999)
   useEffect(() => {
-    if ((won || revealed) && !feedbackShown && !showVocabModal) {
+    if ((won || revealed) && !feedbackShown && !showVocabModal && !isEarlyLearner) {
       const t = setTimeout(() => { setShowFeedback(true); setFeedbackShown(true); }, 1200);
       return () => clearTimeout(t);
     }
-  }, [won, revealed, feedbackShown, showVocabModal]);
+  }, [won, revealed, feedbackShown, showVocabModal]); // eslint-disable-line
 
   // Print trigger
   useEffect(() => {
@@ -407,14 +414,21 @@ function PuzzleBoard({
     }
   }, [cells]); // eslint-disable-line
 
-  // K-2: full win celebration audio
+  // K-2: full win celebration — triple confetti burst, word flash, audio
   useEffect(() => {
     if (won && isEarlyLearner) {
       triggerConfetti();
       playCelebrationSound("win");
+      // Flash all correctly-filled cells
+      setCelebrateAllCells(true);
+      setTimeout(() => setCelebrateAllCells(false), 2800);
+      // Second confetti wave
+      setTimeout(() => triggerConfetti(), 900);
+      // Third wave
+      setTimeout(() => triggerConfetti(), 1800);
       setTimeout(() => {
-        if (!mutedRef.current) speakText("You did it! Amazing work! You solved the puzzle!", 0.85, 1.2);
-      }, 600);
+        if (!mutedRef.current) speakText("You did it! Amazing work! You solved the whole puzzle!", 0.80, 1.15);
+      }, 500);
     }
   }, [won]); // eslint-disable-line
 
@@ -476,7 +490,34 @@ function PuzzleBoard({
 
   function triggerConfetti() {
     setConfettiPieces(makeConfetti());
-    setTimeout(() => setConfettiPieces([]), 2600);
+    setTimeout(() => setConfettiPieces([]), 4200);
+  }
+
+  // Returns clue text safe for TTS — replaces ___ fill-in-the-blank with the
+  // actual answer so the synthesizer doesn't literally say "underscore underscore".
+  function getClueForSpeech(w) {
+    return getClue(w).replace(/_{2,}/g, w.answer);
+  }
+
+  // For songs puzzles: preview all clues one-by-one before the puzzle starts.
+  // Uses SpeechSynthesisUtterance.onend chaining so cancels never skip ahead.
+  function previewClueTrain() {
+    if (!window.speechSynthesis) return;
+    const lines = words.map(w => getClueForSpeech(w));
+    let idx = 0;
+    function next() {
+      if (idx >= lines.length) return;
+      window.speechSynthesis.cancel();
+      const utt   = new SpeechSynthesisUtterance(lines[idx++]);
+      const voice = getBestVoice(String(grade));
+      if (voice) utt.voice = voice;
+      utt.lang  = "en-US";
+      utt.rate  = 0.72;
+      utt.pitch = 1.10;
+      utt.onend = next;
+      window.speechSynthesis.speak(utt);
+    }
+    next();
   }
 
   async function loadContext() {
@@ -720,6 +761,7 @@ function PuzzleBoard({
       else parts.push(cells[r][c] === SOLUTION[r][c] ? "ok" : "err");
     }
     if (burstCells.has(`${r},${c}`)) parts.push("burst");
+    if (celebrateAllCells && SOLUTION[r][c] && cells[r][c] === SOLUTION[r][c]) parts.push("celebrate");
     return parts.join(" ");
   }
 
@@ -775,6 +817,17 @@ function PuzzleBoard({
         /* Starburst on correct cell in K-2 */
         @keyframes cellBurst{0%{transform:scale(1);box-shadow:0 0 0 0 rgba(76,175,80,.85);}45%{transform:scale(1.3);box-shadow:0 0 0 12px rgba(76,175,80,0);}100%{transform:scale(1);box-shadow:none;}}
         .ci.burst{animation:cellBurst .45s ease-out!important;z-index:3;position:relative;}
+
+        /* Rainbow word celebration on K-2 win */
+        @keyframes cellCelebrate{
+          0%  {transform:scale(1)}
+          20% {transform:scale(1.28) rotate(10deg);background:#ffeb3b!important;color:#1a1008!important}
+          40% {transform:scale(1.22) rotate(-8deg);background:#ff5252!important;color:#fff!important}
+          60% {transform:scale(1.28) rotate(6deg) ;background:#448aff!important;color:#fff!important}
+          80% {transform:scale(1.18) rotate(-4deg);background:#69f0ae!important;color:#1a1008!important}
+          100%{transform:scale(1)}
+        }
+        .ci.celebrate{animation:cellCelebrate 0.7s ease-in-out!important;z-index:4;position:relative;}
 
         /* Confetti fall */
         @keyframes confettiFall{from{transform:translateY(0) rotate(0deg);opacity:1;}to{transform:translateY(100vh) rotate(720deg);opacity:0;}}
@@ -1070,7 +1123,7 @@ function PuzzleBoard({
 
               {/* Audio button — always visible, auto-played for K-2 via VocabModal; here it's on-demand */}
               <button
-                onClick={e => { e.stopPropagation(); speakTextGraded(getClue(activeWord), grade, muted); }}
+                onClick={e => { e.stopPropagation(); speakTextGraded(getClueForSpeech(activeWord), grade, muted); }}
                 title="Read clue aloud"
                 style={{ background:"rgba(255,255,255,.15)", border:"1px solid rgba(255,255,255,.35)", borderRadius:"5px", padding:"3px 8px", cursor:"pointer", fontSize:"14px", lineHeight:1, flexShrink:0 }}
               >
@@ -1243,30 +1296,101 @@ function PuzzleBoard({
         </div>{/* end three-pane */}
       </div>{/* end puzzle-root */}
 
-      {/* ══ K-2 WIN CELEBRATION (full screen) ════════════════════════════ */}
+      {/* ══ SONG INTRO — shown once before first interaction ════════════════ */}
+      {showSongIntro && (
+        <div style={{
+          position:"fixed", inset:0,
+          background:"linear-gradient(160deg,#1a237e,#283593,#1b5e20)",
+          display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
+          zIndex:10100, textAlign:"center", padding:"24px",
+        }}>
+          <div style={{ fontSize:"4.5rem", marginBottom:"12px", animation:"celebBounce .8s ease-in-out infinite alternate" }}>🎵</div>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"clamp(1.6rem,7vw,3rem)", color:"#fff", marginBottom:"8px", textShadow:"2px 2px 0 rgba(0,0,0,.3)" }}>
+            {title}
+          </div>
+          <div style={{ fontFamily:"Lora,serif", fontSize:"16px", color:"#90caf9", marginBottom:"28px", lineHeight:1.5 }}>
+            Let's fill in the missing words from this song!
+          </div>
+
+          {/* Preview clues button — reads all clues aloud */}
+          <button
+            onClick={() => {
+              speakTextGraded(`Let's sing ${title}! Listen carefully!`, grade, muted);
+              setTimeout(() => previewClueTrain(), 2200);
+            }}
+            style={{ marginBottom:"12px", padding:"13px 28px", background:"rgba(255,255,255,.15)", color:"#fff", border:"2px solid rgba(255,255,255,.5)", borderRadius:"12px", fontFamily:"Lora,serif", fontWeight:600, fontSize:"16px", cursor:"pointer" }}
+          >
+            🔊 Hear the clues first
+          </button>
+
+          <button
+            onClick={() => {
+              window.speechSynthesis?.cancel();
+              setShowSongIntro(false);
+              // Speak encouragement when puzzle reveals
+              setTimeout(() => {
+                if (!muted) speakTextGraded(`Ready! Fill in the missing words from ${title}!`, grade, false);
+              }, 300);
+            }}
+            style={{ padding:"16px 36px", background:"#ffeb3b", color:"#1a237e", border:"none", borderRadius:"14px", fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"18px", cursor:"pointer", boxShadow:"4px 4px 0 rgba(0,0,0,.3)" }}
+          >
+            🎵 Start Puzzle!
+          </button>
+        </div>
+      )}
+
+      {/* ══ K-2 WIN CELEBRATION (full screen) — z:10000 beats FeedbackModal ═ */}
       {won && isEarlyLearner && (
         <div style={{
           position:"fixed", inset:0,
-          background:"linear-gradient(135deg,rgba(27,94,32,.96),rgba(56,142,60,.92))",
+          background:"linear-gradient(135deg,#1b5e20 0%,#2e7d32 40%,#1565c0 100%)",
           display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
-          zIndex:9100, textAlign:"center", padding:"20px",
+          zIndex:10000, textAlign:"center", padding:"20px",
+          overflow:"hidden",
         }}>
-          <div style={{ fontSize:"5rem", marginBottom:"12px", animation:"celebBounce .7s ease-in-out infinite alternate" }}>🎉</div>
-          <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"clamp(2rem,8vw,3.5rem)", color:"#f0ead8", marginBottom:"10px" }}>
-            You Did It! 🌟
+          {/* Big bouncing emojis */}
+          <div style={{ fontSize:"4.5rem", marginBottom:"8px", animation:"celebBounce .6s ease-in-out infinite alternate" }}>
+            🎉
           </div>
-          <div style={{ fontFamily:"Lora,serif", fontSize:"17px", color:"#a5d6a7", marginBottom:"18px" }}>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"clamp(2.2rem,9vw,4rem)", color:"#ffeb3b", marginBottom:"6px", textShadow:"3px 3px 0 rgba(0,0,0,.3)", animation:"celebBounce .8s ease-in-out infinite alternate" }}>
+            YOU DID IT!
+          </div>
+          <div style={{ fontSize:"3rem", margin:"6px 0", animation:"celebSpin 2s linear infinite" }}>⭐</div>
+          <div style={{ fontFamily:"Lora,serif", fontSize:"clamp(15px,4vw,20px)", color:"#a5d6a7", marginBottom:"10px" }}>
             Amazing work! You solved the whole puzzle!
           </div>
-          <div style={{ fontSize:"3rem", marginBottom:"18px" }}>⭐🕷️⭐</div>
-          <div style={{ fontFamily:"Lora,serif", fontSize:"13px", color:"#81c784", marginBottom:"24px" }}>
-            Time: {formatTime(seconds)} · Mistakes: {mistakes}
+
+          {/* Solved word parade — each word with its emoji */}
+          <div style={{
+            display:"flex", flexWrap:"wrap", gap:"8px", justifyContent:"center",
+            maxWidth:"420px", marginBottom:"16px", padding:"0 8px",
+          }}>
+            {words.map((w, i) => (
+              <div key={w.answer} style={{
+                background:"rgba(255,255,255,.18)",
+                border:"2px solid rgba(255,255,255,.4)",
+                borderRadius:"10px", padding:"5px 10px",
+                fontFamily:"'Playfair Display',serif", fontWeight:900,
+                fontSize:"clamp(11px,3vw,15px)", color:"#fff",
+                letterSpacing:"1px",
+                animation:`celebBounce ${0.6 + (i % 4) * 0.15}s ease-in-out infinite alternate`,
+                animationDelay:`${(i * 0.08)}s`,
+              }}>
+                {w.emoji && w.emoji !== "🔤" && <span style={{ marginRight:"4px" }}>{w.emoji}</span>}
+                {w.answer}
+              </div>
+            ))}
           </div>
+
+          <div style={{ fontFamily:"Lora,serif", fontSize:"12px", color:"#81c784", marginBottom:"20px" }}>
+            ⏱ {formatTime(seconds)} · {mistakes === 0 ? "🌟 No mistakes!" : `${mistakes} mistake${mistakes!==1?"s":""}` }
+          </div>
+
           <div style={{ display:"flex", gap:"12px", flexWrap:"wrap", justifyContent:"center" }}>
-            <button onClick={() => navigate("/create")} style={{ padding:"14px 28px", background:"#f0ead8", color:"#1b5e20", border:"none", borderRadius:"12px", fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"16px", cursor:"pointer", boxShadow:"3px 3px 0 rgba(0,0,0,.25)" }}>
-              New Puzzle! →
+            <button onClick={() => navigate("/create")} style={{ padding:"14px 28px", background:"#ffeb3b", color:"#1b5e20", border:"none", borderRadius:"14px", fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"17px", cursor:"pointer", boxShadow:"4px 4px 0 rgba(0,0,0,.3)", animation:"celebBounce .9s ease-in-out infinite alternate" }}>
+              🎵 New Puzzle!
             </button>
-            <button onClick={() => { setWon(false); setShowFeedback(false); }} style={{ padding:"14px 20px", background:"transparent", color:"#f0ead8", border:"2px solid rgba(255,255,255,.5)", borderRadius:"12px", fontFamily:"Lora,serif", fontWeight:600, fontSize:"14px", cursor:"pointer" }}>
+            <button onClick={() => { setWon(false); }} style={{ padding:"14px 20px", background:"transparent", color:"#f0ead8", border:"2px solid rgba(255,255,255,.5)", borderRadius:"14px", fontFamily:"Lora,serif", fontWeight:600, fontSize:"14px", cursor:"pointer" }}>
               See Puzzle
             </button>
           </div>

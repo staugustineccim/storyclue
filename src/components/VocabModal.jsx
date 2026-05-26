@@ -49,10 +49,10 @@ function speakText(text, grade, muted) {
   if (voice) utt.voice = voice;
   utt.lang   = "en-US";
   utt.volume = 0.92;
-  // Keep pitch near 1.0 — high pitch is what causes the robotic/squeaky quality.
-  // Warmth comes from voice selection + slower, deliberate pacing.
-  utt.rate  = isEarly ? 0.76 : isLower ? 0.88 : 0.95;
-  utt.pitch = isEarly ? 1.02 : isLower ? 1.0  : 1.0;
+  // Slightly higher pitch + slower rate makes standard female voices sound warmer
+  // for K-2. True children's voices require Google Cloud TTS Neural2 Kids.
+  utt.rate  = isEarly ? 0.72 : isLower ? 0.88 : 0.95;
+  utt.pitch = isEarly ? 1.10 : isLower ? 1.02 : 1.0;
   window.speechSynthesis.speak(utt);
 }
 
@@ -120,11 +120,13 @@ export default function VocabModal({
   }, [phase, cardIndex, speed]); // eslint-disable-line
 
   // K-2: auto-speak when card changes (graded TTS, respects mute)
+  // Replace ___ fill-in blanks with the actual word so TTS doesn't say "underscore"
   useEffect(() => {
     if (phase !== "cards" || !early) return;
     const w = words[cardIndex];
     if (!w) return;
-    const text = `${w.answer}. ${w.clue}`;
+    const cleanClue = w.clue.replace(/_{2,}/g, w.answer);
+    const text = `${w.answer}. ${cleanClue}`;
     const t = setTimeout(() => speakText(text, grade, mutedRef.current), 350);
     return () => clearTimeout(t);
   }, [cardIndex, phase]); // eslint-disable-line
@@ -203,7 +205,31 @@ export default function VocabModal({
   function speakCurrent() {
     const w = words[cardIndex];
     if (!w) return;
-    speakText(`${w.answer}. ${w.clue}`, grade, muted);
+    const cleanClue = w.clue.replace(/_{2,}/g, w.answer);
+    speakText(`${w.answer}. ${cleanClue}`, grade, muted);
+  }
+
+  // Renders a clue string, replacing ___ with the answer word shown underlined.
+  // This way kids see the word clearly in context instead of blank underscores.
+  function renderClueWithAnswer(clue, answer) {
+    const parts = clue.split(/_{2,}/);
+    if (parts.length === 1) return clue; // no blank — plain string
+    return parts.map((part, i) => (
+      <span key={i}>
+        {part}
+        {i < parts.length - 1 && (
+          <span style={{
+            textDecoration: "underline",
+            fontWeight: 900,
+            color: "#ffeb3b",
+            letterSpacing: "2px",
+            fontSize: "105%",
+          }}>
+            {answer}
+          </span>
+        )}
+      </span>
+    ));
   }
 
   // ── Derived values ───────────────────────────────────────────────────────
@@ -362,13 +388,13 @@ export default function VocabModal({
                 </div>
               )}
 
-              {/* Clue */}
+              {/* Clue — ___ blanks are replaced with the answer underlined/highlighted */}
               <div style={{
                 fontFamily:"Lora,serif",
                 fontSize: early ? "16px" : "14px",
                 color:"#C8E6C0", lineHeight:1.65,
               }}>
-                {word.clue}
+                {renderClueWithAnswer(word.clue, word.answer)}
               </div>
 
               <div style={{ fontFamily:"Lora,serif", fontSize:"11px", color:"rgba(200,230,192,.55)", fontStyle:"italic" }}>
