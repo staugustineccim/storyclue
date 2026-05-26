@@ -170,7 +170,7 @@ export default function PuzzleGenerator() {
 
   useEffect(() => {
     if (searchParams.get("demo") === "cw") {
-      navigate(getDemoUrl("3"), { replace: true });
+      navigate(getDemoUrl(grade), { replace: true });
     }
   }, []);
 
@@ -539,10 +539,10 @@ export default function PuzzleGenerator() {
               {/* Save-this-link warning — required by spec */}
               <div style={{ background:"#fff8e8", border:"2px solid #d4a020", borderRadius:"8px", padding:"12px 14px", marginBottom:"20px" }}>
                 <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"13px", color:"#7a5000", marginBottom:"4px" }}>
-                  ⚠️ Save your puzzle link now
+                  🔗 Your puzzle is ready — bookmark or copy the link below
                 </div>
                 <div style={{ fontFamily:"Lora,serif", fontSize:"12px", color:"#9a6820", lineHeight:1.6 }}>
-                  Your puzzle link has been created. Save this link — it works forever but we cannot recover it for you if it is lost.
+                  This link works forever and never expires. Copy it now so you can come back any time — puzzles are stored permanently but we can't look them up by name.
                 </div>
               </div>
 
@@ -1154,12 +1154,12 @@ export default function PuzzleGenerator() {
               {!versionCheckDone && inputMode === "lookup"
                 ? "Checking for version options..."
                 : inputMode === "url"
-                  ? "Fetching article and writing clues... about 15 seconds."
+                  ? "Fetching the page and writing clues — this usually takes under 30 seconds."
                   : inputMode === "pdf"
-                    ? `Claude is reading "${pdfFileName}" and writing clues... about 10 seconds.`
+                    ? `Claude is reading "${pdfFileName}" and writing clues…`
                     : inputMode === "songs"
-                      ? `Claude is writing lyric clues for "${selectedSong?.title}"... about 10 seconds.`
-                      : `Claude is reading ${inputMode === "lookup" ? `"${bookRef}"` : "your text"} and writing clues... about 10 seconds.`}
+                      ? `Claude is writing lyric clues for "${selectedSong?.title}"…`
+                      : `Claude is reading ${inputMode === "lookup" ? `"${bookRef}"` : "your text"} and writing clues…`}
             </div>
           )}
         </form>
@@ -1172,7 +1172,7 @@ export default function PuzzleGenerator() {
           <div style={{ fontFamily:"Lora,serif", fontSize:"13px", color:"#4a6a28", marginBottom:"12px" }}>
             Try the Charlotte's Web Chapter 1 demo — no text needed.
           </div>
-          <button onClick={() => navigate(getDemoUrl("3"))}
+          <button onClick={() => navigate(getDemoUrl(grade))}
             style={{ background:"transparent", border:"2px solid #3a6a1a", color:"#3a6a1a", padding:"8px 20px", borderRadius:"4px", fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"13px", cursor:"pointer" }}>
             View Demo Puzzle
           </button>

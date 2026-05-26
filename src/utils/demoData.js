@@ -135,13 +135,13 @@ export function buildDemoData(grade = "3") {
   };
 }
 
-// Pre-encoded demo URL (grade 3, computed once)
-let _demoUrl = null;
+// Pre-encoded demo URLs — cached per grade
+const _demoUrls = {};
 export function getDemoUrl(grade = "3") {
-  if (!_demoUrl || grade !== "3") {
-    _demoUrl = "/play?p=" + encodePuzzle(buildDemoData(grade));
+  if (!_demoUrls[grade]) {
+    _demoUrls[grade] = "/play?p=" + encodePuzzle(buildDemoData(grade));
   }
-  return _demoUrl;
+  return _demoUrls[grade];
 }
 
 export const SERIES_DATA = {

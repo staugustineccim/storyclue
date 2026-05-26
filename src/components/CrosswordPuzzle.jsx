@@ -24,6 +24,16 @@ const MAX_HINTS = 3;
 // Chrome has "Google US English", iOS has "Samantha", etc. — we pick the best one.
 let _voiceCache = null;
 
+// Voices load asynchronously on mobile browsers — this ensures the list
+// is populated before the first speakTextGraded call.
+if (typeof window !== "undefined" && window.speechSynthesis) {
+  // Trigger voice loading immediately; many browsers need this nudge
+  window.speechSynthesis.getVoices();
+  window.speechSynthesis.addEventListener?.("voiceschanged", () => {
+    window.speechSynthesis.getVoices(); // repopulates the internal list
+  });
+}
+
 function getBestVoice(grade) {
   if (!window.speechSynthesis) return null;
   const voices = window.speechSynthesis.getVoices();
@@ -303,16 +313,10 @@ function PuzzleBoard({
     return () => clearInterval(timerRef.current);
   }, [timerActive, won]);
 
-  // Fullscreen persistence
+  // Fullscreen state tracking — no auto-re-entry (that fought the user)
   useEffect(() => {
     function onFsChange() {
-      const isFs = !!document.fullscreenElement;
-      setIsFullscreen(isFs);
-      if (isFs) {
-        userExitedFsRef.current = false;
-      } else if (!userExitedFsRef.current) {
-        setTimeout(() => { document.documentElement.requestFullscreen?.().catch(() => {}); }, 50);
-      }
+      setIsFullscreen(!!document.fullscreenElement);
     }
     document.addEventListener("fullscreenchange", onFsChange);
     document.addEventListener("webkitfullscreenchange", onFsChange);
@@ -414,13 +418,9 @@ function PuzzleBoard({
     }
   }, [won]); // eslint-disable-line
 
-  // Context review: K-5 auto-show after feedback closes; 6th+ button only
-  useEffect(() => {
-    if (!contextAutoShown && feedbackShown && !showFeedback && (won || revealed) && isLowerGrade) {
-      setContextAutoShown(true);
-      loadContext();
-    }
-  }, [showFeedback, feedbackShown]); // eslint-disable-line
+  // Context review: button only for all grades — never auto-fires
+  // (previously auto-fired for K-5; removed because it costs money per
+  //  completion and shows an unexpected overlay the user didn't request)
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   function wordKey(w) { return `${w.orientation}-${w.number}`; }

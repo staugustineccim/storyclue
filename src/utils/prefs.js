@@ -2,7 +2,7 @@
 // No account required. Works for all users on the same browser/device.
 
 const KEY    = "storyclue_prefs";
-const NINETY = 365 * 24 * 60 * 60 * 1000; // 1 year in ms
+const NINETY = 90 * 24 * 60 * 60 * 1000; // 90 days in ms
 
 export function savePrefs(prefs) {
   try {

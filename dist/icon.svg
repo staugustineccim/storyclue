@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="#2d4a18"/>
+  <!-- Inner glow circle -->
+  <circle cx="256" cy="220" r="160" fill="#3a6a1a" opacity="0.5"/>
+  <!-- Spider body -->
+  <ellipse cx="256" cy="210" rx="52" ry="38" fill="#f0ead8"/>
+  <ellipse cx="256" cy="248" rx="38" ry="30" fill="#f0ead8"/>
+  <!-- Spider eyes -->
+  <circle cx="242" cy="204" r="7" fill="#2d4a18"/>
+  <circle cx="270" cy="204" r="7" fill="#2d4a18"/>
+  <circle cx="244" cy="202" r="2.5" fill="white"/>
+  <circle cx="272" cy="202" r="2.5" fill="white"/>
+  <!-- Spider legs left -->
+  <line x1="210" y1="215" x2="158" y2="185" stroke="#f0ead8" stroke-width="9" stroke-linecap="round"/>
+  <line x1="208" y1="228" x2="152" y2="228" stroke="#f0ead8" stroke-width="9" stroke-linecap="round"/>
+  <line x1="212" y1="242" x2="160" y2="268" stroke="#f0ead8" stroke-width="9" stroke-linecap="round"/>
+  <line x1="218" y1="255" x2="172" y2="292" stroke="#f0ead8" stroke-width="9" stroke-linecap="round"/>
+  <!-- Spider legs right -->
+  <line x1="302" y1="215" x2="354" y2="185" stroke="#f0ead8" stroke-width="9" stroke-linecap="round"/>
+  <line x1="304" y1="228" x2="360" y2="228" stroke="#f0ead8" stroke-width="9" stroke-linecap="round"/>
+  <line x1="300" y1="242" x2="352" y2="268" stroke="#f0ead8" stroke-width="9" stroke-linecap="round"/>
+  <line x1="294" y1="255" x2="340" y2="292" stroke="#f0ead8" stroke-width="9" stroke-linecap="round"/>
+  <!-- Web thread -->
+  <line x1="256" y1="172" x2="256" y2="100" stroke="#f0ead8" stroke-width="5" stroke-linecap="round" opacity="0.7"/>
+  <!-- StoryClue text -->
+  <text x="256" y="360" font-family="Georgia, serif" font-size="58" font-weight="900" fill="#f0ead8" text-anchor="middle" letter-spacing="2">StoryClue</text>
+  <text x="256" y="410" font-family="Georgia, serif" font-size="28" fill="#a8d890" text-anchor="middle" letter-spacing="1">AI Crossword</text>
+</svg>
