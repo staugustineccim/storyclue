@@ -329,11 +329,63 @@ export default async function handler(req, res) {
   if (phonicsMode && ["k","1","2"].includes(String(grade))) {
     const storyRef = bookRef?.trim() || "this story";
     const pg = {
-      k: `PHONICS CLUES — Kindergarten: Every clue MUST have TWO PARTS connected with a dash (—): (1) A story connection — one simple sentence naming a specific character, object, or event from "${storyRef}". (2) A phonics hint using beginning sounds, rhymes, or ending sounds. EXAMPLE FORMAT: "Jonah sailed away on this big boat — starts with the /sh/ sound". Use slashes around phoneme sounds: /fff/ /sss/ /sh/ /ch/ /th/. NEVER write a clue that doesn't reference the specific story. EVERY clue must name something from the story AND teach a sound.`,
-      "1": `PHONICS CLUES — 1st Grade: Every clue MUST have TWO PARTS: (1) A story connection — one sentence naming a character, place, or event from "${storyRef}". (2) A phonics hint using ending sounds, blends, or rhymes. EXAMPLE FORMAT: "This is what Jonah did when God asked him to go to Nineveh — ends with the /n/ sound like fun". Include letter count when helpful.`,
-      "2": `PHONICS CLUES — 2nd Grade: Every clue MUST have TWO PARTS: (1) A story connection — one sentence connecting to a specific moment in "${storyRef}". (2) A phonics/spelling pattern hint covering vowel sounds, digraphs, or word patterns. EXAMPLE FORMAT: "The enormous fish that swallowed Jonah — has the long /ā/ sound and follows the silent-e pattern". Include word length when helpful.`,
+      k: `
+KINDERGARTEN PHONICS MODE — STORY-CONNECTED CLUES ONLY
+Word count: MAXIMUM ${limits.wordCount} WORDS — absolutely do not exceed this number.
+Every clue MUST follow this EXACT 2-part format using a dash: "[story moment] — [sound hint]"
+
+✓ GOOD EXAMPLES for "Book of Jonah":
+  SHIP → "Jonah ran away on this big boat — starts with the /sh/ sound"
+  FISH → "The giant animal that swallowed Jonah — starts with the /fff/ sound"
+  SEA  → "Jonah was thrown into this big water — starts with the /sss/ sound"
+  RUN  → "What Jonah did when God called him — rhymes with sun and fun"
+
+✗ BAD EXAMPLES — NEVER write clues like these:
+  SHIP → "Starts with /sh/ like shop and shed" — WRONG: no story connection
+  FISH → "Has 4 letters and ends in /sh/" — WRONG: no story connection
+  RUN  → "Rhymes with sun, bun, fun" — WRONG: no story connection
+
+Part 1 MUST name a specific character, object, or event from "${storyRef}".
+Part 2 MUST teach a beginning sound, ending sound, or rhyme using slashes: /sh/ /fff/ /sss/ /ch/ /th/.`,
+
+      "1": `
+1ST GRADE PHONICS MODE — STORY-CONNECTED CLUES ONLY
+Word count: MAXIMUM ${limits.wordCount} WORDS — absolutely do not exceed this number.
+Every clue MUST follow this EXACT 2-part format using a dash: "[story moment] — [sound/pattern hint]"
+
+✓ GOOD EXAMPLES for "Book of Jonah":
+  RAN  → "What Jonah did when God told him to go to Nineveh — ends with the /an/ sound like can and fan"
+  WAVE → "These crashed over the ship in the terrible storm — follows the silent-e spelling pattern"
+  PRAY → "What the sailors did when the storm got too dangerous — has the /pr/ blend"
+
+✗ BAD EXAMPLES — NEVER write clues like these:
+  RAN  → "Ends with -an like can, fan, man, pan" — WRONG: no story connection
+  WAVE → "Has 4 letters with silent e at the end" — WRONG: no story connection
+  PRAY → "Starts with pr blend" — WRONG: no story connection
+
+Part 1 MUST describe a specific moment, character, or place from "${storyRef}".
+Part 2 MUST include ending sounds, blends, or rhymes.`,
+
+      "2": `
+2ND GRADE PHONICS MODE — STORY-CONNECTED CLUES ONLY
+Word count: MAXIMUM ${limits.wordCount} WORDS — absolutely do not exceed this number.
+Every clue MUST follow this EXACT 2-part format using a dash: "[story moment] — [spelling pattern hint]"
+
+✓ GOOD EXAMPLES for "Book of Jonah":
+  WHALE → "The enormous sea creature that swallowed Jonah whole — has the /wh/ digraph and silent-e pattern"
+  PRAY  → "What Jonah did inside the fish for three days — has the /pr/ blend and long /ā/ vowel sound"
+  STORM → "The terrible weather God sent to stop Jonah's ship — has the /st/ blend and /or/ vowel pattern"
+  VINE  → "The plant God made grow over Jonah to give him shade — follows the silent-e spelling rule"
+
+✗ BAD EXAMPLES — NEVER write clues like these:
+  WHALE → "Has wh digraph and silent e at the end" — WRONG: no story connection
+  PRAY  → "Has pr blend with long a vowel sound" — WRONG: no story connection
+  STORM → "Has st blend and or vowel pattern" — WRONG: no story connection
+
+Part 1 MUST connect to a specific event, character, or place from "${storyRef}".
+Part 2 MUST cover vowel sounds, digraphs, blends, or spelling patterns.`,
     };
-    phonicsNote = `\n${pg[grade] || pg["2"]} CRITICAL: Zero generic phonics patterns allowed. Every single clue must connect to the specific story AND teach the relevant sound. Format every clue as: "[story connection] — [phonics hint]".`;
+    phonicsNote = `\n\n${pg[grade] || pg["2"]}\n\nOVERRIDING RULE: Before returning, check EVERY clue. If any clue is only about sounds/patterns with no story reference, rewrite it. The story connection is NOT optional. Format every single clue as: "[story connection] — [phonics hint]".`;
   }
 
   // ── Picture Mode ───────────────────────────────────────────────────────────
