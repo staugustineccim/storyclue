@@ -3,6 +3,6 @@
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "installCommand": "npm install",
-  "buildCommand": "npm install && npm run build",
+  "buildCommand": "npm install && chmod +x ./node_modules/.bin/vite && npm run build",
   "framework": "vite"
 }
