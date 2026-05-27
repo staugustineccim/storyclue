@@ -8,6 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.106.2",
     "@vercel/kv": "^2.0.0",
     "@vercel/postgres": "^0.10.0",
     "crossword-layout-generator": "^0.1.1",

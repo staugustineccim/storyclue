@@ -5,8 +5,11 @@ import { buildLayout } from "../utils/layoutBuilder";
 import { buildDemoData, getDemoUrl, SERIES_DATA } from "../utils/demoData";
 import { savePrefs, loadPrefs } from "../utils/prefs";
 import { trackEvent } from "../utils/analytics";
+import { useAuth } from "../context/AuthContext";
+import { authEnabled } from "../utils/supabase";
 import AudienceSelector from "./AudienceSelector";
 import SongsLibrary from "./SongsLibrary";
+import AuthButton from "./AuthButton";
 
 // ── Audience cookie helpers ────────────────────────────────────────────────
 // Audience values: "early-learner" | "elementary" | "middle-high" | "adult"
@@ -89,6 +92,10 @@ const BOOK_EXAMPLES = [
 export default function PuzzleGenerator() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+
+  // Track how many puzzles generated this session (for "save your puzzles" nudge)
+  const [sessionPuzzleCount, setSessionPuzzleCount] = useState(0);
 
   // ── Audience — read from cookie (null = not yet chosen → show selector) ──
   const [audience, setAudience] = useState(() => getAudienceCookie());
@@ -440,6 +447,7 @@ export default function PuzzleGenerator() {
         playPath:   `/play/${saveData.slug}${songParam}`,
         slug:       saveData.slug,
       });
+      setSessionPuzzleCount(n => n + 1);
 
       // Track puzzle generation
       trackEvent("puzzle_generated", {
@@ -513,6 +521,8 @@ export default function PuzzleGenerator() {
           <span style={{ fontSize:"13px" }}>🛡️</span>
           <span style={{ fontFamily:"Lora,serif", fontSize:"10px", color:"#f0ead8", fontWeight:600, lineHeight:1.2 }}>Safe for<br/>K-12</span>
         </div>
+        {/* Sign-in button (hidden when auth is not configured) */}
+        <AuthButton isFirstPuzzle={sessionPuzzleCount === 1 && !user} />
       </div>
 
       <div style={{ maxWidth:"700px", margin:"0 auto", padding:"32px 20px" }}>
@@ -610,6 +620,11 @@ export default function PuzzleGenerator() {
             >
               ✦ Generate Another Puzzle
             </button>
+
+            {/* Gentle sign-in nudge — shown only when auth is on and user is signed out */}
+            {authEnabled && !user && (
+              <SaveNudge />
+            )}
           </div>
         )}
 
@@ -1178,6 +1193,57 @@ export default function PuzzleGenerator() {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── SaveNudge ─────────────────────────────────────────────────────────────────
+// Gentle non-popup banner shown after first puzzle if user is signed out.
+// Spec: "Save your puzzles and lock in a founding member discount. Sign in with
+// Google — it takes 10 seconds."
+function SaveNudge() {
+  const { signInWithGoogle } = useAuth();
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed) return null;
+  return (
+    <div style={{
+      marginTop: "18px",
+      padding: "14px 16px",
+      background: "linear-gradient(135deg,#f0f8e8,#e8f4d8)",
+      border: "1.5px solid #4a8a2a",
+      borderRadius: "10px",
+      display: "flex", alignItems: "center", gap: "12px",
+      fontFamily: "Lora, Georgia, serif",
+      position: "relative",
+    }}>
+      <span style={{ fontSize: "1.5rem", flexShrink: 0 }}>🔒</span>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, fontSize: "13px", color: "#2d4a18", marginBottom: "2px" }}>
+          Save your puzzles &amp; lock in a founding member discount
+        </div>
+        <div style={{ fontSize: "12px", color: "#5a7a30", lineHeight: 1.4 }}>
+          Sign in with Google — it takes 10 seconds.
+        </div>
+      </div>
+      <button
+        onClick={signInWithGoogle}
+        style={{
+          background: "#2d4a18", color: "#f0ead8",
+          border: "none", borderRadius: "6px",
+          padding: "7px 14px", fontSize: "12px",
+          fontFamily: "'Playfair Display', serif", fontWeight: 700,
+          cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
+        }}
+      >
+        Sign in
+      </button>
+      <button
+        onClick={() => setDismissed(true)}
+        style={{ position: "absolute", top: "6px", right: "8px", background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: "12px", lineHeight: 1, padding: "2px" }}
+        aria-label="Dismiss"
+      >
+        ✕
+      </button>
     </div>
   );
 }
