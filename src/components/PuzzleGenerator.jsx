@@ -7,9 +7,12 @@ import { savePrefs, loadPrefs } from "../utils/prefs";
 import { trackEvent } from "../utils/analytics";
 import { useAuth } from "../context/AuthContext";
 import { authEnabled } from "../utils/supabase";
+import { initTrial, getDaysRemaining, getTrialStatus, isExpiring, isInGrace, isTrialOver } from "../utils/trial";
 import AudienceSelector from "./AudienceSelector";
 import SongsLibrary from "./SongsLibrary";
 import AuthButton from "./AuthButton";
+import TrialBanner from "./TrialBanner";
+import UpgradeModal from "./UpgradeModal";
 
 // ── Audience cookie helpers ────────────────────────────────────────────────
 // Audience values: "early-learner" | "elementary" | "middle-high" | "adult"
@@ -96,6 +99,16 @@ export default function PuzzleGenerator() {
 
   // Track how many puzzles generated this session (for "save your puzzles" nudge)
   const [sessionPuzzleCount, setSessionPuzzleCount] = useState(0);
+
+  // ── Trial ──────────────────────────────────────────────────────────────────
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
+  // Init trial on first visit to /create
+  useEffect(() => {
+    initTrial();
+    // Auto-show upgrade modal if trial is fully over (day 38+)
+    if (isTrialOver()) setShowUpgradeModal(true);
+  }, []);
 
   // ── Audience — read from cookie (null = not yet chosen → show selector) ──
   const [audience, setAudience] = useState(() => getAudienceCookie());
@@ -521,9 +534,22 @@ export default function PuzzleGenerator() {
           <span style={{ fontSize:"13px" }}>🛡️</span>
           <span style={{ fontFamily:"Lora,serif", fontSize:"10px", color:"#f0ead8", fontWeight:600, lineHeight:1.2 }}>Safe for<br/>K-12</span>
         </div>
+        {/* Trial indicator chip */}
+        <TrialChip onUpgrade={() => setShowUpgradeModal(true)} />
         {/* Sign-in button (hidden when auth is not configured) */}
         <AuthButton isFirstPuzzle={sessionPuzzleCount === 1 && !user} />
       </div>
+
+      {/* Trial expiry banner (day 25+) */}
+      <TrialBanner onUpgrade={() => setShowUpgradeModal(true)} />
+
+      {/* Upgrade modal */}
+      {showUpgradeModal && (
+        <UpgradeModal
+          onClose={() => setShowUpgradeModal(false)}
+          forced={isTrialOver()}
+        />
+      )}
 
       <div style={{ maxWidth:"700px", margin:"0 auto", padding:"32px 20px" }}>
         <h1 style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"28px", color:"#2d4a18", marginBottom:"8px" }}>
@@ -1196,6 +1222,57 @@ export default function PuzzleGenerator() {
     </div>
   );
 }
+
+// ── TrialChip ─────────────────────────────────────────────────────────────────
+// Small pill shown in the header. Only visible during active/expiring trial.
+// Nothing shown when trial hasn't started, is over, or user is subscribed.
+function TrialChip({ onUpgrade }) {
+  const status   = getTrialStatus();
+  const daysLeft = getDaysRemaining();
+
+  if (status === "no-trial" || status === "subscribed") return null;
+  if (status === "ended") {
+    return (
+      <button onClick={onUpgrade} style={{ ...chipBase, background: "rgba(200,60,20,0.85)", cursor: "pointer" }}>
+        <span>⏰</span>
+        <span>Trial ended</span>
+      </button>
+    );
+  }
+  if (status === "grace") {
+    return (
+      <button onClick={onUpgrade} style={{ ...chipBase, background: "rgba(200,100,10,0.85)", cursor: "pointer" }}>
+        <span>⏰</span>
+        <span>Grace period</span>
+      </button>
+    );
+  }
+  if (status === "expiring") {
+    return (
+      <button onClick={onUpgrade} style={{ ...chipBase, background: "rgba(200,140,0,0.85)", cursor: "pointer" }}>
+        <span>🕐</span>
+        <span>Trial: {daysLeft}d left</span>
+      </button>
+    );
+  }
+  // active
+  return (
+    <div style={{ ...chipBase, background: "rgba(255,255,255,0.15)", cursor: "default" }}>
+      <span>✨</span>
+      <span>Trial: {daysLeft}d left</span>
+    </div>
+  );
+}
+
+const chipBase = {
+  display: "flex", alignItems: "center", gap: "4px",
+  background: "rgba(255,255,255,0.15)",
+  border: "1px solid rgba(255,255,255,0.3)",
+  borderRadius: "20px", padding: "4px 10px",
+  fontFamily: "Lora, Georgia, serif", fontSize: "11px",
+  fontWeight: 600, color: "#f0ead8",
+  flexShrink: 0,
+};
 
 // ── SaveNudge ─────────────────────────────────────────────────────────────────
 // Gentle non-popup banner shown after first puzzle if user is signed out.
