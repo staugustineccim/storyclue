@@ -2,12 +2,11 @@ import { useState } from "react";
 import { trackEvent } from "../utils/analytics";
 
 export default function FeedbackModal({ puzzleTitle, grade, wasRevealed, onClose }) {
-  const [step, setStep] = useState("rating"); // "rating" | "followup" | "thanks"
+  const [step, setStep] = useState("rating"); // "rating" | "thanks"
   const [stars, setStars] = useState(0);
   const [hovered, setHovered] = useState(0);
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [wouldPay, setWouldPay] = useState(null);
 
   async function submitRating() {
     if (stars === 0) return;
@@ -28,30 +27,9 @@ export default function FeedbackModal({ puzzleTitle, grade, wasRevealed, onClose
       });
     } catch { /* non-blocking */ }
     setSubmitting(false);
-    setStep("followup");
-  }
-
-  async function submitFollowup(answer) {
-    setWouldPay(answer);
-    try {
-      await fetch("/api/feedback", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          puzzleTitle,
-          grade,
-          stars,
-          comment: comment.trim(),
-          wasRevealed,
-          wouldPay: answer,
-          date: new Date().toISOString(),
-        }),
-      });
-    } catch { /* non-blocking */ }
     trackEvent("feedback_submitted", {
       stars,
-      would_pay:   answer,
-      grade_level: grade,
+      grade_level:  grade,
       was_revealed: wasRevealed,
     });
     setStep("thanks");
@@ -111,24 +89,6 @@ export default function FeedbackModal({ puzzleTitle, grade, wasRevealed, onClose
             >
               {submitting ? "Sending…" : "Submit Feedback"}
             </button>
-          </>
-        )}
-
-        {step === "followup" && (
-          <>
-            <div style={bookIcon}>💡</div>
-            <h2 style={heading}>One quick question</h2>
-            <p style={followupQ}>
-              Would you pay for unlimited puzzles?
-            </p>
-            <div style={buttonRow}>
-              <button onClick={() => submitFollowup(true)} style={yesBtn}>
-                👍 Yes
-              </button>
-              <button onClick={() => submitFollowup(false)} style={noBtn}>
-                👎 No
-              </button>
-            </div>
           </>
         )}
 
@@ -216,27 +176,3 @@ const submitButton = {
   transition: "background 0.2s",
 };
 
-const followupQ = {
-  fontSize: "1.1rem", color: "#333",
-  margin: "0.5rem 0 1.8rem", lineHeight: 1.5,
-};
-
-const buttonRow = {
-  display: "flex", gap: "1rem", justifyContent: "center",
-};
-
-const yesBtn = {
-  background: "#2D5A1A", color: "#fff",
-  border: "none", borderRadius: "8px",
-  padding: "0.7rem 1.8rem", fontSize: "1rem",
-  fontWeight: 600, cursor: "pointer",
-  fontFamily: "Lora, Georgia, serif",
-};
-
-const noBtn = {
-  background: "#fff", color: "#2D5A1A",
-  border: "2px solid #2D5A1A", borderRadius: "8px",
-  padding: "0.7rem 1.8rem", fontSize: "1rem",
-  fontWeight: 600, cursor: "pointer",
-  fontFamily: "Lora, Georgia, serif",
-};
