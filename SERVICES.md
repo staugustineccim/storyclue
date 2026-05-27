@@ -70,12 +70,30 @@ Rule: Alert Bob if total estimated monthly cost exceeds $50.
 - **Purpose:** Visitor tracking, custom event analytics
 - **Pricing:** FREE — always free, no billing tier, no credit card ever required
 - **Limits:** None for standard reporting (up to 2M events/day free)
-- **Status:** ⚠️ CODE PRESENT BUT INACTIVE — Measurement ID is placeholder `G-XXXXXXXXXX`. Bob must create a GA4 property at analytics.google.com and replace the placeholder to activate.
+- **Status:** ✅ LIVE — Measurement ID `G-7K5D2X9XW6` active in index.html
 - **BigQuery export:** Has a paid tier but is opt-in — default GA4 never charges.
 
 ---
 
-### 6. Wikipedia REST API
+### 6. Supabase Auth
+- **Purpose:** Google Sign-In for user accounts (puzzle history, founding member discount, future Stripe billing)
+- **Pricing:** FREE — Supabase free tier includes authentication with unlimited MAU
+- **Free tier:** Unlimited monthly active users for Auth · 500 MB database · 2 GB bandwidth
+- **Paid tier:** $25/month (Pro) if database exceeds 500 MB or bandwidth exceeds 2 GB
+- **Status:** ✅ CODE COMPLETE — waiting for Bob to create Supabase project and add env vars to Vercel
+- **Setup checklist** (one-time, ~15 minutes):
+  1. Create free project at supabase.com
+  2. Dashboard → Authentication → Providers → Google → Enable
+  3. Add Google OAuth credentials from console.cloud.google.com
+  4. Dashboard → Settings → API → copy Project URL and anon public key
+  5. Vercel → StoryClue → Settings → Environment Variables: add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
+  6. Redeploy
+- **Graceful degradation:** Auth silently disabled when env vars not set. App works exactly as before.
+- **Pricing page:** supabase.com/pricing
+
+---
+
+### 8. Wikipedia REST API
 - **Purpose:** Fetches thumbnail images for K-2 Picture Mode
 - **Pricing:** FREE — no API key, no registration, no rate limits (informal limits at high volume)
 - **Endpoint:** `https://en.wikipedia.org/api/rest_v1/page/summary/{word}`
@@ -84,27 +102,27 @@ Rule: Alert Bob if total estimated monthly cost exceeds $50.
 
 ---
 
-### 7. Web Speech API
+### 9. Web Speech API
 - **Purpose:** Text-to-speech for clue reading, vocabulary cards, celebration phrases
 - **Pricing:** FREE — browser built-in, no external calls
 - **Availability:** All modern browsers on iOS, Android, Windows, Mac
 
 ---
 
-### 8. Web Audio API
+### 10. Web Audio API
 - **Purpose:** Celebration sounds (word complete, puzzle win) — no external files
 - **Pricing:** FREE — browser built-in
 
 ---
 
-### 9. Google Fonts
+### 11. Google Fonts
 - **Purpose:** Playfair Display and Lora typefaces throughout the app
 - **Pricing:** FREE — always free, no limits
 - **CDN:** fonts.googleapis.com + fonts.gstatic.com
 
 ---
 
-### 10. YouTube oEmbed + Watch Page Parsing
+### 12. YouTube oEmbed + Watch Page Parsing
 - **Purpose:** Extracts captions/transcripts from YouTube URLs
 - **Pricing:** FREE — no API key required
 - **Method:** Fetches public watch page HTML, parses `ytInitialPlayerResponse` for caption tracks
@@ -113,7 +131,7 @@ Rule: Alert Bob if total estimated monthly cost exceeds $50.
 
 ---
 
-### 11. Vimeo oEmbed
+### 13. Vimeo oEmbed
 - **Purpose:** Gets title and description from Vimeo video URLs
 - **Pricing:** FREE — public oEmbed endpoint, no key required
 - **Status:** ✅ Working
@@ -154,12 +172,20 @@ Rule: Alert Bob if total estimated monthly cost exceeds $50.
 
 ---
 
-### Clerk (for teacher accounts — Tier 3)
-- **Purpose:** User authentication for saved puzzle libraries and teacher accounts
-- **Pricing:** Free up to 10,000 monthly active users (MAU)
-- **Paid tier:** $25/month for up to 100,000 MAU
-- **Free alternative:** Could use Vercel KV with a simple password, but no persistent accounts
-- **Status:** Not started — awaiting approval to begin Tier 3 work
+### ElevenLabs (Parent Voice Cloning)
+- **Purpose:** Let a parent record their own voice once; all K-2 TTS would use that voice. Massively increases engagement for children who respond to parent's voice.
+- **Pricing:** Starter $5/month per workspace · Creator $22/month · up to 192,000 characters/month on Starter
+- **Free alternative:** Web Speech API (already in use) — free but uses system voices, not parent voice
+- **⚠️ PAID SERVICE — REQUIRES BOB'S EXPLICIT APPROVAL BEFORE IMPLEMENTATION**
+- **Note:** This is a V2 feature per product roadmap. Do NOT implement until Bob approves cost and user UX is designed.
+- **Pricing page:** elevenlabs.io/pricing
+
+---
+
+### Clerk (for teacher accounts)
+- **Status:** ❌ SUPERSEDED — Supabase Auth (service #6 above) was chosen instead.
+  Supabase handles both authentication and database in one free-tier service. Clerk is no longer needed.
+- **Do not add Clerk** without Bob's explicit approval.
 
 ---
 
