@@ -20,10 +20,8 @@ export function AuthProvider({ children }) {
     // Handle PKCE code in URL (OAuth callback) then fall through to getSession
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
-    console.log("[Auth] mount — hash:", window.location.hash.slice(0, 40), "code:", code ? "yes" : "no");
     if (code) {
       supabase.auth.exchangeCodeForSession(code)
-        .then(({ data, error }) => console.log("[Auth] exchangeCode →", data?.session?.user?.email, error))
         .catch(() => {})
         .finally(() => {
           window.history.replaceState({}, "", window.location.pathname);
@@ -31,15 +29,13 @@ export function AuthProvider({ children }) {
     }
 
     // Get current session on mount (also picks up implicit-flow hash tokens)
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      console.log("[Auth] getSession →", session?.user?.email ?? "null", error);
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
     // Subscribe to future auth changes (sign-in, sign-out, token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("[Auth] onAuthStateChange →", event, session?.user?.email ?? "null");
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       setLoading(false);
     });

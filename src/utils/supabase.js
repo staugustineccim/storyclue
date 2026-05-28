@@ -17,9 +17,6 @@ import { createClient } from "@supabase/supabase-js";
 const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-console.log("[Supabase] URL:", SUPABASE_URL ? SUPABASE_URL.slice(0, 30) : "MISSING");
-console.log("[Supabase] KEY:", SUPABASE_ANON ? SUPABASE_ANON.slice(0, 20) : "MISSING");
-
 let _supabase = null;
 if (SUPABASE_URL && SUPABASE_ANON) {
   try {
@@ -31,9 +28,8 @@ if (SUPABASE_URL && SUPABASE_ANON) {
         flowType: "implicit",
       },
     });
-    console.log("[Supabase] client created OK");
   } catch (e) {
-    console.error("[Supabase] createClient failed:", e);
+    // Auth silently disabled if client fails to initialize
   }
 }
 
