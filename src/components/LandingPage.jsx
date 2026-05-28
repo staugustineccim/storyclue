@@ -242,38 +242,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── FAITH TRADITIONS CALLOUT ──────────────────────────────────────── */}
-      <section style={{ background:G, padding:"64px 24px" }}>
-        <div style={{ maxWidth:"820px", margin:"0 auto", textAlign:"center" }}>
-          <div style={{ fontSize:"36px", marginBottom:"12px" }}>🕊️</div>
-          <h2 style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"28px", color:P, marginBottom:"14px" }}>
-            Faith-Inclusive. Translation-Neutral.
-          </h2>
-          <p style={{ fontFamily:"Lora,serif", fontSize:"16px", color:"#c8e8a8", lineHeight:1.7, marginBottom:"28px", maxWidth:"640px", margin:"0 auto 28px" }}>
-            StoryClue writes all faith-based clues in modern plain English — never in archaic King James language — so any family can use them regardless of which Bible translation, Torah commentary, or Quran edition they read from.
-          </p>
-          <div className="faith-grid" style={{ maxWidth:"640px", margin:"0 auto 28px", textAlign:"left" }}>
-            {[
-              { icon:"✝️", label:"Christian — Protestant" },
-              { icon:"⛪", label:"Christian — Catholic" },
-              { icon:"✡️", label:"Jewish (Torah & Hebrew terms)" },
-              { icon:"☪️", label:"Islamic (Quran vocabulary)" },
-              { icon:"🕉️", label:"Hindu (Sanskrit context)" },
-              { icon:"☸️", label:"Buddhist" },
-              { icon:"🙏", label:"Other Faith Tradition" },
-              { icon:"📚", label:"None / Secular" },
-            ].map(f => (
-              <div key={f.label} className="faith-item">
-                <span style={{ fontSize:"18px" }}>{f.icon}</span>
-                <span>{f.label}</span>
-              </div>
-            ))}
-          </div>
-          <button className="cta-btn" style={{ background:P, color:G, padding:"12px 28px" }} onClick={() => navigate("/create")}>
-            Create a Faith-Tradition Puzzle
-          </button>
-        </div>
-      </section>
 
       {/* ── WHO IT'S FOR ──────────────────────────────────────────────────── */}
       <section id="who-its-for" style={{ padding:"72px 24px", maxWidth:"1100px", margin:"0 auto" }}>
@@ -338,30 +306,6 @@ export default function LandingPage() {
             </p>
           </div>
 
-        </div>
-      </section>
-
-      {/* ── SERIES MODE ───────────────────────────────────────────────────── */}
-      <section style={{ background:"#f0ead8", padding:"56px 24px", borderTop:"1px solid #e0d0b0", borderBottom:"1px solid #e0d0b0" }}>
-        <div style={{ maxWidth:"720px", margin:"0 auto", textAlign:"center" }}>
-          <div style={{ fontSize:"36px", marginBottom:"12px" }}>📚</div>
-          <h2 style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"26px", color:D, marginBottom:"12px" }}>
-            Series Mode — Spoiler-Safe Puzzles
-          </h2>
-          <p style={{ fontFamily:"Lora,serif", fontSize:"15px", color:"#5a4a28", lineHeight:1.7, marginBottom:"12px" }}>
-            Harry Potter, Jack Reacher, Narnia, Wimpy Kid — check off which books you've read. StoryClue will <em>never</em> reference events, deaths, or plot points from books you haven't reached yet.
-          </p>
-          <p style={{ fontFamily:"Lora,serif", fontSize:"15px", color:"#5a4a28", lineHeight:1.7, marginBottom:"20px" }}>
-            <strong>New: Chapter-level protection.</strong> Tell StoryClue which chapter you're on and the puzzle will only draw from chapters you've already read — not a page further.
-          </p>
-          <div style={{ display:"flex", gap:"8px", justifyContent:"center", flexWrap:"wrap", marginBottom:"24px" }}>
-            {["Harry Potter","Jack Reacher","Charlotte's Web","Wimpy Kid","Narnia","The Bible","Nancy Drew"].map(s => (
-              <span key={s} className="pill pill-green">{s}</span>
-            ))}
-          </div>
-          <button className="cta-btn cta-primary" onClick={() => navigate("/create")}>
-            Try Series Mode
-          </button>
         </div>
       </section>
 
