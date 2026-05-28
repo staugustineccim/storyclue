@@ -17,15 +17,25 @@ import { createClient } from "@supabase/supabase-js";
 const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = (SUPABASE_URL && SUPABASE_ANON)
-  ? createClient(SUPABASE_URL, SUPABASE_ANON, {
+console.log("[Supabase] URL:", SUPABASE_URL ? SUPABASE_URL.slice(0, 30) : "MISSING");
+console.log("[Supabase] KEY:", SUPABASE_ANON ? SUPABASE_ANON.slice(0, 20) : "MISSING");
+
+let _supabase = null;
+if (SUPABASE_URL && SUPABASE_ANON) {
+  try {
+    _supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
       auth: {
         detectSessionInUrl: true,
         persistSession: true,
         autoRefreshToken: true,
         flowType: "implicit",
       },
-    })
-  : null;
+    });
+    console.log("[Supabase] client created OK");
+  } catch (e) {
+    console.error("[Supabase] createClient failed:", e);
+  }
+}
 
+export const supabase = _supabase;
 export const authEnabled = Boolean(supabase);
