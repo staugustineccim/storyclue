@@ -17,7 +17,19 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (!authEnabled) return;
 
-    // Get current session on mount
+    // Handle PKCE code in URL (OAuth callback) then fall through to getSession
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code)
+        .catch(() => {}) // ignore errors — getSession below will handle it
+        .finally(() => {
+          // Clean up the URL so the code isn't re-used on refresh
+          window.history.replaceState({}, "", window.location.pathname);
+        });
+    }
+
+    // Get current session on mount (also picks up implicit-flow hash tokens)
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setLoading(false);
