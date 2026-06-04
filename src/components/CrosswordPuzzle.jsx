@@ -363,23 +363,35 @@ function PuzzleBoard({
       try {
         const activeChild = JSON.parse(sessionStorage.getItem("sc_active_child") || "null");
         if (activeChild?.id) {
-          // Dynamically import supabase to avoid circular deps in puzzle component
-          import("../utils/supabase").then(({ supabase: sb }) => {
+          import("../utils/supabase").then(async ({ supabase: sb }) => {
             if (!sb) return;
-            sb.from("deployment_messages")
-              .select("audio_url, photo_url, voice_profiles!inner(is_deployed, is_active)")
+            const { data } = await sb.from("deployment_messages")
+              .select("audio_path, photo_path, voice_profiles!inner(is_deployed, is_active)")
               .eq("child_profile_id", activeChild.id)
               .eq("voice_profiles.is_deployed", true)
               .eq("voice_profiles.is_active", true)
               .limit(1)
-              .single()
-              .then(({ data }) => {
-                if (data?.audio_url) {
-                  // Show after confetti (3 seconds)
-                  setTimeout(() => setDeployMsgData(data), 3200);
-                  setTimeout(() => setShowDeployMsg(true), 3200);
-                }
-              });
+              .single();
+
+            if (!data?.audio_path) return;
+
+            // SECURITY: Generate short-lived signed URLs (1 hour expiry) — never store permanent URLs
+            const signedData = {};
+            const { data: audioSigned } = await sb.storage
+              .from("voice-recordings-private")
+              .createSignedUrl(data.audio_path, 3600); // 1 hour
+            if (audioSigned?.signedUrl) signedData.audio_url = audioSigned.signedUrl;
+
+            if (data.photo_path) {
+              const { data: photoSigned } = await sb.storage
+                .from("voice-recordings-private")
+                .createSignedUrl(data.photo_path, 3600);
+              if (photoSigned?.signedUrl) signedData.photo_url = photoSigned.signedUrl;
+            }
+
+            if (signedData.audio_url) {
+              setTimeout(() => { setDeployMsgData(signedData); setShowDeployMsg(true); }, 3200);
+            }
           });
         }
       } catch {}

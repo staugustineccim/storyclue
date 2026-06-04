@@ -203,46 +203,37 @@ export default function VoiceSetup({ children = [], onClose }) {
     }
     setWorking(true);
     try {
-      // Synthesize deployment message in parent's cloned voice
-      const deployBase64 = await blobToBase64(deployBlob);
-      // Upload raw recording to Supabase Storage
-      const fileName = `deploy_${user.id}_${Date.now()}.webm`;
-      let audioUrl = null;
+      // ── SECURITY: Upload to PRIVATE bucket — store file PATH not public URL ──
+      // Playback uses short-lived signed URLs generated on demand (1 hour expiry).
+      // A permanent public URL would allow anyone with the link to download and
+      // re-use the parent's voice recording — we never do that.
+      const fileName = `${user.id}/deploy_${Date.now()}.webm`;
+      let audioPath = null;
       if (supabase) {
         const { data: upData } = await supabase.storage
-          .from("voice-recordings")
+          .from("voice-recordings-private") // PRIVATE bucket — configure in Supabase Storage
           .upload(fileName, deployBlob, { contentType: deployBlob.type, upsert: true });
-        if (upData) {
-          const { data: urlData } = supabase.storage
-            .from("voice-recordings")
-            .getPublicUrl(fileName);
-          audioUrl = urlData?.publicUrl || null;
-        }
+        if (upData) audioPath = upData.path;
       }
 
-      // Handle photo upload
-      let photoUrl = null;
+      // Handle photo upload — also private
+      let photoPath = null;
       if (photoFile && supabase) {
-        const photoName = `deploy_photo_${user.id}_${Date.now()}.jpg`;
+        const photoName = `${user.id}/deploy_photo_${Date.now()}.jpg`;
         const { data: photoUp } = await supabase.storage
-          .from("voice-recordings")
+          .from("voice-recordings-private")
           .upload(photoName, photoFile, { contentType: photoFile.type, upsert: true });
-        if (photoUp) {
-          const { data: photoUrlData } = supabase.storage
-            .from("voice-recordings")
-            .getPublicUrl(photoName);
-          photoUrl = photoUrlData?.publicUrl || null;
-        }
+        if (photoUp) photoPath = photoUp.path;
       }
 
-      // Save deployment messages for each child
+      // Save deployment messages for each child — store FILE PATHS not public URLs
       if (supabase && savedVoiceId) {
         for (const child of children) {
           await supabase.from("deployment_messages").insert([{
             voice_profile_id: savedVoiceId,
             child_profile_id: child.id,
-            audio_url: audioUrl,
-            photo_url: photoUrl,
+            audio_path: audioPath,   // private storage path — signed URL generated at playback time
+            photo_path: photoPath,   // private storage path
           }]);
         }
         // Mark voice as deployed

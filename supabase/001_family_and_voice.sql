@@ -87,8 +87,10 @@ CREATE TABLE IF NOT EXISTS deployment_messages (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   voice_profile_id UUID REFERENCES voice_profiles(id) ON DELETE CASCADE NOT NULL,
   child_profile_id UUID REFERENCES child_profiles(id) ON DELETE CASCADE NOT NULL,
-  audio_url        TEXT,       -- Supabase Storage URL of the synthesized audio
-  photo_url        TEXT,       -- Optional: parent-uploaded photo shown during message
+  -- SECURITY: Store file PATHS in private bucket, never permanent public URLs.
+  -- Signed URLs (1 hour expiry) are generated at playback time via Supabase Storage API.
+  audio_path       TEXT,       -- e.g. "user-id/deploy_1234567890.webm" in voice-recordings-private bucket
+  photo_path       TEXT,       -- Optional: parent-uploaded photo — also in private bucket
   created_at       TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -118,6 +120,19 @@ CREATE POLICY "user owns puzzle history"
   ON puzzle_history FOR ALL
   USING (user_id = auth.uid())
   WITH CHECK (user_id = auth.uid());
+
+-- ── Supabase Storage bucket setup (do this in the Supabase dashboard) ────────
+-- Dashboard → Storage → New bucket
+-- Name: "voice-recordings-private"
+-- Public bucket: OFF (private — this is critical for security)
+-- File size limit: 10 MB
+-- Allowed MIME types: audio/webm, audio/mp4, audio/ogg, audio/mpeg, image/jpeg, image/png
+--
+-- SECURITY RATIONALE:
+-- Private bucket means files are NOT accessible via public URL.
+-- Every playback request generates a 1-hour signed URL via the Supabase Storage API.
+-- An intercepted signed URL expires in 1 hour and is then worthless.
+-- The raw voice recording is the most sensitive asset — this protects it.
 
 -- ── Grant public access for anon key reads where needed ──────────────────────
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
