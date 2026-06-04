@@ -28,8 +28,29 @@ Before making any changes, read the entire codebase and identify what is already
 ### Rule 4 — Backup Before Major Changes
 Before any major restructure or significant change: commit current state to GitHub with a descriptive message, create a new branch for the work, confirm both before writing a single line of new code.
 
-### Rule 5 — Content Safety Filter
-A mandatory content safety filter runs on every input before puzzle generation. Screens for self-harm, suicide, bullying, sexual content, drug references, political extremism, and grade-inappropriate content. Biblical and religious content is never blocked based on surface keywords — the filter evaluates educational and redemptive intent. All standard Biblical narratives are pre-approved when faith tradition is selected. Display a Safe for K-12 Education badge on the interface.
+### Rule 5 — Content Safety Filter (Conservative Family Values)
+A mandatory content safety filter runs on every input before puzzle generation. StoryClue.ai is rooted in traditional American conservative values and serves homeschool families, Sunday school teachers, and classroom educators. The filter enforces:
+
+**Always allowed (never block):**
+- All Biblical, Torah, and Quran narratives regardless of dramatic content (death, violence, plagues, floods — all standard)
+- Violence, death, or suicide WHEN part of a recognized book, Bible narrative, or historical account (Romeo and Juliet, Lord of the Flies, Charlotte's Web, etc.)
+- Classic literature with dark themes at grade-appropriate levels
+- All world history including wars, Holocaust, slavery, Civil War — when taught as history
+- American patriotic content, the Constitution, the Founding Fathers
+- Traditional family structures, faith traditions, prayer, sacraments
+
+**Always blocked:**
+- Sexually explicit content of any kind
+- Sexual orientation or gender identity presented as a curriculum topic for children
+- Gender ideology instruction for minors (drag queen story hour, transgender identity for kids, gender spectrum curriculum)
+- DEI/CRT ideology materials (critical race theory lesson plans, white privilege worksheets, anti-racist curriculum for elementary students)
+- Self-harm or suicide instructions (NOT mentions in classic literature — actual how-to content)
+- Drug synthesis instructions
+- Terrorist recruitment or propaganda
+
+**Clue writing standard:** All clues are written from a traditional American educational perspective — patriotic, faith-respectful, factual. Never inject progressive social framing, DEI language, gender ideology, or political commentary into clues. Write about people and events as they are historically and factually understood.
+
+Display a Safe for K-12 Education badge on the interface.
 
 ### Rule 6 — Free Alternatives First
 Always prefer free alternatives over paid services. Web Speech API before Google TTS. YouTube caption API before yt-dlp and Whisper. Wikimedia Commons for images. Document every decision in SERVICES.md.

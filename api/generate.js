@@ -32,8 +32,11 @@ const GRADE_LIMITS = {
   "adult": { wordCount: 25, minLen: 3, maxLen: 13 },
 };
 
-const SYSTEM_PROMPT = `You are a crossword puzzle creator specializing in educational content for children and adults.
+const SYSTEM_PROMPT = `You are a crossword puzzle creator specializing in educational content for children and adults, serving traditional American families, homeschool parents, Sunday school teachers, and classroom educators.
 Your job is to extract vocabulary from content and write grade-appropriate clues.
+Write from a traditional American educational perspective — patriotic, faith-respectful, factual, and appropriate for conservative families.
+Do NOT inject progressive social framing, DEI language, gender ideology, or political commentary of any kind into clues.
+Write about people, places, and events as they are historically and factually understood.
 Return ONLY valid JSON — no markdown fences, no preamble, no explanation of any kind.
 The JSON must be parseable by JSON.parse() with no preprocessing.`;
 
@@ -70,6 +73,10 @@ async function checkContentSafety(inputText, grade, inputMode, faith) {
     /\b(how\s+to\s+(make|cook|synthesize)\s+(meth|heroin|fentanyl|crack\s+cocaine))\b/i,
     // Terrorist recruitment/propaganda
     /\b(join\s+(isis|isil|al.?qaeda)|recruitment\s+video\s+for\s+terror)\b/i,
+    // Sexual orientation / gender ideology as a puzzle topic (not as incidental biographical fact in history)
+    /\b(gender\s+identity\s+lesson|sexual\s+orientation\s+(lesson|curriculum|unit|activity|crossword|puzzle)|trans(gender)?\s+(identity\s+)?for\s+kids|drag\s+queen\s+story|queer\s+theory\s+for|lgbtq\s+curriculum|gender\s+affirm\s+for\s+(kids|children|students))\b/i,
+    // DEI / CRT training materials (ideology-first content, not historical civil rights facts)
+    /\b(critical\s+race\s+theory\s+(curriculum|lesson|unit|worksheet)|dei\s+training\s+(for\s+kids|curriculum|worksheet)|white\s+privilege\s+(lesson|curriculum|for\s+kids)|systemic\s+racism\s+(lesson\s+plan|curriculum\s+for)|anti-racist\s+curriculum\s+for\s+(kids|children|elementary|primary))\b/i,
   ];
   for (const pattern of HARD_BLOCKS) {
     if (pattern.test(sample)) {
@@ -82,23 +89,29 @@ async function checkContentSafety(inputText, grade, inputMode, faith) {
   // Evaluates PURPOSE and INTENT, not keywords. The question is not
   // "does this mention difficult topics" but "does this glorify harm."
   const gradeLabel = grade === "k" ? "Kindergarten" : grade === "adult" ? "Adult Reader" : `Grade ${grade}`;
-  const safetyPrompt = `You are a content safety reviewer for an educational crossword puzzle app serving K-12 students and adult learners.
+  const safetyPrompt = `You are a content safety reviewer for StoryClue.ai — a family-friendly educational crossword puzzle app rooted in traditional American values. It serves K-12 students, homeschool families, Sunday school teachers, and adult learners.
 
-CRITICAL INSTRUCTION: Your job is to identify content that GLORIFIES or INSTRUCTS harmful behavior — not content that merely mentions difficult topics.
+CRITICAL INSTRUCTION: Your job is to identify content that is inappropriate for children or that conflicts with traditional conservative family values. Do not block content merely because it mentions difficult topics — ask whether the PURPOSE is educational or harmful.
 
-The following are ALWAYS appropriate regardless of dramatic content:
-- All Biblical, Torah, and Quran narratives (Noah's flood, Jonah and the whale, the Exodus plagues, the Crucifixion, Daniel in the lion's den, David and Goliath, Samson, Job, Revelation imagery, etc.)
-- All world history content including wars, the Holocaust, slavery, colonialism, genocide — when taught as history
-- Classic literature with dark themes (Shakespeare, Greek tragedy, etc.)
-- Natural disasters, medical conditions, death as a natural topic
-- Faith traditions, religious ceremonies, prayer, sacraments of any religion
-- Any content where difficult themes serve redemptive, educational, or moral purposes
+ALWAYS APPROVE — never block these regardless of dramatic content:
+- All Biblical, Torah, and Quran narratives (Noah's flood, Jonah, the Exodus plagues, the Crucifixion, Daniel, David and Goliath, Samson, Job, Revelation, etc.)
+- All world history including wars, the Holocaust, slavery, the Civil War — when taught as history
+- Classic literature with dark themes (Shakespeare's tragedies, Greek tragedy, The Giver, Lord of the Flies, To Kill a Mockingbird, Romeo and Juliet, etc.) — the darkness in a recognized book is appropriate
+- Violence, death, or suicide WHEN it appears in a recognized classic book, Bible narrative, or historical account
+- Natural disasters, medical conditions, death as natural topics
+- Faith traditions, religious ceremonies, prayer, sacraments of any recognized religion
+- American history, the Constitution, the Founding Fathers, patriotic content
+- Traditional family structures, marriage, and values
 
-ONLY respond {"safe":false} for content that:
-- Explicitly glorifies sexual exploitation of minors
-- Provides actual instructions for self-harm or suicide (not mentions — actual how-to instructions)
-- Promotes terrorism or mass violence as admirable
-- Has zero educational or redemptive purpose at any grade level
+BLOCK — respond {"safe":false} for:
+- Sexually explicit content of any kind
+- Sexual orientation or gender identity presented as a lesson/curriculum topic for children (not incidental biographical facts about historical figures)
+- Gender ideology instruction for minors (e.g. "transgender identity for kids", "drag queen story hour", "gender spectrum for children")
+- DEI/CRT ideology materials framed as curriculum (critical race theory lesson plans, white privilege worksheets, anti-racist curriculum for elementary students)
+- Self-harm or suicide instructions — actual how-to content (NOT mentions in classic literature or historical context)
+- Drug synthesis instructions
+- Terrorist recruitment or propaganda
+- Content that has zero educational or redemptive purpose at any grade level
 
 Grade context: ${gradeLabel}
 Input: "${sample}"
