@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { authEnabled } from "../utils/supabase";
 
@@ -14,9 +14,16 @@ import { authEnabled } from "../utils/supabase";
 // from the main puzzle-generation workflow.
 
 export default function AuthButton({ isFirstPuzzle = false }) {
-  const { user, loading, signInWithGoogle, signOut } = useAuth();
-  const [menuOpen,   setMenuOpen]   = useState(false);
-  const [isNewUser,  setIsNewUser]  = useState(false);
+  const { user, loading, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut } = useAuth();
+  const [menuOpen,     setMenuOpen]     = useState(false);
+  const [isNewUser,    setIsNewUser]    = useState(false);
+  const [showEmail,    setShowEmail]    = useState(false);   // toggle email/password panel
+  const [emailMode,    setEmailMode]    = useState("signin"); // "signin" | "signup"
+  const [emailVal,     setEmailVal]     = useState("");
+  const [passwordVal,  setPasswordVal]  = useState("");
+  const [emailError,   setEmailError]   = useState("");
+  const [emailWorking, setEmailWorking] = useState(false);
+  const [emailSuccess, setEmailSuccess] = useState("");
   const menuRef = useRef(null);
 
   // Detect brand-new sign-ins so we can show the founding member welcome
@@ -90,11 +97,79 @@ export default function AuthButton({ isFirstPuzzle = false }) {
   }
 
   // ── Signed-out state ───────────────────────────────────────────────────────
+  async function handleEmailSubmit(e) {
+    e.preventDefault();
+    setEmailError("");
+    setEmailWorking(true);
+    const fn = emailMode === "signin" ? signInWithEmail : signUpWithEmail;
+    const { error } = await fn(emailVal.trim(), passwordVal);
+    setEmailWorking(false);
+    if (error) {
+      setEmailError(error);
+    } else if (emailMode === "signup") {
+      setEmailSuccess("Check your email for a confirmation link.");
+    }
+    // signInWithPassword triggers onAuthStateChange — no navigation needed
+  }
+
+  if (showEmail) {
+    return (
+      <div ref={menuRef} style={{ position:"relative", flexShrink:0 }}>
+        <div style={{ position:"absolute", top:"calc(100% + 8px)", right:0, background:"#fff", borderRadius:"12px", boxShadow:"0 4px 24px rgba(0,0,0,.18)", padding:"16px", width:"260px", zIndex:9001, fontFamily:"Lora,Georgia,serif" }}>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"14px", color:"#2d4a18", marginBottom:"12px" }}>
+            {emailMode === "signin" ? "Sign in" : "Create account"}
+          </div>
+          {emailSuccess ? (
+            <div style={{ fontSize:"13px", color:"#2d8a40", lineHeight:1.5 }}>{emailSuccess}</div>
+          ) : (
+            <form onSubmit={handleEmailSubmit}>
+              <input
+                type="email" placeholder="Email" value={emailVal}
+                onChange={e => setEmailVal(e.target.value)} required
+                style={{ width:"100%", padding:"8px 10px", border:"1.5px solid #c8b888", borderRadius:"4px", fontFamily:"Lora,serif", fontSize:"13px", marginBottom:"8px", boxSizing:"border-box" }}
+              />
+              <input
+                type="password" placeholder="Password" value={passwordVal}
+                onChange={e => setPasswordVal(e.target.value)} required
+                style={{ width:"100%", padding:"8px 10px", border:"1.5px solid #c8b888", borderRadius:"4px", fontFamily:"Lora,serif", fontSize:"13px", marginBottom:"8px", boxSizing:"border-box" }}
+              />
+              {emailError && <div style={{ fontSize:"12px", color:"#c0392b", marginBottom:"6px" }}>{emailError}</div>}
+              <button type="submit" disabled={emailWorking} style={{ width:"100%", padding:"8px", background:"#2d4a18", color:"#f0ead8", border:"none", borderRadius:"6px", fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"13px", cursor:"pointer", marginBottom:"8px" }}>
+                {emailWorking ? "…" : emailMode === "signin" ? "Sign In" : "Create Account"}
+              </button>
+            </form>
+          )}
+          <div style={{ display:"flex", justifyContent:"space-between", fontSize:"12px" }}>
+            <button onClick={() => setEmailMode(m => m === "signin" ? "signup" : "signin")} style={{ background:"none", border:"none", color:"#5a8a2a", cursor:"pointer", fontFamily:"Lora,serif", fontSize:"12px", padding:0 }}>
+              {emailMode === "signin" ? "New? Create account" : "Already have account?"}
+            </button>
+            <button onClick={() => { setShowEmail(false); setEmailError(""); setEmailSuccess(""); }} style={{ background:"none", border:"none", color:"#888", cursor:"pointer", fontFamily:"Lora,serif", fontSize:"12px", padding:0 }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+        {/* Show the main sign-in button underneath */}
+        <button onClick={signInWithGoogle} style={signInBtn} aria-label="Sign in with Google">
+          <GoogleIcon />
+          <span>Sign in</span>
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <button onClick={signInWithGoogle} style={signInBtn} aria-label="Sign in with Google">
-      <GoogleIcon />
-      <span>Sign in</span>
-    </button>
+    <div ref={menuRef} style={{ position:"relative", flexShrink:0, display:"flex", flexDirection:"column", alignItems:"flex-end", gap:"4px" }}>
+      <button onClick={signInWithGoogle} style={signInBtn} aria-label="Sign in with Google">
+        <GoogleIcon />
+        <span>Continue with Google</span>
+      </button>
+      <button
+        onClick={() => setShowEmail(true)}
+        style={{ background:"none", border:"none", color:"rgba(240,234,216,.6)", fontFamily:"Lora,serif", fontSize:"11px", cursor:"pointer", padding:"0 4px", whiteSpace:"nowrap" }}
+      >
+        or email &amp; password
+      </button>
+    </div>
   );
 }
 

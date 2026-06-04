@@ -292,6 +292,7 @@ export default async function handler(req, res) {
     seriesMode, selectedBooks, seriesName, currentChapter,
     phonicsMode = false, pictureMode = false,
     songsMode = false,
+    puzzleStyle = "topic",
   } = req.body || {};
 
   const limits   = GRADE_LIMITS[grade]  || GRADE_LIMITS["3"];
@@ -659,7 +660,87 @@ Return this exact JSON structure with no other text:
       });
     }
 
+    // ── Update 5: Classic Crossword — inject grade-appropriate filler words ──
+    // Only for 6th grade and above when puzzleStyle = "classic".
+    // Filler words have pre-defined clues and are NOT theme-connected.
+    const CLASSIC_GRADES = ["6","7","8","9-10","11-12","adult"];
+    if (puzzleStyle === "classic" && CLASSIC_GRADES.includes(String(grade))) {
+      function getFillerTier(g) {
+        if (g === "adult") return "adult";
+        if (["9-10","11-12"].includes(String(g))) return "high";
+        return "middle";
+      }
+      const FILLER_WORDS = {
+        middle: [
+          { word:"AREA",clue:"A region or section of space" },
+          { word:"OPEN",clue:"Not closed; available to enter" },
+          { word:"IDEA",clue:"A thought or plan in your mind" },
+          { word:"EDGE",clue:"The outer boundary of something" },
+          { word:"EVEN",clue:"Flat and level; also means fair" },
+          { word:"IRON",clue:"A strong metal; also smooths clothes" },
+          { word:"ABLE",clue:"Having the power or skill to do something" },
+          { word:"ELSE",clue:"In addition; other than what was mentioned" },
+          { word:"OVER",clue:"Above or finished; done" },
+          { word:"ONLY",clue:"Just one; nothing more" },
+          { word:"MANY",clue:"A large number of things or people" },
+          { word:"GIVE",clue:"To hand something to another person" },
+          { word:"MOVE",clue:"To go from one place to another" },
+          { word:"WORK",clue:"Effort put toward a task or job" },
+          { word:"TURN",clue:"To rotate or change direction" },
+        ],
+        high: [
+          { word:"STORY",clue:"A narrative account of events" },
+          { word:"PLACE",clue:"A particular location or position" },
+          { word:"LIGHT",clue:"Illumination; the opposite of darkness" },
+          { word:"POWER",clue:"The ability to act or influence events" },
+          { word:"WORLD",clue:"The earth and all its people and places" },
+          { word:"HUMAN",clue:"Relating to people; of or for mankind" },
+          { word:"CIVIL",clue:"Relating to citizens or polite conduct" },
+          { word:"MORAL",clue:"Concerned with right and wrong behavior" },
+          { word:"LOGIC",clue:"Reasoning based on sound principles" },
+          { word:"TRUTH",clue:"A statement that matches reality" },
+          { word:"BRAVE",clue:"Showing courage in the face of danger" },
+          { word:"NOBLE",clue:"Having high moral character; dignified" },
+          { word:"VITAL",clue:"Absolutely necessary; essential" },
+          { word:"CLEAR",clue:"Easy to understand; transparent" },
+          { word:"BROAD",clue:"Wide in extent; covering many things" },
+        ],
+        adult: [
+          { word:"PROSE",clue:"Written language in ordinary form, not verse" },
+          { word:"NOVEL",clue:"A book-length work of fiction" },
+          { word:"VERSE",clue:"Writing arranged in rhythmic lines; poetry" },
+          { word:"SCENE",clue:"A sequence of action in a play or story" },
+          { word:"THEME",clue:"The central subject or message of a work" },
+          { word:"VALOR",clue:"Great bravery in the face of danger" },
+          { word:"GRACE",clue:"Elegance and ease of movement or manner" },
+          { word:"IRONY",clue:"When words mean the opposite of what is said" },
+          { word:"DRAMA",clue:"A play; also intense or exciting events" },
+          { word:"HONOR",clue:"Great respect or high moral character" },
+          { word:"SWIFT",clue:"Moving or happening very quickly" },
+          { word:"POISE",clue:"Calm confidence in manner and bearing" },
+          { word:"CRAFT",clue:"Skill and artistry in making something" },
+          { word:"DEPTH",clue:"The quality of being deep or profound" },
+          { word:"LUCID",clue:"Clear and easy to understand" },
+        ],
+      };
+      const tier = getFillerTier(grade);
+      const pool = [...FILLER_WORDS[tier]];
+      // Shuffle filler pool
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+      // Avoid duplicating any theme word already in the puzzle
+      const themeWords = new Set(parsed.words.map(w => w.word.toUpperCase()));
+      const fillers = pool
+        .filter(f => !themeWords.has(f.word))
+        .slice(0, 8) // Add up to 8 filler words
+        .map(f => ({ word: f.word, clue: f.clue, isFiller: true }));
+      parsed.words = [...parsed.words, ...fillers];
+    }
+
     parsed.language = langFlag;
+    parsed.puzzleStyle = puzzleStyle;
     return res.status(200).json(parsed);
 
   } catch (err) {

@@ -1,6 +1,6 @@
 # StoryClue.ai — Claude Code Context File
 **Read this file at the start of every session before touching any code.**
-**Last updated: May 26, 2026**
+**Last updated: June 3, 2026**
 
 ---
 
@@ -118,8 +118,8 @@ Measurement ID G-7K5D2X9XW6 live in index.html. Still needed: verify puzzle_gene
 
 ## 5. Missing V1 Features — Build After Priority Fixes
 
-### User Accounts
-Supabase Auth — email/password login and Google login. Required before payments can work.
+### ✅ User Accounts — DONE
+Supabase Auth — Google OAuth ✅ and email/password login ✅. Family Dashboard with child profiles ✅.
 
 ### Stripe Payments
 Recurring billing, plan upgrades/downgrades, failed payment handling. Wire to Supabase user profiles via webhook. Three tiers:

@@ -240,6 +240,10 @@ function PuzzleBoard({
   const [won,          setWon]          = useState(false);
   const [seconds,      setSeconds]      = useState(0);
   const [timerActive,  setTimerActive]  = useState(false);
+  // ── Deployment message (Update 10) ────────────────────────────────────────
+  const [showDeployMsg,    setShowDeployMsg]    = useState(false);
+  const [deployMsgData,    setDeployMsgData]    = useState(null);   // {audio_url, photo_url}
+  const deployAudioRef = useRef(null);
   const [mistakes,     setMistakes]     = useState(0);
   const [clueTab,      setClueTab]      = useState("across");
   const [shareMsg,     setShareMsg]     = useState("");
@@ -355,6 +359,31 @@ function PuzzleBoard({
         time_taken_seconds:  seconds,
         mistake_count:       mistakes,
       });
+      // Deployment message: check if active child has a deployed parent voice
+      try {
+        const activeChild = JSON.parse(sessionStorage.getItem("sc_active_child") || "null");
+        if (activeChild?.id) {
+          // Dynamically import supabase to avoid circular deps in puzzle component
+          import("../utils/supabase").then(({ supabase: sb }) => {
+            if (!sb) return;
+            sb.from("deployment_messages")
+              .select("audio_url, photo_url, voice_profiles!inner(is_deployed, is_active)")
+              .eq("child_profile_id", activeChild.id)
+              .eq("voice_profiles.is_deployed", true)
+              .eq("voice_profiles.is_active", true)
+              .limit(1)
+              .single()
+              .then(({ data }) => {
+                if (data?.audio_url) {
+                  // Show after confetti (3 seconds)
+                  setTimeout(() => setDeployMsgData(data), 3200);
+                  setTimeout(() => setShowDeployMsg(true), 3200);
+                }
+              });
+          });
+        }
+      } catch {}
+
       // Songs puzzle: save completed song + show "Words Learned" card after celebration
       if (songId) {
         try {
@@ -1472,6 +1501,67 @@ function PuzzleBoard({
           wasRevealed={revealed}
           onClose={() => setShowFeedback(false)}
         />
+      )}
+
+      {/* ── Deployment Message (Update 10) — heart animation + parent audio ── */}
+      {showDeployMsg && deployMsgData && (
+        <div style={{
+          position:"fixed", inset:0, background:"rgba(0,0,0,.75)",
+          display:"flex", alignItems:"center", justifyContent:"center",
+          zIndex:9998, padding:"20px",
+        }}>
+          <style>{`
+            @keyframes heartbeat{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
+            @keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+          `}</style>
+          <div style={{
+            background:"#fff", borderRadius:"20px", padding:"32px 28px",
+            maxWidth:"380px", width:"100%", textAlign:"center",
+            boxShadow:"0 20px 60px rgba(0,0,0,.4)",
+            animation:"fadeInUp .5s ease",
+          }}>
+            {/* Heart animation */}
+            <div style={{ fontSize:"60px", animation:"heartbeat 1.2s infinite", marginBottom:"16px" }}>❤️</div>
+
+            {/* Optional parent photo */}
+            {deployMsgData.photo_url && (
+              <img
+                src={deployMsgData.photo_url}
+                alt="From your family"
+                style={{ width:"100px", height:"100px", borderRadius:"50%", objectFit:"cover", border:"3px solid #e91e63", marginBottom:"14px" }}
+              />
+            )}
+
+            <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"18px", color:"#c2185b", marginBottom:"8px" }}>
+              A special message for you
+            </div>
+            <div style={{ fontFamily:"Lora,serif", fontSize:"13px", color:"#888", marginBottom:"16px" }}>
+              Someone who loves you very much recorded this just for you.
+            </div>
+
+            {/* Audio player */}
+            <audio
+              ref={deployAudioRef}
+              src={deployMsgData.audio_url}
+              autoPlay
+              onEnded={() => {}}
+              style={{ width:"100%", marginBottom:"16px" }}
+              controls
+            />
+
+            <button
+              onClick={() => setShowDeployMsg(false)}
+              style={{
+                padding:"10px 28px", background:"#c2185b", color:"#fff",
+                border:"none", borderRadius:"8px",
+                fontFamily:"'Playfair Display',serif", fontWeight:700,
+                fontSize:"14px", cursor:"pointer",
+              }}
+            >
+              💕 Close
+            </button>
+          </div>
+        </div>
       )}
 
       {/* ── Words You Learned Today — songs puzzle reward card ── */}

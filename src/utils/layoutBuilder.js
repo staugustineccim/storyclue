@@ -122,6 +122,19 @@ function checkAllSquaresCrossed(words) {
   return Object.values(cc).every(v => v >= 2);
 }
 
+// Update 4 — Standard 2: No 2x2 blocks of black squares anywhere
+// A 2x2 block = (r,c), (r,c+1), (r+1,c), (r+1,c+1) all black
+function checkNo2x2BlackBlocks(grid, rows, cols) {
+  for (let r = 0; r < rows - 1; r++) {
+    for (let c = 0; c < cols - 1; c++) {
+      if (!grid[r][c] && !grid[r][c+1] && !grid[r+1][c] && !grid[r+1][c+1]) {
+        return false; // found a 2x2 black block
+      }
+    }
+  }
+  return true;
+}
+
 // Returns array of violation strings — empty array means the layout is valid
 function validate(words, grid, rows, cols, tier) {
   const v = [];
@@ -132,11 +145,13 @@ function validate(words, grid, rows, cols, tier) {
   if (tier === "intermediate" || tier === "full") {
     if (!checkEndLettersChecked(words))          v.push("unchecked-end-letters");
     if (getBlackPct(grid, rows, cols) > 0.20)    v.push("black-squares>20%");
+    if (!checkNo2x2BlackBlocks(grid, rows, cols)) v.push("2x2-black-block");
   }
   if (tier === "full") {
     if (!check180Symmetry(grid, rows, cols))      v.push("no-180°-symmetry");
     if (!checkAllSquaresCrossed(words))           v.push("unchecked-squares");
     if (getBlackPct(grid, rows, cols) > 0.16)    v.push("black-squares>16%");
+    // Standard 5: white squares ≥ 84% (same as black ≤ 16% — already enforced above)
   }
   return v;
 }

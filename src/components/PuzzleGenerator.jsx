@@ -13,6 +13,7 @@ import SongsLibrary from "./SongsLibrary";
 import AuthButton from "./AuthButton";
 import TrialBanner from "./TrialBanner";
 import UpgradeModal from "./UpgradeModal";
+import FamilyDashboard from "./FamilyDashboard";
 
 // ── Audience cookie helpers ────────────────────────────────────────────────
 // Audience values: "early-learner" | "elementary" | "middle-high" | "adult"
@@ -81,16 +82,66 @@ const FAITH_TRADITIONS = [
   { key:"other",                label:"Other Faith Tradition" },
 ];
 
-const BOOK_EXAMPLES = [
-  "Book of Jonah",
-  "Charlotte's Web, Chapter 1",
-  "Genesis Chapter 1",
-  "The Gettysburg Address",
-  "Romeo and Juliet, Act 1 Scene 1",
-  "The Lion the Witch and the Wardrobe, Chapter 1",
-  "Harry Potter and the Philosopher's Stone, Chapter 1",
-  "Jack Reacher: Killing Floor, Chapter 1",
-];
+// Update 2 — Audience-specific suggestion chips (no chip appears in more than one tier)
+const AUDIENCE_EXAMPLES = {
+  "early-learner": [
+    "Twinkle Twinkle Little Star",
+    "Old MacDonald Had a Farm",
+    "Itsy Bitsy Spider",
+    "Farm Animals",
+    "Colors and Shapes",
+    "The Very Hungry Caterpillar",
+    "Green Eggs and Ham",
+    "Animals at the Zoo",
+    "Weather and Seasons",
+    "Nursery Rhymes",
+  ],
+  "elementary": [
+    "Charlotte's Web Chapter 1",
+    "Stuart Little",
+    "The Lion the Witch and the Wardrobe Chapter 1",
+    "James and the Giant Peach",
+    "Harry Potter and the Sorcerer's Stone Chapter 1",
+    "Farm Animals",
+    "Solar System",
+    "American Revolution",
+    "The Human Body",
+    "Ancient Egypt",
+  ],
+  "middle-high": [
+    "Romeo and Juliet",
+    "The Great Gatsby",
+    "Lord of the Flies",
+    "Animal Farm",
+    "To Kill a Mockingbird",
+    "The Outsiders",
+    "Taylor Swift",
+    "World War II",
+    "The Constitution",
+    "The American Civil War",
+  ],
+  "adult": [
+    "Jack Reacher Killing Floor Chapter 1",
+    "The Gettysburg Address",
+    "Genesis Chapter 1",
+    "Agatha Christie And Then There Were None",
+    "Winston Churchill",
+    "World War II",
+    "Jimmy Buffett",
+    "Classic Broadway Musicals",
+  ],
+};
+
+// Puzzle Style cookie helpers (Update 3)
+const STYLE_COOKIE = "sc_puzzle_style";
+function getPuzzleStyleCookie() {
+  const m = document.cookie.match(new RegExp(`(?:^|;\\s*)${STYLE_COOKIE}=([^;]+)`));
+  return m ? m[1] : null;
+}
+function setPuzzleStyleCookie(value) {
+  const exp = new Date(Date.now() + 90 * 864e5).toUTCString();
+  document.cookie = `${STYLE_COOKIE}=${value};expires=${exp};path=/;SameSite=Lax`;
+}
 
 export default function PuzzleGenerator() {
   const navigate = useNavigate();
@@ -99,6 +150,15 @@ export default function PuzzleGenerator() {
 
   // Track how many puzzles generated this session (for "save your puzzles" nudge)
   const [sessionPuzzleCount, setSessionPuzzleCount] = useState(0);
+
+  // ── Family Dashboard — shown to signed-in users before audience selection ──
+  // null = not yet decided; false = skipped (continue as self); object = child selected
+  const [familyStep, setFamilyStep] = useState(() => {
+    // If user just arrived and auth is enabled, start at family dashboard (null)
+    // Skip if not signed in (handled in render)
+    return null;
+  });
+  const [activeChild, setActiveChild] = useState(null); // child profile object
 
   // ── Trial ──────────────────────────────────────────────────────────────────
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -139,6 +199,19 @@ export default function PuzzleGenerator() {
   const [versionData,      setVersionData]      = useState(null);   // API response
   const [selectedVersion,  setSelectedVersion]  = useState(null);   // chosen version id
   const [otherVersionText, setOtherVersionText] = useState("");
+
+  // ── Puzzle Style (Update 3) — "topic" | "classic" — 6th+ and Reader only ──
+  const CLASSIC_GRADES = ["6","7","8","9-10","11-12","adult"];
+  const [puzzleStyle, setPuzzleStyleState] = useState(() => {
+    const saved = getPuzzleStyleCookie();
+    if (saved === "topic" || saved === "classic") return saved;
+    return (saved?.grade || "3") === "adult" ? "classic" : "topic";
+  });
+  function setPuzzleStyle(val) {
+    setPuzzleStyleState(val);
+    setPuzzleStyleCookie(val);
+  }
+  const showStyleSelector = CLASSIC_GRADES.includes(grade);
 
   // ── K-2 Early Learner features ────────────────────────────────────────────
   const [phonicsMode, setPhonicsMode] = useState(false);
@@ -220,6 +293,25 @@ export default function PuzzleGenerator() {
   const showSeriesMode  = audience !== "early-learner";
   // PDF upload hidden for early learners (they don't upload documents)
   const showPdfMode     = audience !== "early-learner";
+
+  // ── Show Family Dashboard for signed-in users (before audience selector) ──
+  if (authEnabled && user && familyStep === null) {
+    return (
+      <FamilyDashboard
+        onSelectChild={child => {
+          setActiveChild(child);
+          setFamilyStep("child-selected");
+          // Load the child's audience and grade automatically
+          chooseAudience(child.audience || "elementary");
+          setGrade(child.grade || "3");
+        }}
+        onSkipToAudience={() => {
+          setActiveChild(null);
+          setFamilyStep("skipped");
+        }}
+      />
+    );
+  }
 
   // ── Show audience selector if no audience chosen yet ──────────────────────
   if (!audience) {
@@ -388,6 +480,7 @@ export default function PuzzleGenerator() {
         currentChapter: seriesMode ? currentChapter : "",
         phonicsMode: isK2 && phonicsMode,
         pictureMode: isK2 && pictureMode,
+        puzzleStyle: showStyleSelector ? puzzleStyle : "topic",
       };
 
       const res = await fetch("/api/generate", {
@@ -754,12 +847,12 @@ export default function PuzzleGenerator() {
           {/* ── LOOKUP MODE ─────────────────────────────────────────────── */}
           {inputMode === "lookup" && (
             <div style={{ marginBottom:"24px" }}>
-              <label style={labelStyle}>Book, Chapter, or Topic</label>
+              <label style={labelStyle}>What's your puzzle about?</label>
               <input
                 type="text"
                 value={bookRef}
                 onChange={e => setBookRef(e.target.value)}
-                placeholder="e.g. Book of Jonah, Charlotte's Web Chapter 1, Genesis Chapter 1"
+                placeholder="e.g. Farm Animals, Charlotte's Web Chapter 1, Jimmy Buffett, Solar System, Genesis Chapter 1, Kitchen Utensils, American Revolution, Ancient Egypt"
                 style={{ ...inputStyle, fontSize:"15px", padding:"12px 14px" }}
               />
               <div style={{ marginTop:"10px" }}>
@@ -767,14 +860,14 @@ export default function PuzzleGenerator() {
                   Try one of these:
                 </div>
                 <div>
-                  {BOOK_EXAMPLES.map(ex => (
+                  {(AUDIENCE_EXAMPLES[audience] || AUDIENCE_EXAMPLES["elementary"]).map(ex => (
                     <span key={ex} className="example-chip" onClick={() => setBookRef(ex)}>{ex}</span>
                   ))}
                 </div>
               </div>
               <div style={{ marginTop:"10px", padding:"10px 12px", background:"#e8f0d8", borderRadius:"4px", border:"1px solid #b8d898" }}>
                 <div style={{ fontFamily:"Lora,serif", fontSize:"12px", color:"#3a5a18", lineHeight:1.6 }}>
-                  <strong>Works best with:</strong> any faith tradition, classic literature, children's books, and well-known stories. For modern copyrighted books, Claude uses its knowledge of the story to create vocabulary-rich clues.
+                  Works with anything — books, chapters, topics, people, places, events, songs, or any subject you can think of.
                 </div>
               </div>
             </div>
@@ -983,6 +1076,39 @@ export default function PuzzleGenerator() {
                   </div>
                 </div>
               </label>
+            </div>
+          )}
+
+          {/* ── Puzzle Style (Update 3) — 6th grade and above + Reader Mode only ── */}
+          {showStyleSelector && (
+            <div style={{ marginBottom:"24px" }}>
+              <label style={labelStyle}>Puzzle Style</label>
+              <div style={{ display:"flex", gap:"10px" }}>
+                <button
+                  type="button"
+                  className={`mode-btn${puzzleStyle==="topic"?" on":""}`}
+                  style={{ flex:1, padding:"14px 10px", lineHeight:1.4 }}
+                  onClick={() => setPuzzleStyle("topic")}
+                >
+                  <div style={{ fontSize:"18px", marginBottom:"4px" }}>📖</div>
+                  <div style={{ fontWeight:700, fontSize:"13px" }}>Topic Focus</div>
+                  <div style={{ fontSize:"11px", opacity:.8, marginTop:"2px", fontFamily:"Lora,serif", fontWeight:400 }}>
+                    Vocabulary from your topic only. Clean, fast grid.
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className={`mode-btn${puzzleStyle==="classic"?" on":""}`}
+                  style={{ flex:1, padding:"14px 10px", lineHeight:1.4 }}
+                  onClick={() => setPuzzleStyle("classic")}
+                >
+                  <div style={{ fontSize:"18px", marginBottom:"4px" }}>🗞️</div>
+                  <div style={{ fontWeight:700, fontSize:"13px" }}>Classic Crossword</div>
+                  <div style={{ fontSize:"11px", opacity:.8, marginTop:"2px", fontFamily:"Lora,serif", fontWeight:400 }}>
+                    Dense grid with filler words. NYT-style appearance.
+                  </div>
+                </button>
+              </div>
             </div>
           )}
 
