@@ -541,7 +541,7 @@ The child should fill in the answer word because they already know it from singi
     if (!safety.safe) {
       return res.status(400).json({
         error:
-          "This content is not appropriate for educational use and cannot be used to generate a puzzle.",
+          "This topic isn't in StoryClue's content library. Try a book title, chapter, historical event, science topic, or any traditional school subject.",
       });
     }
   }
