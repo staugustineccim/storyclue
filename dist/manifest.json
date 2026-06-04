@@ -1,7 +1,7 @@
 {
   "name": "StoryClue — AI Crossword Maker",
   "short_name": "StoryClue",
-  "description": "AI-generated crossword puzzles from any story, chapter, or lesson. Grade-adaptive clues for K-6.",
+  "description": "AI-generated crossword puzzles from any story, chapter, or lesson. Grade-adaptive clues for K-12.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
