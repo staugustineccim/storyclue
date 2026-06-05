@@ -69,12 +69,20 @@ const PREVIEW_PHRASES = [
   "You are doing so wonderfully!",
 ];
 
+// Increase body size limit for base64 audio blobs
+export const config = {
+  api: { bodyParser: { sizeLimit: "10mb" } },
+};
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
   const action = req.query.action || req.body?.action;
+
+  // Diagnostic: log what we received so Vercel logs show the call
+  console.log("[voice] action:", action, "| hasKey:", !!API_KEY, "| bodyKeys:", Object.keys(req.body || {}));
 
   if (!API_KEY) {
     return res.status(503).json({

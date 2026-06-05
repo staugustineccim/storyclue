@@ -140,8 +140,9 @@ export default function VoiceSetup({ children = [], onClose }) {
       setVoiceId(data.voiceId);
       setPreviewAudios(data.previews || []);
       setStep("preview");
-    } catch {
-      setError("Could not connect to voice service. Please try again.");
+    } catch (err) {
+      console.error("[VoiceSetup] submitPreview error:", err);
+      setError("Could not connect to voice service: " + (err?.message || String(err)));
     }
     setWorking(false);
   }
