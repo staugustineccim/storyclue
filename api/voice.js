@@ -19,20 +19,20 @@
 // who do repeated puzzle sessions.
 
 import { createHash } from "crypto";
-import { createClient } from "@supabase/supabase-js";
 
 const ELEVENLABS_API = "https://api.elevenlabs.io/v1";
 const API_KEY = process.env.ELEVENLABS_API_KEY;
 
 const CACHE_BUCKET = "voice-recordings-private";
 
-// Lazy Supabase client — initialized on first use so a Node.js 20 compatibility
-// issue with the Supabase package doesn't crash the entire voice module at load time.
+// Lazy Supabase client — uses dynamic import so a Node.js 20 / Supabase
+// compatibility error at import time cannot crash the voice module.
 let _supabaseAdmin = undefined;
-function getSupabase() {
+async function getSupabase() {
   if (_supabaseAdmin !== undefined) return _supabaseAdmin;
   try {
     if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      const { createClient } = await import("@supabase/supabase-js");
       _supabaseAdmin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
     } else {
       _supabaseAdmin = null;
@@ -50,7 +50,7 @@ function cacheKey(voiceId, text) {
 }
 
 async function getFromCache(voiceId, text) {
-  const supabaseAdmin = getSupabase();
+  const supabaseAdmin = await getSupabase();
   if (!supabaseAdmin) return null;
   try {
     const path = cacheKey(voiceId, text);
@@ -64,7 +64,7 @@ async function getFromCache(voiceId, text) {
 }
 
 async function saveToCache(voiceId, text, audioBase64) {
-  const supabaseAdmin = getSupabase();
+  const supabaseAdmin = await getSupabase();
   if (!supabaseAdmin) return;
   try {
     const path = cacheKey(voiceId, text);
