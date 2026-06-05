@@ -278,6 +278,9 @@ function PuzzleBoard({
   // ── Audio / mute ──────────────────────────────────────────────────────────
   const [muted, setMuted] = useState(() => localStorage.getItem("sc-muted") === "1");
 
+  // ── Parent voice (ElevenLabs) — loaded if active child has a voice set up ─
+  const [parentVoiceId, setParentVoiceId] = useState(null);
+
   // ── Picture mode: Wikipedia images ───────────────────────────────────────
   const [wordImages, setWordImages] = useState({}); // { "WORD": "https://..." }
 
@@ -313,6 +316,28 @@ function PuzzleBoard({
       .then(r => r.json())
       .then(data => { if (data.images) setWordImages(data.images); })
       .catch(() => { /* silently fail — emoji is the fallback */ });
+  }, []); // eslint-disable-line
+
+  // Load parent voice_id for active child (used for K-2 song intro + clue reading)
+  useEffect(() => {
+    async function loadParentVoice() {
+      try {
+        const activeChild = JSON.parse(sessionStorage.getItem("sc_active_child") || "null");
+        if (!activeChild?.id) return;
+        const { supabase: sb } = await import("../utils/supabase");
+        if (!sb) return;
+        const { data: child } = await sb.from("child_profiles")
+          .select("parent_id").eq("id", activeChild.id).single();
+        if (!child?.parent_id) return;
+        const { data: voice } = await sb.from("voice_profiles")
+          .select("elevenlabs_voice_id")
+          .eq("parent_id", child.parent_id)
+          .eq("is_active", true)
+          .single();
+        if (voice?.elevenlabs_voice_id) setParentVoiceId(voice.elevenlabs_voice_id);
+      } catch { /* silently fail — fallback to Web Speech API */ }
+    }
+    loadParentVoice();
   }, []); // eslint-disable-line
 
   // Puzzle timer
@@ -540,25 +565,53 @@ function PuzzleBoard({
     return getClue(w).replace(/_{2,}/g, w.answer);
   }
 
-  // For songs puzzles: preview all clues one-by-one before the puzzle starts.
-  // Uses SpeechSynthesisUtterance.onend chaining so cancels never skip ahead.
-  function previewClueTrain() {
-    if (!window.speechSynthesis) return;
-    const lines = words.map(w => getClueForSpeech(w));
-    let idx = 0;
-    function next() {
-      if (idx >= lines.length) return;
+  // Play a single phrase using parent's ElevenLabs voice, falling back to Web Speech API.
+  // Returns a Promise that resolves when the audio finishes.
+  async function speakWithParentVoice(text) {
+    if (muted || !text) return;
+    if (parentVoiceId) {
+      try {
+        const r = await fetch("/api/voice", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: "speak", voiceId: parentVoiceId, text }),
+        });
+        if (r.ok) {
+          const { audioBase64 } = await r.json();
+          if (audioBase64) {
+            return new Promise(resolve => {
+              const audio = new Audio(audioBase64);
+              audio.onended = resolve;
+              audio.onerror = resolve; // fallthrough on error
+              audio.play().catch(resolve);
+            });
+          }
+        }
+      } catch { /* fall through to Web Speech API */ }
+    }
+    // Fallback: Web Speech API
+    return new Promise(resolve => {
+      if (!window.speechSynthesis) { resolve(); return; }
       window.speechSynthesis.cancel();
-      const utt   = new SpeechSynthesisUtterance(lines[idx++]);
+      const utt   = new SpeechSynthesisUtterance(text);
       const voice = getBestVoice(String(grade));
       if (voice) utt.voice = voice;
       utt.lang  = "en-US";
       utt.rate  = 0.72;
       utt.pitch = 1.10;
-      utt.onend = next;
+      utt.onend = resolve;
+      utt.onerror = resolve;
       window.speechSynthesis.speak(utt);
+    });
+  }
+
+  // For songs puzzles: preview all clues one-by-one before the puzzle starts.
+  // Uses parent voice (ElevenLabs) when available, falls back to Web Speech API.
+  async function previewClueTrain() {
+    const lines = words.map(w => getClueForSpeech(w));
+    for (const line of lines) {
+      await speakWithParentVoice(line);
     }
-    next();
   }
 
   async function loadContext() {
@@ -1355,9 +1408,9 @@ function PuzzleBoard({
 
           {/* Preview clues button — reads all clues aloud */}
           <button
-            onClick={() => {
-              speakTextGraded(`Let's sing ${title}! Listen carefully!`, grade, muted);
-              setTimeout(() => previewClueTrain(), 2200);
+            onClick={async () => {
+              await speakWithParentVoice(`Let's sing ${title}! Listen carefully!`);
+              previewClueTrain();
             }}
             style={{ marginBottom:"12px", padding:"13px 28px", background:"rgba(255,255,255,.15)", color:"#fff", border:"2px solid rgba(255,255,255,.5)", borderRadius:"12px", fontFamily:"Lora,serif", fontWeight:600, fontSize:"16px", cursor:"pointer" }}
           >
