@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../utils/supabase";
+import VoiceSetup from "./VoiceSetup";
 
 // ── FamilyDashboard ───────────────────────────────────────────────────────────
 // Shown to signed-in users before audience selection.
@@ -42,6 +43,7 @@ export default function FamilyDashboard({ onSelectChild, onSkipToAudience }) {
   const [newGrade,    setNewGrade]    = useState("3");
   const [newEmoji,    setNewEmoji]    = useState("⭐");
   const [saving,      setSaving]      = useState(false);
+  const [showVoice,   setShowVoice]   = useState(false);
 
   useEffect(() => {
     if (!supabase || !user) { setLoading(false); return; }
@@ -251,6 +253,27 @@ export default function FamilyDashboard({ onSelectChild, onSkipToAudience }) {
           </div>
         )}
 
+        {/* Parent Voice Settings */}
+        <div style={{ background:"#fff", border:"1.5px solid #c8b888", borderRadius:"12px", padding:"20px 24px", marginBottom:"24px" }}>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"12px" }}>
+            <div>
+              <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"16px", color:"#2d4a18", marginBottom:"4px" }}>
+                🎙️ Parent Voice Settings
+              </div>
+              <div style={{ fontFamily:"Lora,serif", fontSize:"13px", color:"#6a5a30", lineHeight:1.5 }}>
+                Record your voice so your child hears <em>you</em> reading their puzzle clues — even when you're away.
+                Mom, Dad, Grandma, and Grandpa each get their own voice.
+              </div>
+            </div>
+            <button
+              onClick={() => setShowVoice(true)}
+              style={{ padding:"10px 22px", background:"#2d4a18", color:"#f0ead8", border:"none", borderRadius:"8px", fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"14px", cursor:"pointer", whiteSpace:"nowrap" }}
+            >
+              Set Up Voice →
+            </button>
+          </div>
+        </div>
+
         {/* Parent / no-child option */}
         <div style={{ textAlign:"center", paddingTop:"16px", borderTop:"1px solid #e0d8c8" }}>
           <button
@@ -262,6 +285,14 @@ export default function FamilyDashboard({ onSelectChild, onSkipToAudience }) {
         </div>
 
       </div>
+
+      {/* Voice Setup overlay */}
+      {showVoice && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.6)", zIndex:1000, overflowY:"auto" }}>
+          <VoiceSetup children={children} onClose={() => setShowVoice(false)} />
+        </div>
+      )}
+
     </div>
   );
 }
