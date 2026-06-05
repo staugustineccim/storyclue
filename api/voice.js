@@ -24,12 +24,25 @@ import { createClient } from "@supabase/supabase-js";
 const ELEVENLABS_API = "https://api.elevenlabs.io/v1";
 const API_KEY = process.env.ELEVENLABS_API_KEY;
 
-// Supabase admin client for cache storage (uses service role key — server only)
-const supabaseAdmin = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
-  ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
-  : null;
-
 const CACHE_BUCKET = "voice-recordings-private";
+
+// Lazy Supabase client — initialized on first use so a Node.js 20 compatibility
+// issue with the Supabase package doesn't crash the entire voice module at load time.
+let _supabaseAdmin = undefined;
+function getSupabase() {
+  if (_supabaseAdmin !== undefined) return _supabaseAdmin;
+  try {
+    if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      _supabaseAdmin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+    } else {
+      _supabaseAdmin = null;
+    }
+  } catch (err) {
+    console.error("[voice] Supabase init failed (cache disabled):", err?.message);
+    _supabaseAdmin = null;
+  }
+  return _supabaseAdmin;
+}
 
 function cacheKey(voiceId, text) {
   const hash = createHash("sha256").update(text.trim().toLowerCase()).digest("hex").slice(0, 16);
@@ -37,6 +50,7 @@ function cacheKey(voiceId, text) {
 }
 
 async function getFromCache(voiceId, text) {
+  const supabaseAdmin = getSupabase();
   if (!supabaseAdmin) return null;
   try {
     const path = cacheKey(voiceId, text);
@@ -50,6 +64,7 @@ async function getFromCache(voiceId, text) {
 }
 
 async function saveToCache(voiceId, text, audioBase64) {
+  const supabaseAdmin = getSupabase();
   if (!supabaseAdmin) return;
   try {
     const path = cacheKey(voiceId, text);
