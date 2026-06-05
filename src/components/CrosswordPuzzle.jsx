@@ -119,7 +119,7 @@ function speakTextWeb(text, grade) {
   speakTextGraded(text, grade || "3", false);
 }
 
-// Legacy synchronous helper kept for celebration phrases (no grade/muted context needed)
+// Legacy synchronous helper kept for non-K-2 grades
 function speakText(text, rate = 1.0, pitch = 1.0) {
   if (!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
@@ -127,6 +127,36 @@ function speakText(text, rate = 1.0, pitch = 1.0) {
   utt.rate  = rate;
   utt.pitch = pitch;
   window.speechSynthesis.speak(utt);
+}
+
+// Module-level parent voice helper — safe to call from inside useEffect closures.
+// Accepts voiceId and muted via refs so stale closures are never a problem.
+// Falls back to Web Speech API automatically if no voice is configured.
+async function speakWithVoice(text, voiceIdRef, mutedRef, gradeRef) {
+  if (mutedRef?.current || !text) return;
+  const voiceId = voiceIdRef?.current;
+  const grade   = gradeRef?.current || "3";
+  if (voiceId) {
+    try {
+      const r = await fetch("/api/voice", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "speak", voiceId, text }),
+      });
+      if (r.ok) {
+        const { audioBase64 } = await r.json();
+        if (audioBase64) {
+          return new Promise(resolve => {
+            const audio = new Audio(audioBase64);
+            audio.onended = resolve;
+            audio.onerror = resolve;
+            audio.play().catch(resolve);
+          });
+        }
+      }
+    } catch { /* fall through to Web Speech API */ }
+  }
+  speakTextGraded(text, grade, false);
 }
 
 // Web Audio API celebration sounds — no external files needed
@@ -299,11 +329,15 @@ function PuzzleBoard({
   const mascotTimerRef    = useRef(null);
   const completedWordsRef = useRef(new Set());
   const mutedRef          = useRef(muted);
+  const parentVoiceIdRef  = useRef(null);
+  const gradeRef          = useRef(grade);
 
   // ── Effects ───────────────────────────────────────────────────────────────
 
-  // Keep muted ref in sync so closure-based effects always see current value
+  // Keep refs in sync so closure-based effects always see current values
   useEffect(() => { mutedRef.current = muted; }, [muted]);
+  useEffect(() => { parentVoiceIdRef.current = parentVoiceId; }, [parentVoiceId]);
+  useEffect(() => { gradeRef.current = grade; }, [grade]);
 
   // Picture mode: fetch Wikipedia thumbnail images for vocabulary words
   useEffect(() => {
@@ -334,7 +368,10 @@ function PuzzleBoard({
           .eq("parent_id", child.parent_id)
           .eq("is_active", true)
           .single();
-        if (voice?.elevenlabs_voice_id) setParentVoiceId(voice.elevenlabs_voice_id);
+        if (voice?.elevenlabs_voice_id) {
+          setParentVoiceId(voice.elevenlabs_voice_id);
+          parentVoiceIdRef.current = voice.elevenlabs_voice_id;
+        }
       } catch { /* silently fail — fallback to Web Speech API */ }
     }
     loadParentVoice();
@@ -475,7 +512,7 @@ function PuzzleBoard({
       playCelebrationSound("word");
       const phrases = ["Great job!", "You got it!", "Wonderful!", "Keep going!"];
       setTimeout(() => {
-        if (!mutedRef.current) speakText(phrases[Math.floor(Math.random() * phrases.length)], 0.9, 1.2);
+        speakWithVoice(phrases[Math.floor(Math.random() * phrases.length)], parentVoiceIdRef, mutedRef, gradeRef);
       }, 200);
     }
   }, [cells]); // eslint-disable-line
@@ -493,7 +530,7 @@ function PuzzleBoard({
       // Third wave
       setTimeout(() => triggerConfetti(), 1800);
       setTimeout(() => {
-        if (!mutedRef.current) speakText("You did it! Amazing work! You solved the whole puzzle!", 0.80, 1.15);
+        speakWithVoice("You did it! Amazing work! You solved the whole puzzle!", parentVoiceIdRef, mutedRef, gradeRef);
       }, 500);
     }
   }, [won]); // eslint-disable-line
@@ -1217,7 +1254,7 @@ function PuzzleBoard({
 
               {/* Audio button — always visible, auto-played for K-2 via VocabModal; here it's on-demand */}
               <button
-                onClick={e => { e.stopPropagation(); speakTextGraded(getClueForSpeech(activeWord), grade, muted); }}
+                onClick={e => { e.stopPropagation(); speakWithParentVoice(getClueForSpeech(activeWord)); }}
                 title="Read clue aloud"
                 style={{ background:"rgba(255,255,255,.15)", border:"1px solid rgba(255,255,255,.35)", borderRadius:"5px", padding:"3px 8px", cursor:"pointer", fontSize:"14px", lineHeight:1, flexShrink:0 }}
               >
@@ -1422,9 +1459,7 @@ function PuzzleBoard({
               window.speechSynthesis?.cancel();
               setShowSongIntro(false);
               // Speak encouragement when puzzle reveals
-              setTimeout(() => {
-                if (!muted) speakTextGraded(`Ready! Fill in the missing words from ${title}!`, grade, false);
-              }, 300);
+              setTimeout(() => speakWithParentVoice(`Ready! Fill in the missing words from ${title}!`), 300);
             }}
             style={{ padding:"16px 36px", background:"#ffeb3b", color:"#1a237e", border:"none", borderRadius:"14px", fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"18px", cursor:"pointer", boxShadow:"4px 4px 0 rgba(0,0,0,.3)" }}
           >
