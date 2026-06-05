@@ -154,21 +154,28 @@ Rule: Alert Bob if total estimated monthly cost exceeds $50.
 ## APPROVED FOR UPCOMING WORK
 
 ### ElevenLabs (Parent Voice Cloning) — ✅ APPROVED June 3, 2026
-- **Purpose:** Parent records voice sample once; all K-2 TTS uses that voice. Premium feature for Family Plan subscribers only.
-- **API key:** Add `ELEVENLABS_API_KEY` to Vercel environment variables (server-side only — never VITE_ prefixed)
+- **Purpose:** Parent records voice sample once; all K-2 TTS uses that voice — song intros, clue previews, word celebrations, puzzle win. Premium feature for Family Plan subscribers only.
+- **API keys required (Vercel env vars — server-side only, never VITE_ prefixed):**
+  - `ELEVENLABS_API_KEY` — from elevenlabs.io dashboard
+  - `SUPABASE_URL` — Supabase project URL (for audio cache)
+  - `SUPABASE_SERVICE_ROLE_KEY` — Supabase service role key (NOT anon key — needs storage write access)
 - **Plan:** Creator — $22/month
 - **Creator plan includes:** 100K characters/month, Instant Voice Cloning, unlimited voice profiles
-- **Cost control:** Aggressive caching in Supabase Storage — synthesize each phrase+voice combo once, cache forever. K-2 word pools are small and repeat heavily.
-- **Free tier users:** Fall back to Web Speech API automatically — no cost
-- **Setup:** Bob signs up at elevenlabs.io, creates API key named "StoryClue", adds to Vercel as `ELEVENLABS_API_KEY`
+- **Cost control — audio caching implemented:**
+  Each unique (voiceId + text) pair is synthesized ONCE, stored in `voice-recordings-private` bucket at `voices-cache/{voiceId}/{hash}.mp3`, and served from cache on every repeat play. Celebration phrases and song clue previews are identical every session — 95%+ of calls hit cache after the first session.
+  - **Without caching:** ~600 chars/session × 3/day × 1 family = 54K chars/month (unsustainable)
+  - **With caching:** ~600 chars first-ever session per voice, ~0 ongoing for repeated phrases
+- **Free tier users:** Fall back to Web Speech API automatically — no ElevenLabs cost ever
+- **Setup:** Bob signs up at elevenlabs.io → Creator plan → API key named "StoryClue" → add to Vercel as `ELEVENLABS_API_KEY`. Also add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` from Supabase project Settings → API.
 
 | Users with voice enabled | Est. chars/month (with caching) | Plan needed | Cost |
 |---|---|---|---|
-| 1–50 families | ~60K chars | Creator | $22/mo |
-| 50–200 families | ~200K chars | Creator/Pro | $22–$99/mo |
-| 200–500 families | ~500K chars | Pro | $99/mo |
+| 1–50 families | ~5K chars after first week | Creator | $22/mo |
+| 50–200 families | ~20K chars | Creator | $22/mo |
+| 200–500 families | ~50K chars | Creator | $22/mo |
+| 500+ families | ~100K+ chars | Creator/Pro | $22–$99/mo |
 
-> **Note:** Only Family Plan subscribers ($9.99/mo) get voice cloning. At $9.99/mo, 3 paying subscribers cover the $22/mo Creator plan. Voice feature is self-funding from first few subscribers.
+> **Note:** Only Family Plan subscribers ($9.99/mo) get voice cloning. 3 paying subscribers cover the $22/mo Creator plan. Voice feature is self-funding from the first few subscribers.
 
 - **Pricing page:** elevenlabs.io/pricing
 

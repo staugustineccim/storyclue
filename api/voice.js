@@ -7,11 +7,60 @@
 // IMPORTANT: ELEVENLABS_API_KEY must be set in Vercel environment variables.
 // Never expose this key to the client — all ElevenLabs calls go through here.
 //
-// Free tier users (plan_level = 'free') fall back to a note that voice cloning
-// is a paid feature. The client handles the fallback to Web Speech API.
+// ── COST CONTROL: Audio caching ──────────────────────────────────────────────
+// ElevenLabs charges per character synthesized. Most phrases (celebrations,
+// song clue previews) are identical every session. We cache synthesized audio
+// in Supabase Storage so each unique (voiceId + text) combination is only
+// synthesized ONCE — ever. Repeat plays are free.
+//
+// Cache key: voices-cache/{voiceId}/{sha256(text).slice(0,16)}.mp3
+// Stored in the same "voice-recordings-private" bucket (private, signed URLs).
+// Expected savings: 95%+ reduction in ElevenLabs character usage for families
+// who do repeated puzzle sessions.
+
+import { createHash } from "crypto";
+import { createClient } from "@supabase/supabase-js";
 
 const ELEVENLABS_API = "https://api.elevenlabs.io/v1";
 const API_KEY = process.env.ELEVENLABS_API_KEY;
+
+// Supabase admin client for cache storage (uses service role key — server only)
+const supabaseAdmin = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+  : null;
+
+const CACHE_BUCKET = "voice-recordings-private";
+
+function cacheKey(voiceId, text) {
+  const hash = createHash("sha256").update(text.trim().toLowerCase()).digest("hex").slice(0, 16);
+  return `voices-cache/${voiceId}/${hash}.mp3`;
+}
+
+async function getFromCache(voiceId, text) {
+  if (!supabaseAdmin) return null;
+  try {
+    const path = cacheKey(voiceId, text);
+    const { data, error } = await supabaseAdmin.storage
+      .from(CACHE_BUCKET)
+      .download(path);
+    if (error || !data) return null;
+    const buf = Buffer.from(await data.arrayBuffer());
+    return `data:audio/mpeg;base64,${buf.toString("base64")}`;
+  } catch { return null; }
+}
+
+async function saveToCache(voiceId, text, audioBase64) {
+  if (!supabaseAdmin) return;
+  try {
+    const path = cacheKey(voiceId, text);
+    const base64Data = audioBase64.replace(/^data:[^;]+;base64,/, "");
+    const buf = Buffer.from(base64Data, "base64");
+    await supabaseAdmin.storage
+      .from(CACHE_BUCKET)
+      .upload(path, buf, { contentType: "audio/mpeg", upsert: false });
+    // upsert:false — don't overwrite, saves a write if already cached
+  } catch { /* cache write failure is non-fatal */ }
+}
 
 // Celebration phrases used for the 30-second preview (Step 1)
 const PREVIEW_PHRASES = [
@@ -98,7 +147,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ voiceId });
     }
 
-    // ── Speak (TTS synthesis) ──────────────────────────────────────────────
+    // ── Speak (TTS synthesis with caching) ────────────────────────────────
     if (action === "speak") {
       const { voiceId, text } = req.body;
 
@@ -106,10 +155,18 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "voiceId and text required" });
       }
 
+      // Check cache first — no ElevenLabs call needed if already synthesized
+      const cached = await getFromCache(voiceId, text);
+      if (cached) {
+        return res.status(200).json({ audioBase64: cached, fromCache: true });
+      }
+
+      // Not cached — synthesize and save
       const audio = await synthesize(voiceId, text);
       if (!audio) {
         return res.status(500).json({ error: "Synthesis failed" });
       }
+      saveToCache(voiceId, text, audio); // fire-and-forget, non-blocking
       return res.status(200).json({ audioBase64: audio });
     }
 
