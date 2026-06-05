@@ -17,7 +17,7 @@
 ## 2. Standing Rules — Non-Negotiable
 
 ### Rule 1 — SERVICES.md
-Maintain a SERVICES.md file in the project root at all times. Every external API and service must be listed with: name, purpose, free tier limits, paid tier cost, usage estimate at 100/1K/10K users, and pricing page link. Never implement a paid service without Bob's explicit approval. Always try free alternatives first. Alert Bob if total estimated monthly costs exceed $50. Update SERVICES.md every time a new service is added.
+Maintain a SERVICES.md file in the project root at all times. Every external API and service must be listed with: name, purpose, free tier limits, paid tier cost, usage estimate at 100/1K/10K users, and pricing page link. Never implement a paid service without Bob's explicit approval. Always try free alternatives first. Alert Bob when total estimated monthly costs exceed $50. Bob's comfort zone is under $100/month — never propose architecture that pushes past $100/month without explicit flagging and approval. Update SERVICES.md every time a new service is added.
 
 ### Rule 2 — Grade-Appropriate Content
 Every UI element must match the selected grade level. Example chips, placeholder text, sample books, suggested content, and all defaults must be appropriate for the selected grade. K-2 never sees Romeo and Juliet, Jack Reacher, adult novels, or college-level content. Bob should never have to catch this manually — Claude Code owns enforcement.

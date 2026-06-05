@@ -1,10 +1,11 @@
 # StoryClue — Services & Cost Registry
 
-Last updated: June 3, 2026
+Last updated: June 5, 2026
 Rule: Never add a paid service without Bob's explicit approval.
 Rule: Always try free alternatives first.
 Rule: Flag any usage-based service with cost estimates at 100 / 1,000 / 10,000 users.
-Rule: Alert Bob if total estimated monthly cost exceeds $50.
+Rule: Alert Bob when total estimated monthly cost exceeds $50.
+Rule: Bob's comfort zone is under $100/month. Never propose architecture that pushes past $100/month without flagging it explicitly and getting approval.
 
 ---
 
