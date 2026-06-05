@@ -367,6 +367,11 @@ export default function LandingPage() {
               {label}
             </button>
           ))}
+          <button
+            onClick={() => navigate("/terms")}
+            style={{ background:"none", border:"none", color:"rgba(200,232,168,.7)", fontFamily:"Lora,serif", fontSize:"12px", cursor:"pointer", textDecoration:"underline" }}>
+            Terms of Service
+          </button>
         </div>
         <div style={{ fontFamily:"Lora,serif", fontSize:"11px", color:"rgba(240,234,216,.3)", marginTop:"16px" }}>
           Built in Duck Key, Florida · May 2026 · StoryClue.ai
