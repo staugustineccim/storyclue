@@ -68,7 +68,7 @@ async function saveToCache(voiceId, text, audioBase64) {
   if (!supabaseAdmin) return;
   try {
     const path = cacheKey(voiceId, text);
-    const base64Data = audioBase64.replace(/^data:[^;]+;base64,/, "");
+    const base64Data = audioBase64.replace(/^data:[^,]+,/, "");
     const buf = Buffer.from(base64Data, "base64");
     await supabaseAdmin.storage
       .from(CACHE_BUCKET)
@@ -116,7 +116,11 @@ export default async function handler(req, res) {
       }
 
       // Convert base64 to buffer
-      const base64Data = audioBase64.replace(/^data:[^;]+;base64,/, "");
+      // Use [^,]+, to strip the full data URL prefix regardless of MIME params
+      // e.g. "data:audio/webm;codecs=opus;base64,..." has two semicolons —
+      // the old regex ^data:[^;]+;base64, only stripped the first semicolon,
+      // leaving "codecs=opus;base64,<data>" which decoded to garbage bytes.
+      const base64Data = audioBase64.replace(/^data:[^,]+,/, "");
       const audioBuffer = Buffer.from(base64Data, "base64");
 
       // Detect MIME type — iOS Safari produces audio/mp4, Android produces audio/webm
