@@ -332,6 +332,7 @@ function PuzzleBoard({
   const mutedRef          = useRef(muted);
   const parentVoiceIdRef  = useRef(null);
   const gradeRef          = useRef(grade);
+  const previewPlayingRef = useRef(false); // guard against concurrent previewClueTrain calls
 
   // ── Effects ───────────────────────────────────────────────────────────────
 
@@ -621,6 +622,7 @@ function PuzzleBoard({
 
   // Play a single phrase using parent's ElevenLabs voice, falling back to Web Speech API.
   // Returns a Promise that resolves when the audio finishes.
+  // Uses a once-safe resolver so onended / onerror can never resolve the same Promise twice.
   async function speakWithParentVoice(text) {
     if (muted || !text) return;
     if (parentVoiceId) {
@@ -634,10 +636,12 @@ function PuzzleBoard({
           const { audioBase64 } = await r.json();
           if (audioBase64) {
             return new Promise(resolve => {
+              let done = false;
+              const once = () => { if (!done) { done = true; resolve(); } };
               const audio = new Audio(audioBase64);
-              audio.onended = resolve;
-              audio.onerror = resolve; // fallthrough on error
-              audio.play().catch(resolve);
+              audio.onended = once;
+              audio.onerror = once;
+              audio.play().catch(once);
             });
           }
         }
@@ -647,24 +651,35 @@ function PuzzleBoard({
     return new Promise(resolve => {
       if (!window.speechSynthesis) { resolve(); return; }
       window.speechSynthesis.cancel();
+      let done = false;
+      const once = () => { if (!done) { done = true; resolve(); } };
       const utt   = new SpeechSynthesisUtterance(text);
       const voice = getBestVoice(String(grade));
       if (voice) utt.voice = voice;
       utt.lang  = "en-US";
       utt.rate  = 0.72;
       utt.pitch = 1.10;
-      utt.onend = resolve;
-      utt.onerror = resolve;
+      utt.onend   = once;
+      utt.onerror = once;
       window.speechSynthesis.speak(utt);
     });
   }
 
   // For songs puzzles: preview all clues one-by-one before the puzzle starts.
-  // Uses parent voice (ElevenLabs) when available, falls back to Web Speech API.
+  // Guard: previewPlayingRef prevents a second concurrent train from starting
+  // if the user taps "Hear the clues first" again while audio is still playing.
   async function previewClueTrain() {
-    const lines = words.map(w => getClueForSpeech(w));
-    for (const line of lines) {
-      await speakWithParentVoice(line);
+    if (previewPlayingRef.current) return;
+    previewPlayingRef.current = true;
+    try {
+      window.speechSynthesis?.cancel(); // clear any leftover speech before starting
+      const lines = words.map(w => getClueForSpeech(w));
+      for (const line of lines) {
+        if (!previewPlayingRef.current) break; // allow cancellation
+        await speakWithParentVoice(line);
+      }
+    } finally {
+      previewPlayingRef.current = false;
     }
   }
 
@@ -777,12 +792,10 @@ function PuzzleBoard({
       grade_level:        grade,
       time_taken_seconds: seconds,
     });
-    if (grade === "adult") {
-      setCells(SOLUTION.map(row => row.map(c => c || "")));
-      setRevealed(true);
-    } else {
-      setShowVocabModal(true);
-    }
+    // Always reveal answers directly — ending the puzzle session.
+    // VocabModal is for the "already won" flow, never the "Show Answer" flow.
+    setCells(SOLUTION.map(row => row.map(c => c || "")));
+    setRevealed(true);
   }
 
   function handleVocabContinue() {
@@ -1463,8 +1476,14 @@ function PuzzleBoard({
           {/* Preview clues button — reads all clues aloud */}
           <button
             onClick={async () => {
+              if (previewPlayingRef.current) {
+                // Already playing — cancel and reset so a second tap stops it
+                previewPlayingRef.current = false;
+                window.speechSynthesis?.cancel();
+                return;
+              }
               await speakWithParentVoice(`Let's sing ${title}! Listen carefully!`);
-              previewClueTrain();
+              await previewClueTrain(); // await so concurrent taps are blocked by the guard
             }}
             style={{ marginBottom:"12px", padding:"13px 28px", background:"rgba(255,255,255,.15)", color:"#fff", border:"2px solid rgba(255,255,255,.5)", borderRadius:"12px", fontFamily:"Lora,serif", fontWeight:600, fontSize:"16px", cursor:"pointer" }}
           >
@@ -1473,6 +1492,7 @@ function PuzzleBoard({
 
           <button
             onClick={() => {
+              previewPlayingRef.current = false; // cancel any ongoing clue preview
               window.speechSynthesis?.cancel();
               setShowSongIntro(false);
               // Speak encouragement when puzzle reveals

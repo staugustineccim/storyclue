@@ -1,6 +1,6 @@
 # StoryClue — Services & Cost Registry
 
-Last updated: June 5, 2026
+Last updated: June 6, 2026
 Rule: Never add a paid service without Bob's explicit approval.
 Rule: Always try free alternatives first.
 Rule: Flag any usage-based service with cost estimates at 100 / 1,000 / 10,000 users.
@@ -36,15 +36,10 @@ Rule: Bob's comfort zone is under $100/month. Never propose architecture that pu
 
 ### 2. Vercel (Hosting + Serverless Functions)
 - **Purpose:** Hosts the React app and all `/api/*` serverless functions
-- **Current plan:** Hobby (Free)
-- **Free tier limits:**
-  - 100 GB bandwidth/month
-  - 100,000 serverless function invocations/month
-  - 12 functions maximum
-  - No team features
-- **Pro plan:** $20/month — removes function limit, adds team collaboration, more bandwidth
-- **Current function count:** 12 of 12 allowed (at limit — Pro plan required before adding more)
-- **⚠️ NOTE:** The Hobby plan 12-function limit has been reached. Upgrade to Pro ($20/mo) before adding any new API endpoints.
+- **Current plan:** Pro — $20/month ✅ (upgraded June 3, 2026)
+- **Pro plan includes:** Unlimited serverless functions, 1 TB bandwidth/month, team collaboration
+- **Current function count:** 12 functions — no longer limited (Pro removes the 12-function cap)
+- **Upgrade reason:** Hobby plan's 12-function cap was blocking `/api/voice` from serving correctly.
 - **Pricing page:** vercel.com/pricing
 
 ---

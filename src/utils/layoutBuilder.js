@@ -173,7 +173,7 @@ export function buildLayout(apiWords, grade = "3", puzzleStyle = "topic") {
   const tier       = getTier(grade);
   const isClassic  = puzzleStyle === "classic";
   // Classic mode: run more attempts to find the densest layout possible
-  const MAX_TRIES  = isClassic ? 30 : (tier === "full" ? 20 : 8);
+  const MAX_TRIES  = isClassic ? 50 : (tier === "full" ? 20 : 8);
   // Preserve all extra fields (emoji, etc.) — only normalise answer casing
   const baseList   = apiWords.map(w => ({ ...w, answer: w.word.toUpperCase(), clue: w.clue }));
 

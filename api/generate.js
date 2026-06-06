@@ -37,6 +37,8 @@ Your job is to extract vocabulary from content and write grade-appropriate clues
 Write from a traditional American educational perspective — patriotic, faith-respectful, factual, and appropriate for conservative families.
 Do NOT inject progressive social framing, DEI language, gender ideology, or political commentary of any kind into clues.
 Write about people, places, and events as they are historically and factually understood.
+SECULAR MODE RULE: When the user prompt contains "SECULAR MODE — HARD CONSTRAINT", every single clue in your response MUST be completely secular — zero religious references, zero Biblical language, zero theological terms, zero mentions of God, faith, prayer, or any religious figure, even if the source content contains religious language. This is an absolute rule with no exceptions.
+SPANISH LANGUAGE RULE: When the user prompt specifies Spanish or Bilingual mode, every single clue (or every single answer word, depending on the mode) MUST be in Spanish with zero English fallback under any circumstances. If you cannot produce a Spanish clue for a word, rewrite the clue differently in Spanish — never output English when Spanish is required.
 Return ONLY valid JSON — no markdown fences, no preamble, no explanation of any kind.
 The JSON must be parseable by JSON.parse() with no preprocessing.`;
 
@@ -452,13 +454,13 @@ The child should fill in the answer word because they already know it from singi
   let langFlag = "english";
   if (language === "spanish" && !bilingualMode) {
     langFlag = "spanish";
-    languageNote = `\nLanguage: Generate ALL vocabulary WORDS and CLUES entirely in Spanish. Answer words must be Spanish words in ALL CAPS using only the letters A-Z (no accents, tildes, or special characters — use plain ASCII: N for Ñ, etc.). Clues must be in Spanish at the appropriate grade level. After generating, run a secondary validation pass: confirm each Spanish word is correctly spelled, grammatically appropriate for the grade level, and each clue accurately describes its answer word in Spanish. Fix any errors before returning.`;
+    languageNote = `\nSPANISH MODE — HARD CONSTRAINT: Generate ALL vocabulary WORDS and CLUES entirely in Spanish. NEVER write even a single clue in English under any circumstances — if you struggle with a word, rewrite the clue differently in Spanish. Answer words must be Spanish words in ALL CAPS using only the letters A-Z (no accents, tildes, or special characters — use plain ASCII: N for Ñ, etc.). Clues must be in Spanish at the appropriate grade level. VALIDATION: Before returning, re-read every single clue. If ANY clue is in English, replace it with a Spanish clue immediately. Every clue in the JSON must be in Spanish — this is an absolute non-negotiable requirement.`;
   } else if (bilingualMode === "en-clue-es-word") {
     langFlag = "bilingual-en-clue-es-word";
-    languageNote = `\nBilingual Mode (English clues / Spanish answers): Write all CLUES in English, but the ANSWER WORDS must be their Spanish equivalents in ALL CAPS (A-Z only, no accents). For example, clue "A friendly spider" → answer ARANA (for araña). Each English clue describes what the Spanish word means.`;
+    languageNote = `\nBILINGUAL MODE — HARD CONSTRAINT (English clues / Spanish answers): Write all CLUES in English, but the ANSWER WORDS must be their Spanish equivalents in ALL CAPS (A-Z only, no accents). For example, clue "A friendly spider" → answer ARANA (for araña). Each English clue describes what the Spanish word means. NEVER include an English answer word — every answer must be Spanish.`;
   } else if (bilingualMode === "es-clue-en-word") {
     langFlag = "bilingual-es-clue-en-word";
-    languageNote = `\nBilingual Mode (Spanish clues / English answers): Write all CLUES in Spanish, but the ANSWER WORDS must be English (ALL CAPS, A-Z only). Each Spanish clue describes the English answer word.`;
+    languageNote = `\nBILINGUAL MODE — HARD CONSTRAINT (Spanish clues / English answers): Write all CLUES in Spanish, but the ANSWER WORDS must be English (ALL CAPS, A-Z only). NEVER write even a single clue in English — if you struggle with a word, rewrite the clue differently in Spanish. VALIDATION: Before returning, re-read every clue. If ANY clue is in English rather than Spanish, replace it immediately. Every clue must be in Spanish — no exceptions.`;
   }
 
   // ── Resolve input text ─────────────────────────────────────────────────────
@@ -680,9 +682,12 @@ Return this exact JSON structure with no other text:
 
     // ── Update 5: Classic Crossword — inject grade-appropriate filler words ──
     // Only for 6th grade and above when puzzleStyle = "classic".
+    // NEVER inject English filler into Spanish or bilingual puzzles — filler
+    // words have English clues which would break the language consistency.
     // Filler words have pre-defined clues and are NOT theme-connected.
     const CLASSIC_GRADES = ["6","7","8","9-10","11-12","adult"];
-    if (puzzleStyle === "classic" && CLASSIC_GRADES.includes(String(grade))) {
+    const isNonEnglish = language === "spanish" || Boolean(bilingualMode);
+    if (puzzleStyle === "classic" && CLASSIC_GRADES.includes(String(grade)) && !isNonEnglish) {
       function getFillerTier(g) {
         if (g === "adult") return "adult";
         if (["9-10","11-12"].includes(String(g))) return "high";
@@ -782,7 +787,7 @@ Return this exact JSON structure with no other text:
       const themeWords = new Set(parsed.words.map(w => w.word.toUpperCase()));
       const fillers = pool
         .filter(f => !themeWords.has(f.word))
-        .slice(0, 15) // Add up to 15 filler words for denser grid coverage
+        .slice(0, 20) // Add up to 20 filler words for denser grid coverage
         .map(f => ({ word: f.word, clue: f.clue, isFiller: true }));
       parsed.words = [...parsed.words, ...fillers];
     }
