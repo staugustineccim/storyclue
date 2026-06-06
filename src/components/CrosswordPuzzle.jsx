@@ -310,6 +310,7 @@ function PuzzleBoard({
 
   // ── Parent voice (ElevenLabs) — loaded if active child has a voice set up ─
   const [parentVoiceId, setParentVoiceId] = useState(null);
+  const [activeChildName, setActiveChildName] = useState(null); // for personalized celebrations
 
   // ── Picture mode: Wikipedia images ───────────────────────────────────────
   const [wordImages, setWordImages] = useState({}); // { "WORD": "https://..." }
@@ -352,17 +353,20 @@ function PuzzleBoard({
       .catch(() => { /* silently fail — emoji is the fallback */ });
   }, []); // eslint-disable-line
 
-  // Load parent voice_id for active child (used for K-2 song intro + clue reading)
+  // Load parent voice_id + child name for active child (K-2 song intro, clue reading, celebrations)
   useEffect(() => {
     async function loadParentVoice() {
       try {
         const activeChild = JSON.parse(sessionStorage.getItem("sc_active_child") || "null");
         if (!activeChild?.id) return;
+        // Store child name for personalized celebration phrases
+        if (activeChild?.name) setActiveChildName(activeChild.name);
         const { supabase: sb } = await import("../utils/supabase");
         if (!sb) return;
         const { data: child } = await sb.from("child_profiles")
-          .select("parent_id").eq("id", activeChild.id).single();
+          .select("parent_id, name").eq("id", activeChild.id).single();
         if (!child?.parent_id) return;
+        if (child?.name) setActiveChildName(child.name);
         const { data: voice } = await sb.from("voice_profiles")
           .select("elevenlabs_voice_id")
           .eq("parent_id", child.parent_id)
@@ -510,7 +514,14 @@ function PuzzleBoard({
     if (newCompletion) {
       triggerConfetti();
       playCelebrationSound("word");
-      const phrases = ["Great job!", "You got it!", "Wonderful!", "Keep going!"];
+      const name = activeChildName;
+      const phrases = name ? [
+        `Great job ${name}!`,
+        `You got it ${name}!`,
+        `Wonderful ${name}!`,
+        `Keep going ${name}!`,
+        `Amazing ${name}!`,
+      ] : ["Great job!", "You got it!", "Wonderful!", "Keep going!", "Amazing!"];
       setTimeout(() => {
         speakWithVoice(phrases[Math.floor(Math.random() * phrases.length)], parentVoiceIdRef, mutedRef, gradeRef);
       }, 200);
@@ -530,7 +541,11 @@ function PuzzleBoard({
       // Third wave
       setTimeout(() => triggerConfetti(), 1800);
       setTimeout(() => {
-        speakWithVoice("You did it! Amazing work! You solved the whole puzzle!", parentVoiceIdRef, mutedRef, gradeRef);
+        const name = activeChildName;
+        const winPhrase = name
+          ? `You did it ${name}! Amazing work! You solved the whole puzzle!`
+          : "You did it! Amazing work! You solved the whole puzzle!";
+        speakWithVoice(winPhrase, parentVoiceIdRef, mutedRef, gradeRef);
       }, 500);
     }
   }, [won]); // eslint-disable-line
