@@ -116,42 +116,52 @@ export default async function handler(req, res) {
       }
 
       // Convert base64 to buffer
-      const audioBuffer = Buffer.from(audioBase64.replace(/^data:[^;]+;base64,/, ""), "base64");
+      const base64Data = audioBase64.replace(/^data:[^;]+;base64,/, "");
+      const audioBuffer = Buffer.from(base64Data, "base64");
 
-      // Determine MIME type (default to webm which MediaRecorder produces)
-      const mimeMatch = audioBase64.match(/^data:([^;]+);base64,/);
-      const mimeType = mimeMatch ? mimeMatch[1] : "audio/webm";
-      const ext = mimeType.includes("mp4") ? "mp4" : mimeType.includes("ogg") ? "ogg" : "webm";
+      // Detect MIME type — iOS Safari produces audio/mp4, Android produces audio/webm
+      const mimeMatch = audioBase64.match(/^data:([^;,]+)/);
+      const rawMime   = mimeMatch ? mimeMatch[1].toLowerCase() : "audio/webm";
+      // Normalise to a MIME ElevenLabs accepts
+      const mimeType  = rawMime.includes("mp4") || rawMime.includes("m4a") || rawMime.includes("aac")
+        ? "audio/mp4"
+        : rawMime.includes("ogg") ? "audio/ogg"
+        : "audio/webm";
+      const ext = mimeType === "audio/mp4" ? "m4a" : mimeType === "audio/ogg" ? "ogg" : "webm";
 
-      // Build multipart form data for ElevenLabs
-      const boundary = "----FormBoundary" + Math.random().toString(36).slice(2);
-      const name = `StoryClue_${label.replace(/\s+/g, "_")}_${Date.now()}`;
+      console.log("[voice] clone: mimeType=", mimeType, "ext=", ext, "bufLen=", audioBuffer.length);
 
-      let formBody = "";
-      formBody += `--${boundary}\r\nContent-Disposition: form-data; name="name"\r\n\r\n${name}\r\n`;
-      formBody += `--${boundary}\r\nContent-Disposition: form-data; name="description"\r\n\r\nStoryClue parent voice for ${label}\r\n`;
-
-      const formPrefix = Buffer.from(formBody);
-      const fileHeader = Buffer.from(
-        `--${boundary}\r\nContent-Disposition: form-data; name="files"; filename="recording.${ext}"\r\nContent-Type: ${mimeType}\r\n\r\n`
+      // Use native FormData (Node.js 18 built-in) — much more reliable than
+      // manual multipart construction, handles Content-Type/boundary automatically.
+      const voiceName = `StoryClue_${label.replace(/\s+/g, "_")}_${Date.now()}`;
+      const form = new FormData();
+      form.append("name", voiceName);
+      form.append("description", `StoryClue parent voice — ${label}`);
+      form.append(
+        "files",
+        new Blob([audioBuffer], { type: mimeType }),
+        `recording.${ext}`
       );
-      const formSuffix = Buffer.from(`\r\n--${boundary}--\r\n`);
-      const body = Buffer.concat([formPrefix, fileHeader, audioBuffer, formSuffix]);
 
       const cloneRes = await fetch(`${ELEVENLABS_API}/voices/add`, {
         method: "POST",
-        headers: {
-          "xi-api-key": API_KEY,
-          "Content-Type": `multipart/form-data; boundary=${boundary}`,
-          "Content-Length": String(body.length),
-        },
-        body,
+        headers: { "xi-api-key": API_KEY },
+        // Do NOT set Content-Type manually — FormData sets it with the boundary
+        // Do NOT set Content-Length — Node.js fetch manages it
+        body: form,
       });
 
       if (!cloneRes.ok) {
         const errText = await cloneRes.text();
-        console.error("ElevenLabs clone error:", errText);
-        return res.status(500).json({ error: "Could not create voice clone. Please try again." });
+        console.error("[voice] ElevenLabs clone error:", cloneRes.status, errText);
+        // Return the actual ElevenLabs error so it shows in the UI for debugging
+        let friendlyMsg = "Could not create voice clone. Please try again.";
+        try {
+          const errJson = JSON.parse(errText);
+          if (errJson?.detail?.message) friendlyMsg = errJson.detail.message;
+          else if (errJson?.detail) friendlyMsg = String(errJson.detail);
+        } catch {}
+        return res.status(500).json({ error: friendlyMsg, elevenlabsStatus: cloneRes.status });
       }
 
       const cloneData = await cloneRes.json();

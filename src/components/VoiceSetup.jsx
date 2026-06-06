@@ -132,7 +132,8 @@ export default function VoiceSetup({ children = [], onClose }) {
         if (data.fallback) {
           setError("Voice cloning requires a Family Plan subscription. You can upgrade from your account settings.");
         } else {
-          setError(data.error || "Could not process recording. Please try again.");
+          const detail = data.elevenlabsStatus ? ` (ElevenLabs ${data.elevenlabsStatus})` : "";
+          setError((data.error || "Could not process recording. Please try again.") + detail);
         }
         setWorking(false);
         return;
