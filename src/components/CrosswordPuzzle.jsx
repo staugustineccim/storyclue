@@ -296,6 +296,7 @@ function PuzzleBoard({
   const [continueUsed,      setContinueUsed]      = useState(false);
   const [showWordsLearned,  setShowWordsLearned]  = useState(false);
   const [clueBarExpanded,   setClueBarExpanded]   = useState(false);
+  const [kbdBottom,         setKbdBottom]         = useState(0); // px from bottom when keyboard is open
 
   // ── K-2 Early Learner state ───────────────────────────────────────────────
   const [burstCells,       setBurstCells]       = useState(() => new Set());
@@ -407,6 +408,21 @@ function PuzzleBoard({
   useEffect(() => {
     activeClueRef.current?.scrollIntoView({ behavior:"auto", block:"center" });
   }, [activeWord]);
+
+  // Float active clue bar above the soft keyboard on iOS / Android
+  // visualViewport.height shrinks when the keyboard opens; we measure the gap
+  // between the full window height and the visible viewport height+offset.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      const hidden = window.innerHeight - (vv.height + vv.offsetTop);
+      setKbdBottom(hidden > 80 ? Math.round(hidden) : 0);
+    };
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => { vv.removeEventListener("resize", update); vv.removeEventListener("scroll", update); };
+  }, []);
 
   // ── Auto-win detection ────────────────────────────────────────────────────
   // Fires immediately when the last correct letter is entered — no need to
@@ -1255,10 +1271,33 @@ function PuzzleBoard({
           {checked && !won && !revealed && <span style={{ fontSize:"11px", color:"#7a5a00", fontFamily:"Lora,serif", fontStyle:"italic" }}>🟢 correct · 🔴 wrong · 🟡 empty</span>}
         </div>
 
-        {/* ACTIVE CLUE BAR */}
+        {/* ACTIVE CLUE BAR — floats above the soft keyboard when typing */}
+        {/* Spacer keeps flex layout intact while clue bar is fixed */}
+        {kbdBottom > 0 && <div style={{ flexShrink:0, minHeight:"46px" }} aria-hidden="true" />}
         <div
           className={`no-print clue-bar${clueBarExpanded?" expanded":""}`}
-          style={{ background:"#2D5A1A", borderBottom:"3px solid #1a3a0a", padding:"8px 14px", flexShrink:0, minHeight:"40px", display:"flex", alignItems:"center", gap:"10px" }}
+          style={{
+            background:"#2D5A1A",
+            padding:"8px 14px",
+            display:"flex",
+            alignItems:"center",
+            gap:"10px",
+            ...(kbdBottom > 0 ? {
+              // Keyboard is open — pin clue bar just above it
+              position:"fixed",
+              left:0, right:0,
+              bottom: kbdBottom,
+              zIndex: 250,
+              minHeight:"46px",
+              boxShadow:"0 -3px 14px rgba(0,0,0,.4)",
+              borderTop:"3px solid #1a3a0a",
+            } : {
+              // Normal inline flow
+              borderBottom:"3px solid #1a3a0a",
+              flexShrink:0,
+              minHeight:"40px",
+            }),
+          }}
           onClick={() => setClueBarExpanded(v => !v)}
         >
           {activeWord ? (

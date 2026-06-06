@@ -43,19 +43,20 @@ export default function FamilyDashboard({ onSelectChild, onSkipToAudience }) {
   const [newGrade,    setNewGrade]    = useState("3");
   const [newEmoji,    setNewEmoji]    = useState("⭐");
   const [saving,      setSaving]      = useState(false);
-  const [showVoice,   setShowVoice]   = useState(false);
+  const [showVoice,    setShowVoice]    = useState(false);
+  const [voiceProfiles, setVoiceProfiles] = useState([]); // {id, label, is_active, is_deployed}
 
   useEffect(() => {
     if (!supabase || !user) { setLoading(false); return; }
-    supabase
-      .from("child_profiles")
-      .select("*")
-      .eq("parent_id", user.id)
-      .order("created_at", { ascending: true })
-      .then(({ data, error }) => {
-        if (!error && data) setChildren(data);
-        setLoading(false);
-      });
+    // Load children and existing voice profiles in parallel
+    Promise.all([
+      supabase.from("child_profiles").select("*").eq("parent_id", user.id).order("created_at", { ascending: true }),
+      supabase.from("voice_profiles").select("id,label,is_active,is_deployed").eq("parent_id", user.id).eq("is_active", true),
+    ]).then(([{ data: kids, error: kErr }, { data: voices, error: vErr }]) => {
+      if (!kErr && kids)   setChildren(kids);
+      if (!vErr && voices) setVoiceProfiles(voices);
+      setLoading(false);
+    });
   }, [user]);
 
   async function addChild(e) {
@@ -255,21 +256,36 @@ export default function FamilyDashboard({ onSelectChild, onSkipToAudience }) {
 
         {/* Parent Voice Settings */}
         <div style={{ background:"#fff", border:"1.5px solid #c8b888", borderRadius:"12px", padding:"20px 24px", marginBottom:"24px" }}>
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"12px" }}>
-            <div>
+          <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", flexWrap:"wrap", gap:"12px" }}>
+            <div style={{ flex:1, minWidth:0 }}>
               <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"16px", color:"#2d4a18", marginBottom:"4px" }}>
                 🎙️ Parent Voice Settings
               </div>
-              <div style={{ fontFamily:"Lora,serif", fontSize:"13px", color:"#6a5a30", lineHeight:1.5 }}>
-                Record your voice so your child hears <em>you</em> reading their puzzle clues — even when you're away.
-                Mom, Dad, Grandma, and Grandpa each get their own voice.
-              </div>
+              {voiceProfiles.length === 0 ? (
+                <div style={{ fontFamily:"Lora,serif", fontSize:"13px", color:"#6a5a30", lineHeight:1.5 }}>
+                  Record your voice so your child hears <em>you</em> reading their puzzle clues — even when you're away.
+                  Mom, Dad, Grandma, and Grandpa each get their own voice.
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontFamily:"Lora,serif", fontSize:"13px", color:"#6a5a30", lineHeight:1.5, marginBottom:"8px" }}>
+                    {voiceProfiles.map(v => (
+                      <span key={v.id} style={{ display:"inline-flex", alignItems:"center", gap:"4px", marginRight:"12px", color:"#2d4a18", fontWeight:600 }}>
+                        ✅ {v.label}{v.is_deployed ? " 🎖️" : ""}
+                      </span>
+                    ))}
+                  </div>
+                  <div style={{ fontFamily:"Lora,serif", fontSize:"12px", color:"#8a7a5a" }}>
+                    <strong>{voiceProfiles[0].label}'s voice</strong> is the default. Add another voice or re-record any time.
+                  </div>
+                </div>
+              )}
             </div>
             <button
               onClick={() => setShowVoice(true)}
               style={{ padding:"10px 22px", background:"#2d4a18", color:"#f0ead8", border:"none", borderRadius:"8px", fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"14px", cursor:"pointer", whiteSpace:"nowrap" }}
             >
-              Set Up Voice →
+              {voiceProfiles.length === 0 ? "Set Up Voice →" : "Add / Update Voice →"}
             </button>
           </div>
         </div>
@@ -289,7 +305,7 @@ export default function FamilyDashboard({ onSelectChild, onSkipToAudience }) {
       {/* Voice Setup overlay */}
       {showVoice && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.6)", zIndex:1000, overflowY:"auto" }}>
-          <VoiceSetup children={children} onClose={() => setShowVoice(false)} />
+          <VoiceSetup children={children} existingVoices={voiceProfiles} onClose={() => { setShowVoice(false); /* reload voices after setup */ supabase?.from("voice_profiles").select("id,label,is_active,is_deployed").eq("parent_id", user.id).eq("is_active", true).then(({ data }) => { if (data) setVoiceProfiles(data); }); }} />
         </div>
       )}
 

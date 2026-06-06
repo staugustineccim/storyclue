@@ -32,7 +32,7 @@ const DEPLOYMENT_PHRASES = [
   "Daddy loves you more than anything in the world.",
 ];
 
-export default function VoiceSetup({ children = [], onClose }) {
+export default function VoiceSetup({ children = [], existingVoices = [], onClose }) {
   const { user } = useAuth();
   const [step,           setStep]           = useState("intro");     // intro → recording → preview → approve → phrases → deploy-q → deploy-record → done
   const [voiceLabel,     setVoiceLabel]     = useState("Mom");
@@ -218,14 +218,25 @@ export default function VoiceSetup({ children = [], onClose }) {
         if (upData) audioPath = upData.path;
       }
 
-      // Handle photo upload — also private
+      // Handle photo upload — also private bucket, same path prefix as audio
+      // Use the real file extension (iPhone may send image/jpeg, image/heic, image/png)
       let photoPath = null;
       if (photoFile && supabase) {
-        const photoName = `${user.id}/deploy_photo_${Date.now()}.jpg`;
-        const { data: photoUp } = await supabase.storage
+        const mimeExt = { "image/jpeg":"jpg","image/jpg":"jpg","image/png":"png",
+                          "image/webp":"webp","image/heic":"heic","image/heif":"heif" };
+        const ext = mimeExt[photoFile.type] || "jpg";
+        const photoName = `${user.id}/deploy_photo_${Date.now()}.${ext}`;
+        const { data: photoUp, error: photoErr } = await supabase.storage
           .from("voice-recordings-private")
           .upload(photoName, photoFile, { contentType: photoFile.type, upsert: true });
-        if (photoUp) photoPath = photoUp.path;
+        if (photoErr) {
+          console.error("[VoiceSetup] Photo upload failed:", photoErr.message || photoErr);
+          setError(`Photo upload failed: ${photoErr.message || "unknown error"}. Your voice message will still be saved without the photo.`);
+          await new Promise(r => setTimeout(r, 2500)); // let user read the warning
+          setError("");
+        } else if (photoUp) {
+          photoPath = photoUp.path;
+        }
       }
 
       // Save deployment messages for each child — store FILE PATHS not public URLs
@@ -272,26 +283,51 @@ export default function VoiceSetup({ children = [], onClose }) {
   const btnGhost = { ...btn, background:"transparent", color:G, border:`2px solid ${G}` };
 
   // ── INTRO ──────────────────────────────────────────────────────────────────
-  if (step === "intro") return (
+  if (step === "intro") {
+    const primaryVoice = existingVoices[0]; // first active voice = current default
+    return (
     <div style={baseStyle}><div style={modalStyle}>
       <button onClick={onClose} style={{ position:"absolute", top:12, right:14, background:"none", border:"none", fontSize:"18px", cursor:"pointer", color:"#aaa" }}>✕</button>
       <div style={{ fontSize:"3rem", marginBottom:"12px" }}>🎤</div>
-      <h2 style={heading}>Set Up Your Voice</h2>
-      <p style={sub}>When your child does a puzzle, they'll hear your voice — not a robot. You'll record a quick sample and we'll use it for all celebration messages.</p>
+
+      {primaryVoice ? (
+        <>
+          <h2 style={heading}>Voice Settings</h2>
+          {/* Show current default */}
+          <div style={{ background:"#e8f5e8", border:"1.5px solid #66bb6a", borderRadius:"10px", padding:"14px 16px", marginBottom:"16px" }}>
+            <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"14px", color:"#2d4a18", marginBottom:"4px" }}>
+              ✅ {primaryVoice.label}'s voice is your current default
+            </div>
+            <div style={{ fontFamily:"Lora,serif", fontSize:"13px", color:"#4a7a30" }}>
+              Your child will hear {primaryVoice.label}'s voice during clue reading and celebrations.
+              {primaryVoice.is_deployed && " 🎖️ Deployed message is active."}
+            </div>
+          </div>
+          <p style={sub}>Want to add another voice profile (Mom, Dad, Grandpa, etc.) or re-record this one? Select a label and record a new sample below.</p>
+        </>
+      ) : (
+        <>
+          <h2 style={heading}>Set Up Your Voice</h2>
+          <p style={sub}>When your child does a puzzle, they'll hear your voice — not a robot. You'll record a quick sample and we'll use it for all celebration messages.</p>
+        </>
+      )}
 
       {/* Voice label selection */}
       <div style={{ marginBottom:"20px" }}>
         <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"13px", color:"#4a3a18", marginBottom:"8px" }}>
-          Which voice profile is this?
+          {primaryVoice ? "Which voice profile are you recording?" : "Which voice profile is this?"}
         </div>
         <div style={{ display:"flex", gap:"8px", flexWrap:"wrap" }}>
-          {VOICE_LABELS.map(label => (
-            <button key={label} type="button"
-              onClick={() => setVoiceLabel(label)}
-              style={{ padding:"7px 16px", border:`2px solid ${voiceLabel===label ? G : "#c8b888"}`, borderRadius:"20px", background: voiceLabel===label ? G : "transparent", color: voiceLabel===label ? P : "#4a3a18", fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"13px", cursor:"pointer" }}>
-              {label}
-            </button>
-          ))}
+          {VOICE_LABELS.map(label => {
+            const alreadySet = existingVoices.some(v => v.label === label);
+            return (
+              <button key={label} type="button"
+                onClick={() => setVoiceLabel(label)}
+                style={{ padding:"7px 16px", border:`2px solid ${voiceLabel===label ? G : "#c8b888"}`, borderRadius:"20px", background: voiceLabel===label ? G : "transparent", color: voiceLabel===label ? P : "#4a3a18", fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"13px", cursor:"pointer" }}>
+                {label}{alreadySet ? " ✅" : ""}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -300,7 +336,8 @@ export default function VoiceSetup({ children = [], onClose }) {
       </p>
       <button style={btn} onClick={() => setStep("recording")}>Let's Record →</button>
     </div></div>
-  );
+    );
+  }
 
   // ── RECORDING ─────────────────────────────────────────────────────────────
   if (step === "recording") return (
