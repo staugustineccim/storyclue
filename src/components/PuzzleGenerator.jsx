@@ -503,7 +503,7 @@ export default function PuzzleGenerator() {
         return;
       }
 
-      const layout = buildLayout(data.words, grade);
+      const layout = buildLayout(data.words, grade, data.puzzleStyle || puzzleStyle);
 
       if (!layout) {
         setError("Couldn't build a grid from this content. Try a different chapter or paste the text directly.");

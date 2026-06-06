@@ -167,13 +167,22 @@ function shuffle(arr) {
 }
 
 // ── buildLayout — main export ──────────────────────────────────────────────
-// Takes words from API: [{word, clue}]  + grade string
+// Takes words from API: [{word, clue}]  + grade string + optional puzzleStyle
 // Returns placed puzzle data ready for CrosswordPuzzle, or null if layout fails.
-export function buildLayout(apiWords, grade = "3") {
-  const tier      = getTier(grade);
-  const MAX_TRIES = tier === "full" ? 20 : 8;
+export function buildLayout(apiWords, grade = "3", puzzleStyle = "topic") {
+  const tier       = getTier(grade);
+  const isClassic  = puzzleStyle === "classic";
+  // Classic mode: run more attempts to find the densest layout possible
+  const MAX_TRIES  = isClassic ? 30 : (tier === "full" ? 20 : 8);
   // Preserve all extra fields (emoji, etc.) — only normalise answer casing
-  const baseList  = apiWords.map(w => ({ ...w, answer: w.word.toUpperCase(), clue: w.clue }));
+  const baseList   = apiWords.map(w => ({ ...w, answer: w.word.toUpperCase(), clue: w.clue }));
+
+  // Classic mode: sort longest words first so the generator places them as
+  // the backbone of the grid — shorter filler words then weave between them,
+  // producing a much tighter, more square layout.
+  const sortedList = isClassic
+    ? [...baseList].sort((a, b) => b.answer.length - a.answer.length)
+    : baseList;
 
   // Minimum placed words — must be grade-aware.
   // K=8 max, 1st=10, 2nd=12 — they can NEVER reach 15, so use 60% of
@@ -182,10 +191,14 @@ export function buildLayout(apiWords, grade = "3") {
 
   let bestResult    = null;
   let bestViolCount = Infinity;
+  // Classic mode: also track the densest layout seen (most words placed / grid area)
+  let bestDensity   = 0;
+  let densestResult = null;
 
   for (let attempt = 0; attempt < MAX_TRIES; attempt++) {
-    // Shuffle on every retry to coax different layouts from the generator
-    const wordList = attempt === 0 ? baseList : shuffle(baseList);
+    // Attempt 0: sorted (longest-first for classic, original for topic)
+    // Subsequent attempts: shuffle to explore different configurations
+    const wordList = attempt === 0 ? sortedList : shuffle(baseList);
 
     let output;
     try { output = CrosswordLayoutGenerator.generateLayout(wordList); }
@@ -227,9 +240,24 @@ export function buildLayout(apiWords, grade = "3") {
 
     const violations = validate(words, grid, rows, cols, tier);
 
+    // Classic mode: score by density (placed words / grid area) — higher is better
+    if (isClassic) {
+      const density = words.length / (rows * cols);
+      if (density > bestDensity) {
+        bestDensity   = density;
+        densestResult = { rows, cols, words };
+      }
+    }
+
     if (violations.length === 0) {
-      console.log(`[StoryClue] ✓ Grade "${grade}" (${tier}) — valid layout on attempt ${attempt + 1}`);
-      return { rows, cols, words };
+      console.log(`[StoryClue] ✓ Grade "${grade}" (${tier}) style "${puzzleStyle}" — valid layout on attempt ${attempt + 1}`);
+      // For classic mode keep searching for an even denser valid layout
+      if (!isClassic) return { rows, cols, words };
+      if (violations.length < bestViolCount) {
+        bestViolCount = violations.length;
+        bestResult    = { rows, cols, words };
+      }
+      continue;
     }
 
     console.log(
@@ -241,6 +269,12 @@ export function buildLayout(apiWords, grade = "3") {
       bestViolCount = violations.length;
       bestResult    = { rows, cols, words };
     }
+  }
+
+  // Classic mode: prefer the densest layout found (even if it has minor violations)
+  if (isClassic && densestResult) {
+    console.log(`[StoryClue] Classic mode — returning densest layout (density: ${(bestDensity * 100).toFixed(1)}%)`);
+    return densestResult;
   }
 
   // Fall back to best available layout when perfect standards can't be met
