@@ -436,6 +436,7 @@ function PuzzleBoard({
               .eq("child_profile_id", activeChild.id)
               .eq("voice_profiles.is_deployed", true)
               .eq("voice_profiles.is_active", true)
+              .order("created_at", { ascending: false })
               .limit(1)
               .single();
 
@@ -516,12 +517,13 @@ function PuzzleBoard({
       playCelebrationSound("word");
       const name = activeChildName;
       const phrases = name ? [
-        `Great job ${name}!`,
-        `You got it ${name}!`,
-        `Wonderful ${name}!`,
-        `Keep going ${name}!`,
-        `Amazing ${name}!`,
-      ] : ["Great job!", "You got it!", "Wonderful!", "Keep going!", "Amazing!"];
+        `Great job, ${name}!`,
+        `You got it, ${name}!`,
+        `Wonderful, ${name}!`,
+        `Keep going, ${name}!`,
+        `Way to go, ${name}!`,
+        `That's right, ${name}!`,
+      ] : ["Great job!", "You got it!", "Wonderful!", "Keep going!", "Way to go!", "That's right!"];
       setTimeout(() => {
         speakWithVoice(phrases[Math.floor(Math.random() * phrases.length)], parentVoiceIdRef, mutedRef, gradeRef);
       }, 200);
@@ -543,7 +545,7 @@ function PuzzleBoard({
       setTimeout(() => {
         const name = activeChildName;
         const winPhrase = name
-          ? `You did it ${name}! Amazing work! You solved the whole puzzle!`
+          ? `You did it, ${name}! Amazing work! You solved the whole puzzle!`
           : "You did it! Amazing work! You solved the whole puzzle!";
         speakWithVoice(winPhrase, parentVoiceIdRef, mutedRef, gradeRef);
       }, 500);

@@ -229,8 +229,13 @@ export default function VoiceSetup({ children = [], onClose }) {
       }
 
       // Save deployment messages for each child — store FILE PATHS not public URLs
+      // Delete old rows first so re-recording always replaces (never stacks stale rows)
       if (supabase && savedVoiceId) {
         for (const child of children) {
+          await supabase.from("deployment_messages")
+            .delete()
+            .eq("voice_profile_id", savedVoiceId)
+            .eq("child_profile_id", child.id);
           await supabase.from("deployment_messages").insert([{
             voice_profile_id: savedVoiceId,
             child_profile_id: child.id,
