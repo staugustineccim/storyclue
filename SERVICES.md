@@ -1,6 +1,6 @@
 # StoryClue — Services & Cost Registry
 
-Last updated: June 6, 2026
+Last updated: June 6, 2026 (added QA Agent costs)
 Rule: Never add a paid service without Bob's explicit approval.
 Rule: Always try free alternatives first.
 Rule: Flag any usage-based service with cost estimates at 100 / 1,000 / 10,000 users.
@@ -21,6 +21,9 @@ Rule: Bob's comfort zone is under $100/month. Never propose architecture that pu
   - Safety check (avg — faith fast-pass skips Claude 50% of the time): ~$0.002
   - Version check (lookup mode): ~$0.007
   - Subtotal per puzzle: **~$0.020**
+- **QA Agent (nightly, 14 test puzzles):** ~$0.28/night = **~$8.50/month fixed overhead**
+  - Runs at 2 AM EST every night — completely separate from user analytics
+  - This is a fixed cost regardless of user count
 - **⚠️ USAGE-BASED COST ESTIMATES:**
 
 | Users/month | Puzzles (avg 2/user) | Est. monthly cost |
@@ -218,12 +221,14 @@ Rule: Bob's comfort zone is under $100/month. Never propose architecture that pu
 
 ## TOTAL ESTIMATED MONTHLY COST
 
-| Users/month | Anthropic | Vercel | Supabase | ElevenLabs | Total |
-|---|---|---|---|---|---|
-| 100 | ~$4 | $0 | $0 | $22* | **~$26** ✅ |
-| 1,000 | ~$40 | $20 (Pro) | $0–$25 | $22* | **~$82–$107** 🔴 |
-| 2,500 | ~$100 | $20 (Pro) | $25 | $22–$99* | **~$167–$244** 🔴 |
-| 10,000 | ~$400 | $20 (Pro) | $35 | $99–$330* | **~$554–$785** 🔴 |
+| Users/month | Anthropic (users) | QA Agent | Vercel | Supabase | ElevenLabs | Total |
+|---|---|---|---|---|---|---|
+| 100 | ~$4 | $8.50 | $20 (Pro) | $0 | $22* | **~$54** ⚠️ |
+| 1,000 | ~$40 | $8.50 | $20 (Pro) | $0–$25 | $22* | **~$91–$116** 🔴 |
+| 2,500 | ~$100 | $8.50 | $20 (Pro) | $25 | $22–$99* | **~$176–$252** 🔴 |
+| 10,000 | ~$400 | $8.50 | $20 (Pro) | $35 | $99–$330* | **~$563–$794** 🔴 |
+
+> **⚠️ NOTE:** QA Agent adds ~$8.50/month fixed cost. At 100 users total monthly cost crosses $50. Monetization must be live before this scale.
 
 *ElevenLabs cost is flat if caching is effective. Actual cost depends on new unique phrases per month.
 

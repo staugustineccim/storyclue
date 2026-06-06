@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const STAR_COLORS = ["", "#e74c3c", "#e67e22", "#f1c40f", "#2ecc71", "#27ae60"];
 const GRADE_LABELS = {
@@ -283,6 +283,228 @@ function FeedbackTab({ records, total }) {
   );
 }
 
+// ── QA Report Tab ─────────────────────────────────────────────────────────────
+function QAReportTab({ password }) {
+  const [data,     setData]     = useState(null);
+  const [loading,  setLoading]  = useState(false);
+  const [running,  setRunning]  = useState(false);
+  const [error,    setError]    = useState("");
+  const [expanded, setExpanded] = useState(null); // expanded test index
+
+  async function load() {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/qa-report", {
+        headers: { "x-admin-password": password },
+      });
+      if (!res.ok) { setError("Could not load QA report."); setLoading(false); return; }
+      setData(await res.json());
+    } catch { setError("Network error loading QA report."); }
+    setLoading(false);
+  }
+
+  async function triggerRun() {
+    if (!window.confirm("Run QA suite now? This takes ~1-2 minutes and costs ~$0.28 in Anthropic API.")) return;
+    setRunning(true);
+    setError("");
+    try {
+      const res = await fetch("/api/qa-report", {
+        method:  "POST",
+        headers: { "x-admin-password": password },
+      });
+      if (!res.ok) { setError("QA run failed. Check Vercel function logs."); }
+      else { await load(); }
+    } catch (err) { setError(`QA run error: ${err?.message}`); }
+    setRunning(false);
+  }
+
+  useEffect(() => { load(); }, []); // eslint-disable-line
+
+  if (loading) return <p style={{ textAlign:"center", color:"#888", padding:"3rem" }}>Loading QA report…</p>;
+  if (error)   return <p style={{ textAlign:"center", color:"#c0392b", padding:"2rem" }}>{error} <button onClick={load} style={reloadBtn}>Retry</button></p>;
+  if (!data)   return null;
+
+  const latest  = data.latest;
+  const history = data.history || [];
+
+  return (
+    <div>
+      {/* ── Header + Trigger ── */}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"1.2rem", flexWrap:"wrap", gap:"0.8rem" }}>
+        <div>
+          <h2 style={{ margin:0, fontSize:"1.1rem", color:"#2D5A1A", fontFamily:"'Playfair Display',serif" }}>🤖 Nightly QA Agent</h2>
+          <p style={{ margin:"0.2rem 0 0", fontSize:"0.82rem", color:"#888" }}>
+            Runs at 2:00 AM EST every night · {history.length} run{history.length !== 1 ? "s" : ""} recorded
+            {latest && <> · Last: {formatDate(latest.runAt)}</>}
+          </p>
+        </div>
+        <div style={{ display:"flex", gap:"0.5rem" }}>
+          <button onClick={load} style={reloadBtn}>↻ Refresh</button>
+          <button onClick={triggerRun} disabled={running}
+            style={{ ...reloadBtn, background:"#2D5A1A", color:"#fff", border:"none", fontWeight:600 }}>
+            {running ? "Running…" : "▶ Run Now"}
+          </button>
+        </div>
+      </div>
+
+      {/* ── No data yet ── */}
+      {!latest && (
+        <div style={{ textAlign:"center", padding:"3rem", color:"#aaa" }}>
+          <div style={{ fontSize:"3rem", marginBottom:"0.5rem" }}>🕷️</div>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1rem" }}>No QA runs yet.</div>
+          <div style={{ fontSize:"0.85rem", marginTop:"0.3rem" }}>First run will happen automatically tonight at 2 AM EST, or click Run Now above.</div>
+        </div>
+      )}
+
+      {latest && (
+        <>
+          {/* ── Latest run summary cards ── */}
+          <div style={cardRow}>
+            <div style={{ ...card, borderTop:`4px solid ${latest.failed === 0 ? "#27ae60" : "#e74c3c"}` }}>
+              <div style={{ ...cardNum, color: latest.failed === 0 ? "#27ae60" : "#e74c3c" }}>
+                {latest.passed}/{latest.total}
+              </div>
+              <div style={cardLabel}>Tests Passed</div>
+            </div>
+            <div style={{ ...card, borderTop:`4px solid ${latest.failed > 0 ? "#e74c3c" : "#27ae60"}` }}>
+              <div style={{ ...cardNum, color: latest.failed > 0 ? "#e74c3c" : "#27ae60" }}>
+                {latest.failed}
+              </div>
+              <div style={cardLabel}>Tests Failed</div>
+            </div>
+            <div style={card}>
+              <div style={cardNum}>{(latest.durationMs / 1000).toFixed(1)}s</div>
+              <div style={cardLabel}>Run Duration</div>
+            </div>
+            <div style={card}>
+              <div style={{ fontSize:"1.1rem", fontWeight:700, color:"#888", marginBottom:"0.2rem" }}>{formatDate(latest.runAt)}</div>
+              <div style={cardLabel}>Last Run</div>
+            </div>
+          </div>
+
+          {/* ── Overall suggestions ── */}
+          {latest.overallSuggestions?.length > 0 && (
+            <div style={{ background:"#e8f4fd", border:"1px solid #b3d9f7", borderRadius:"10px", padding:"0.9rem 1.1rem", marginBottom:"1.2rem" }}>
+              <div style={{ fontWeight:700, fontSize:"0.85rem", color:"#1a5276", marginBottom:"0.4rem" }}>💡 Enhancement Suggestions</div>
+              {latest.overallSuggestions.map((s,i) => (
+                <div key={i} style={{ fontSize:"0.83rem", color:"#1a5276", marginBottom:"0.2rem" }}>{s}</div>
+              ))}
+            </div>
+          )}
+
+          {/* ── Test results table ── */}
+          <div style={tableWrap}>
+            <h3 style={{ ...sectionHead, padding:"1rem 1.2rem 0.5rem" }}>
+              📋 Test Results — {formatDate(latest.runAt)}
+            </h3>
+            <table style={table}>
+              <thead>
+                <tr>
+                  <th style={th}>Status</th>
+                  <th style={th}>Test</th>
+                  <th style={th}>Grade</th>
+                  <th style={th}>Mode</th>
+                  <th style={th}>Words</th>
+                  <th style={{ ...th, width:"32px" }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {latest.tests.map((t, i) => (
+                  <>
+                    <tr key={i} style={{ background: i % 2 === 0 ? "#fff" : "#fafaf7", cursor: t.violations?.length > 0 ? "pointer" : "default" }}
+                      onClick={() => t.violations?.length > 0 && setExpanded(expanded === i ? null : i)}>
+                      <td style={td}>
+                        <span style={{
+                          display:"inline-block", padding:"2px 8px", borderRadius:"12px",
+                          fontSize:"0.75rem", fontWeight:700,
+                          background: t.status === "pass" ? "#e8f8ee" : t.status === "fail" ? "#fdecea" : "#fff3cd",
+                          color:      t.status === "pass" ? "#1e7e34" : t.status === "fail" ? "#c0392b" : "#856404",
+                        }}>
+                          {t.status === "pass" ? "✅ PASS" : t.status === "fail" ? "❌ FAIL" : "⚠️ ERROR"}
+                        </span>
+                      </td>
+                      <td style={{ ...td, fontSize:"0.82rem" }}>{t.name}</td>
+                      <td style={td}>{t.grade}</td>
+                      <td style={{ ...td, textTransform:"capitalize", fontSize:"0.8rem", color:"#666" }}>{t.mode}</td>
+                      <td style={{ ...td, textAlign:"right", fontSize:"0.8rem" }}>
+                        {t.themeWordCount > 0 && <span style={{ color:"#2D5A1A", fontWeight:600 }}>{t.themeWordCount}</span>}
+                        {t.fillerWordCount > 0 && <span style={{ color:"#888" }}> +{t.fillerWordCount}</span>}
+                      </td>
+                      <td style={{ ...td, textAlign:"center", color:"#aaa", fontSize:"0.75rem" }}>
+                        {t.violations?.length > 0 ? (expanded === i ? "▲" : "▼") : ""}
+                      </td>
+                    </tr>
+                    {expanded === i && t.violations?.length > 0 && (
+                      <tr key={`${i}-detail`} style={{ background:"#fff8f5" }}>
+                        <td colSpan={6} style={{ ...td, padding:"0.75rem 1.2rem" }}>
+                          {t.violations.map((v, j) => (
+                            <div key={j} style={{ fontSize:"0.82rem", color:"#c0392b", marginBottom:"0.3rem" }}>
+                              ❌ {v}
+                            </div>
+                          ))}
+                          {t.suggestions?.map((s, j) => (
+                            <div key={`s${j}`} style={{ fontSize:"0.82rem", color:"#1a5276", marginTop:"0.3rem" }}>
+                              💡 {s}
+                            </div>
+                          ))}
+                          <div style={{ fontSize:"0.78rem", color:"#aaa", marginTop:"0.4rem" }}>
+                            Ran in {t.durationMs}ms
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ── Run history ── */}
+          {history.length > 1 && (
+            <div style={{ ...tableWrap, marginTop:"1.2rem" }}>
+              <h3 style={{ ...sectionHead, padding:"1rem 1.2rem 0.5rem" }}>📅 Run History</h3>
+              <table style={table}>
+                <thead>
+                  <tr>
+                    <th style={th}>Date</th>
+                    <th style={th}>Passed</th>
+                    <th style={th}>Failed</th>
+                    <th style={th}>Total</th>
+                    <th style={th}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.slice(0, 14).map((run, i) => (
+                    <tr key={i} style={{ background: i % 2 === 0 ? "#fff" : "#fafaf7" }}>
+                      <td style={{ ...td, fontSize:"0.8rem", color:"#888", whiteSpace:"nowrap" }}>{formatDate(run.runAt)}</td>
+                      <td style={{ ...td, color:"#27ae60", fontWeight:700 }}>{run.passed}</td>
+                      <td style={{ ...td, color: run.failed > 0 ? "#e74c3c" : "#aaa", fontWeight: run.failed > 0 ? 700 : 400 }}>{run.failed}</td>
+                      <td style={td}>{run.total}</td>
+                      <td style={{ ...td, fontSize:"0.78rem", color:"#666" }}>
+                        {run.overallSuggestions?.filter(s => s.startsWith("⚠️")).map((s,j) => (
+                          <div key={j}>{s}</div>
+                        ))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* ── Analytics isolation notice ── */}
+          <div style={{ background:"#f0f9f0", border:"1px solid #a8d5b0", borderRadius:"8px", padding:"0.8rem 1rem", marginTop:"1rem", fontSize:"0.8rem", color:"#1e5c2e" }}>
+            🔒 <strong>Analytics isolation:</strong> QA agent activity never appears in Real User Analytics.
+            QA calls go directly to the generate API without logging events to the analytics tables.
+            Google Analytics events are never fired (server-side only). The Analytics tab above shows only genuine user activity.
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 export default function AdminDashboard() {
   const [password, setPassword] = useState("");
@@ -291,7 +513,7 @@ export default function AdminDashboard() {
   const [total,    setTotal]    = useState(0);
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState("");
-  const [tab,      setTab]      = useState("analytics"); // "analytics" | "feedback"
+  const [tab,      setTab]      = useState("analytics"); // "analytics" | "feedback" | "qa"
 
   async function login(e) {
     e.preventDefault();
@@ -366,11 +588,18 @@ export default function AdminDashboard() {
           >
             💬 Feedback ({total})
           </button>
+          <button
+            onClick={() => setTab("qa")}
+            style={{ ...tabBtn, ...(tab === "qa" ? tabBtnActive : {}) }}
+          >
+            🤖 QA Report
+          </button>
         </div>
 
         {/* Tab Content */}
         {tab === "analytics" && <AnalyticsTab password={password} />}
         {tab === "feedback"  && <FeedbackTab  records={records} total={total} />}
+        {tab === "qa"        && <QAReportTab  password={password} />}
       </div>
     </div>
   );
