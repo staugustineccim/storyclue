@@ -335,7 +335,7 @@ function QAReportTab({ password }) {
         <div>
           <h2 style={{ margin:0, fontSize:"1.1rem", color:"#2D5A1A", fontFamily:"'Playfair Display',serif" }}>🤖 Nightly QA Agent</h2>
           <p style={{ margin:"0.2rem 0 0", fontSize:"0.82rem", color:"#888" }}>
-            Runs at 2:00 AM EST every night · {history.length} run{history.length !== 1 ? "s" : ""} recorded
+            Runs at 2:00 AM EST every Monday · {history.length} run{history.length !== 1 ? "s" : ""} recorded
             {latest && <> · Last: {formatDate(latest.runAt)}</>}
           </p>
         </div>

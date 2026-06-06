@@ -1,6 +1,9 @@
 // ── /api/qa-agent — Nightly QA Agent ──────────────────────────────────────────
-// Triggered by Vercel cron at 07:00 UTC (2:00 AM EST) every night.
-// Can also be triggered manually via POST from the admin dashboard.
+// Triggered by Vercel cron at 07:00 UTC (2:00 AM EST) every Monday morning.
+// Can also be triggered on demand via POST from the admin dashboard "Run Now" button.
+//
+// Weekly is intentional — StoryClue doesn't change daily and nightly would burn
+// ~$8.50/month in Anthropic API calls for no benefit. Run on demand after major deploys.
 //
 // What it does:
 //   1. Runs a suite of ~14 test puzzle generations across all grade levels,
@@ -8,11 +11,11 @@
 //   2. Validates each result against CLAUDE.md standards.
 //   3. Stores results in Vercel KV — never in the main analytics tables.
 //   4. NEVER fires Google Analytics events (server-side only).
-//   5. Results appear in the admin dashboard QA Report tab each morning.
+//   5. Results appear in the admin dashboard QA Report tab every Monday.
 //
 // Auth: accepts Vercel CRON_SECRET header OR ADMIN_PASSWORD header.
 //
-// COST: ~14 Anthropic API calls per run × $0.020 = ~$0.28/night ≈ $8.50/month.
+// COST: ~14 Anthropic API calls per run × $0.020 = ~$0.28/run ≈ $1.20/month.
 
 import { kv } from "@vercel/kv";
 

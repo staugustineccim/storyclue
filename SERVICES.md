@@ -21,8 +21,9 @@ Rule: Bob's comfort zone is under $100/month. Never propose architecture that pu
   - Safety check (avg — faith fast-pass skips Claude 50% of the time): ~$0.002
   - Version check (lookup mode): ~$0.007
   - Subtotal per puzzle: **~$0.020**
-- **QA Agent (nightly, 14 test puzzles):** ~$0.28/night = **~$8.50/month fixed overhead**
-  - Runs at 2 AM EST every night — completely separate from user analytics
+- **QA Agent (weekly, 14 test puzzles):** ~$0.28/run = **~$1.20/month fixed overhead**
+  - Runs at 2 AM EST every Monday — completely separate from user analytics
+  - Also available on-demand via admin dashboard "Run Now" button after major deploys
   - This is a fixed cost regardless of user count
 - **⚠️ USAGE-BASED COST ESTIMATES:**
 
@@ -223,12 +224,12 @@ Rule: Bob's comfort zone is under $100/month. Never propose architecture that pu
 
 | Users/month | Anthropic (users) | QA Agent | Vercel | Supabase | ElevenLabs | Total |
 |---|---|---|---|---|---|---|
-| 100 | ~$4 | $8.50 | $20 (Pro) | $0 | $22* | **~$54** ⚠️ |
-| 1,000 | ~$40 | $8.50 | $20 (Pro) | $0–$25 | $22* | **~$91–$116** 🔴 |
-| 2,500 | ~$100 | $8.50 | $20 (Pro) | $25 | $22–$99* | **~$176–$252** 🔴 |
-| 10,000 | ~$400 | $8.50 | $20 (Pro) | $35 | $99–$330* | **~$563–$794** 🔴 |
+| 100 | ~$4 | $1.20 | $20 (Pro) | $0 | $22* | **~$47** ✅ |
+| 1,000 | ~$40 | $1.20 | $20 (Pro) | $0–$25 | $22* | **~$83–$108** 🔴 |
+| 2,500 | ~$100 | $1.20 | $20 (Pro) | $25 | $22–$99* | **~$168–$245** 🔴 |
+| 10,000 | ~$400 | $1.20 | $20 (Pro) | $35 | $99–$330* | **~$555–$786** 🔴 |
 
-> **⚠️ NOTE:** QA Agent adds ~$8.50/month fixed cost. At 100 users total monthly cost crosses $50. Monetization must be live before this scale.
+> **⚠️ NOTE:** At ~1,000 users, Anthropic + Vercel Pro costs exceed $50/month. Stripe subscriptions must be live before this scale.
 
 *ElevenLabs cost is flat if caching is effective. Actual cost depends on new unique phrases per month.
 
