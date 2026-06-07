@@ -1,6 +1,6 @@
 # StoryClue.ai — Project Status for Claude Chat
 *Paste this entire document at the start of any Claude Chat session to avoid repeated recommendations.*
-*Last updated: June 6, 2026 (late evening — word count enforcement complete)*
+*Last updated: June 6, 2026 (night — Apple-readiness + Vocabulary Struggle Tracker complete)*
 
 ---
 
@@ -218,6 +218,10 @@ AI-generated crossword puzzle maker for K-12 students, homeschool families, teac
 13. Voice UX → FamilyDashboard loads voice_profiles on mount, shows ✅ Grandpa / ✅ Mom labels with "Grandpa's voice is the default" copy; button changes from "Set Up Voice" to "Add / Update Voice" once voices exist; VoiceSetup intro panel acknowledges current default voice; voice list refreshes after setup closes
 14. Brand refresh → spider icon fully retired; new AI-generated boy+magnifying glass icon at all sizes; in-game mascot changed to 🔍; all headers, nav bars, loading screens, and error states updated
 15. Word count enforcement → `wordCountInstruction()` now says "MAXIMUM N words — strictly do not exceed this count" for all grades 3+; Spanish `languageNote` adds explicit WORD COUNT clause; server-side `.slice(0, limits.wordCount)` hard cap remains as backstop. Fixes Spanish Reader Mode returning 39 words instead of 25.
+16. Vocabulary Struggle Tracker (spaced repetition) → `src/utils/wordProgress.js` implements SM-2 algorithm: tracks per-word mistakes, hints, letter reveals, Show Answer usage; status lifecycle learning→struggling→mastered; Ebbinghaus intervals (1→2→4→8→16→21 days, then 30-day refresher); mastery = 3 clean solves on 7+ day intervals; clue difficulty auto-downgraded for struggling words (Marzano scaffolding); stored in localStorage per child (`sc_wp_<childId>`). Struggle words injected into future puzzle generation prompts with simpler clues. Post-win Review Card surfaces due words from previous sessions (filtered to exclude words just practiced). Tracks per-word mistakes in keyDown and letter reveals in hintRevealLetter.
+17. Audio singleton (`_currentAudio`) → prevents multiple voices playing simultaneously; all ElevenLabs Audio elements tracked; `stopCurrentAudio()` cancels both Web Speech API and any active Audio element. K-2 last-word overlap fix, deployment message audio fix, song intro cancel fix, mute button fix.
+18. Rate limiting → 20 puzzles/IP/hour via Vercel KV; fails open; QA agent exempt; 429 shows friendly ⏳ message in PuzzleGenerator.
+19. iOS safe-area insets → `viewport-fit=cover` + `env(safe-area-inset-*)` on puzzle-root, loading, and error screens. Prevents notch/Dynamic Island covering top bar or home indicator covering bottom.
 
 ---
 
