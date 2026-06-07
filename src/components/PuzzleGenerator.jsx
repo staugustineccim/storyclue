@@ -461,6 +461,16 @@ export default function PuzzleGenerator() {
     setLoading(true);
 
     try {
+      // ── Fetch struggle words for spaced repetition injection ──────────────
+      // Words the student has previously struggled with get injected into this
+      // puzzle (if relevant to the content) with a downgraded clue for easier recall.
+      let struggleWords = [];
+      try {
+        const { getDueWords, getActiveChildId } = await import("../utils/wordProgress");
+        const childId = getActiveChildId();
+        struggleWords = getDueWords(childId, 3); // up to 3 due words
+      } catch { /* non-blocking — never let this prevent puzzle generation */ }
+
       const isK2 = ["k","1","2"].includes(grade);
       const body = {
         // PDF/songs mode: both resolve to lookup on the server (no chapterText needed)
@@ -481,6 +491,7 @@ export default function PuzzleGenerator() {
         phonicsMode: isK2 && phonicsMode,
         pictureMode: isK2 && pictureMode,
         puzzleStyle: showStyleSelector ? puzzleStyle : "topic",
+        struggleWords, // spaced repetition injection
       };
 
       const res = await fetch("/api/generate", {

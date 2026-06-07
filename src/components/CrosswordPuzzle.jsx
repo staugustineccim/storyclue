@@ -6,6 +6,7 @@ import FeedbackModal from "./FeedbackModal";
 import VocabModal from "./VocabModal";
 import ContextReviewModal from "./ContextReviewModal";
 import { trackEvent } from "../utils/analytics";
+import { updateWordProgress, getDueWords, getActiveChildId } from "../utils/wordProgress";
 
 function formatTime(s) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -353,6 +354,16 @@ function PuzzleBoard({
   const gradeRef          = useRef(grade);
   const previewPlayingRef = useRef(false); // guard against concurrent previewClueTrain calls
 
+  // ── Per-word performance tracking (for spaced repetition) ────────────────
+  // wordMistakesRef: wrong letters typed per word key
+  // revealedLetterWordsRef: words that had a letter hint revealed
+  const wordMistakesRef        = useRef({}); // { "across-1": 3, "down-2": 0, ... }
+  const revealedLetterWordsRef = useRef(new Set()); // word keys that used letter reveal
+
+  // Review card: words due for spaced-repetition review (loaded from localStorage)
+  const [showReviewCard,  setShowReviewCard]  = useState(false);
+  const [reviewCardWords, setReviewCardWords] = useState([]);
+
   // ── Effects ───────────────────────────────────────────────────────────────
 
   // Keep refs in sync so closure-based effects always see current values
@@ -454,6 +465,7 @@ function PuzzleBoard({
     if (allSolved) {
       setWon(true);
       setTimerActive(false);
+      trackPuzzleWords(false); // record word performance for spaced repetition
       trackEvent("puzzle_completed", {
         book_title:          title,
         grade_level:         grade,
@@ -497,6 +509,21 @@ function PuzzleBoard({
           });
         }
       } catch {}
+
+      // Spaced repetition: check for struggle words to review after celebration.
+      // Filter out words in THIS puzzle (they were just practiced — not needed in the card).
+      setTimeout(() => {
+        try {
+          const childId = getActiveChildId();
+          const due = getDueWords(childId, 4); // fetch up to 4 due words
+          const thisPuzzleWords = new Set(words.map(w => w.answer.toUpperCase()));
+          const forReview = due.filter(d => !thisPuzzleWords.has(d.word.toUpperCase()));
+          if (forReview.length > 0) {
+            setReviewCardWords(forReview);
+            setShowReviewCard(true);
+          }
+        } catch { /* non-blocking */ }
+      }, 4000); // after win confetti settles
 
       // Songs puzzle: save completed song + show "Words Learned" card after celebration
       if (songId) {
@@ -732,6 +759,35 @@ function PuzzleBoard({
     }
   }
 
+  // ── Spaced repetition: record how the student did on each word ───────────
+  // Called on puzzle win (wasRevealed=false) and Show Answer (wasRevealed=true).
+  // Fire-and-forget — never blocks the UI.
+  function trackPuzzleWords(wasRevealed) {
+    try {
+      const childId = getActiveChildId();
+      const wordResults = words.map(w => {
+        const key             = wordKey(w);
+        const wasSolved       = completedWordsRef.current.has(key);
+        const hadSimplerClue  = !!simplerClues[key];
+        const hadLetterReveal = revealedLetterWordsRef.current.has(key);
+        const wordMistakes    = wordMistakesRef.current[key] || 0;
+        // A "clean" solve: solved before Show Answer, no hint of any kind, zero mistakes
+        const solvedClean     = wasSolved && !hadSimplerClue && !hadLetterReveal && wordMistakes === 0;
+        return {
+          word:           w.answer,
+          grade:          String(grade),
+          hintsUsed:      hadSimplerClue,
+          letterRevealed: hadLetterReveal,
+          // showAnswerUsed: words NOT solved before reveal are "given away"
+          showAnswerUsed: wasRevealed && !wasSolved,
+          solvedClean,
+          mistakes:       wordMistakes,
+        };
+      });
+      updateWordProgress(childId, wordResults);
+    } catch { /* tracking failure must never affect the puzzle UX */ }
+  }
+
   async function loadContext() {
     if (contextSentences) { setShowContextReview(true); return; }
     setContextLoading(true);
@@ -798,7 +854,14 @@ function PuzzleBoard({
       e.preventDefault();
       const letter = e.key.toUpperCase();
       const next   = cells.map(row => [...row]);
-      if (next[r][c] && next[r][c] !== letter) setMistakes(m => m + 1);
+      if (next[r][c] && next[r][c] !== letter) {
+        setMistakes(m => m + 1);
+        // Per-word mistake tracking for spaced repetition
+        if (activeWord) {
+          const wk = wordKey(activeWord);
+          wordMistakesRef.current[wk] = (wordMistakesRef.current[wk] || 0) + 1;
+        }
+      }
       next[r][c] = letter;
       setCells(next); setChecked(false);
 
@@ -841,6 +904,7 @@ function PuzzleBoard({
       grade_level:        grade,
       time_taken_seconds: seconds,
     });
+    trackPuzzleWords(true); // record — unsolved words get showAnswerUsed=true
     // Always reveal answers directly — ending the puzzle session.
     // VocabModal is for the "already won" flow, never the "Show Answer" flow.
     setCells(SOLUTION.map(row => row.map(c => c || "")));
@@ -873,7 +937,9 @@ function PuzzleBoard({
     setMascotMood("idle");
     setShowContextReview(false);
     setContextAutoShown(false);
-    completedWordsRef.current = new Set();
+    completedWordsRef.current        = new Set();
+    wordMistakesRef.current          = {};
+    revealedLetterWordsRef.current   = new Set();
   }
 
   function toggleMute() {
@@ -919,6 +985,7 @@ function PuzzleBoard({
         setHintMsg(`Letter revealed! (${hintsLeft - 1} hint${hintsLeft - 1 !== 1 ? "s" : ""} left)`);
         setTimeout(() => setHintMsg(""), 3000);
         setShowHintMenu(false);
+        revealedLetterWordsRef.current.add(wordKey(activeWord)); // spaced repetition tracking
         trackEvent("hint_used", { hint_type: "letter", grade_level: grade, book_title: title });
         return;
       }
@@ -1778,6 +1845,64 @@ function PuzzleBoard({
               }}
             >
               💕 Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Vocabulary Review Card — struggle words from previous sessions ── */}
+      {/* Only appears if the PuzzleGenerator passed struggleWords that the student
+          should review. Shown once per puzzle session, after the win celebration. */}
+      {showReviewCard && (
+        <div style={{
+          position:"fixed", inset:0, background:"rgba(0,0,0,.65)",
+          display:"flex", alignItems:"center", justifyContent:"center",
+          zIndex:9997, padding:"16px",
+        }}>
+          <div style={{
+            background:"#FDFAF4", borderRadius:"20px",
+            padding:"2rem 2rem 2.5rem", maxWidth:"440px", width:"100%",
+            textAlign:"center", boxShadow:"0 24px 64px rgba(0,0,0,.35)",
+            fontFamily:"Lora,Georgia,serif", maxHeight:"90vh", overflowY:"auto",
+          }}>
+            <div style={{ fontSize:"2.5rem", marginBottom:"8px" }}>🔁</div>
+            <h2 style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"1.4rem", color:"#2D5A1A", marginBottom:"4px" }}>
+              Words to Remember
+            </h2>
+            <p style={{ color:"#6a5a30", fontSize:"0.85rem", marginBottom:"20px", lineHeight:1.5 }}>
+              These words were tricky before. Let's practice them again!
+            </p>
+
+            <div style={{ display:"flex", flexDirection:"column", gap:"10px", marginBottom:"24px", textAlign:"left" }}>
+              {reviewCardWords.map((rw, i) => (
+                <div key={i} style={{
+                  background:"#f0fdf4", border:"2px solid #66bb6a", borderRadius:"12px",
+                  padding:"12px 16px",
+                }}>
+                  <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"1.1rem", color:"#1b5e20", letterSpacing:"1.5px", marginBottom:"4px" }}>
+                    {rw.word}
+                    {rw.status === "struggling" && <span style={{ marginLeft:"8px", fontSize:"0.65rem", background:"#fff3cd", color:"#856404", borderRadius:"8px", padding:"2px 7px", fontFamily:"Lora,serif", fontWeight:600, verticalAlign:"middle" }}>KEEP PRACTICING</span>}
+                    {rw.status === "mastered" && <span style={{ marginLeft:"8px", fontSize:"0.65rem", background:"#d4edda", color:"#155724", borderRadius:"8px", padding:"2px 7px", fontFamily:"Lora,serif", fontWeight:600, verticalAlign:"middle" }}>⭐ YOU KNOW THIS!</span>}
+                  </div>
+                  <div style={{ fontSize:"0.8rem", color:"#6a5a30", fontStyle:"italic" }}>
+                    {rw.reviewReason}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <p style={{ color:"#888", fontSize:"0.8rem", marginBottom:"16px", lineHeight:1.4 }}>
+              StoryClue will keep bringing these words back until they stick. 🌱
+            </p>
+            <button
+              onClick={() => setShowReviewCard(false)}
+              style={{
+                background:"#2D5A1A", color:"#fff", border:"none", borderRadius:"10px",
+                padding:"12px 28px", fontFamily:"'Playfair Display',serif",
+                fontWeight:700, fontSize:"1rem", cursor:"pointer",
+              }}
+            >
+              Got it! 👍
             </button>
           </div>
         </div>

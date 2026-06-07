@@ -333,6 +333,7 @@ export default async function handler(req, res) {
     phonicsMode = false, pictureMode = false,
     songsMode = false,
     puzzleStyle = "topic",
+    struggleWords = [], // spaced repetition: words the student needs to re-encounter
   } = body;
 
   const limits   = GRADE_LIMITS[grade]  || GRADE_LIMITS["3"];
@@ -488,6 +489,38 @@ The child should fill in the answer word because they already know it from singi
     languageNote = `\nBILINGUAL MODE — HARD CONSTRAINT (Spanish clues / English answers): Write all CLUES in Spanish, but the ANSWER WORDS must be English (ALL CAPS, A-Z only). NEVER write even a single clue in English — if you struggle with a word, rewrite the clue differently in Spanish. VALIDATION: Before returning, re-read every clue. If ANY clue is in English rather than Spanish, replace it immediately. Every clue must be in Spanish — no exceptions.`;
   }
 
+  // ── Spaced repetition: build review note for struggle words ──────────────────
+  // If the student has struggled with specific words before, ask Claude to include
+  // them if they're relevant to the content, and to write a simpler clue for them.
+  // We never force unrelated words into a puzzle — context relevance matters.
+  let reviewNote = "";
+  if (Array.isArray(struggleWords) && struggleWords.length > 0) {
+    const GRADE_DESCRIPTIONS_SIMPLE = {
+      k: "kindergarten (5-year-old vocabulary, one very short sentence)",
+      "1": "first grade (simple everyday words, short sentence)",
+      "2": "second grade (simple words a 7-year-old knows)",
+      "3": "third grade (words an 8-year-old knows)",
+      "4": "fourth grade (words a 9-year-old knows)",
+      "5": "fifth grade (words a 10-year-old knows)",
+      "6": "sixth grade (middle school vocabulary)",
+      "7": "seventh grade (middle school analytical language)",
+      "8": "eighth grade (complex vocabulary, inferential clues)",
+      "9-10": "high school level (academic vocabulary)",
+      "11-12": "advanced high school (AP/college-prep)",
+      "adult": "adult reader level (rich vocabulary)",
+    };
+    const reviewList = struggleWords
+      .map(w => {
+        const clueDesc = GRADE_DESCRIPTIONS_SIMPLE[w.clueGrade] || GRADE_DESCRIPTIONS_SIMPLE[w.grade] || "simple";
+        const statusNote = w.status === "struggling"
+          ? "(student has needed help multiple times)"
+          : "(student has seen this before but struggled)";
+        return `  • ${w.word} — use a ${clueDesc} clue ${statusNote}`;
+      })
+      .join("\n");
+    reviewNote = `\nVOCABULARY REVIEW (spaced repetition): This student has previously struggled with the following words. If ANY of them are relevant to the current content, INCLUDE them in the puzzle and write a SIMPLER clue than normal — the clue should help the student recognize the word in context, not just define it abstractly:\n${reviewList}\nIf a word is not relevant to this content, skip it — never force an unrelated word into the puzzle.`;
+  }
+
   // ── Resolve input text ─────────────────────────────────────────────────────
   let resolvedText = chapterText;
   let safetyInputLabel = "";
@@ -588,7 +621,7 @@ The child should fill in the answer word because they already know it from singi
 
     userPrompt = `Create a crossword puzzle vocabulary list from your knowledge of: "${bookRef}"
 
-Grade level for clues: ${gradeDesc}${faithNote}${seriesNote}${languageNote}${phonicsNote}${pictureNote}${songsNote}
+Grade level for clues: ${gradeDesc}${faithNote}${seriesNote}${languageNote}${phonicsNote}${pictureNote}${songsNote}${reviewNote}
 
 Instructions:
 - Use your knowledge of this text, chapter, or topic to identify ${wci}
@@ -625,7 +658,7 @@ Return this exact JSON structure with no other text:
 ${resolvedText.slice(0, 6000)}
 """
 
-Grade level for clues: ${gradeDesc}${faithNote}${seriesNote}${languageNote}${phonicsNote}${pictureNote}${songsNote}
+Grade level for clues: ${gradeDesc}${faithNote}${seriesNote}${languageNote}${phonicsNote}${pictureNote}${songsNote}${reviewNote}
 
 Instructions:
 - Extract ${wci} from the text above
