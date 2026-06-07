@@ -19,6 +19,20 @@ const GRADE_LABELS = {
 
 const MAX_HINTS = 3;
 
+// ── Global audio singleton — only one voice plays at a time ───────────────────
+// ElevenLabs synthesis creates `new Audio(base64)` objects that are otherwise
+// fire-and-forget — two rapid calls stack and both play simultaneously.
+// _currentAudio holds the active Audio element; stopCurrentAudio() kills it
+// AND cancels Web Speech API so both paths are covered in a single call.
+let _currentAudio = null;
+function stopCurrentAudio() {
+  if (_currentAudio) {
+    try { _currentAudio.pause(); _currentAudio.src = ""; } catch { /* ignore */ }
+    _currentAudio = null;
+  }
+  window.speechSynthesis?.cancel();
+}
+
 // ── Smart Web Speech voice picker — no API key needed ─────────────────────────
 // Ranks available browser voices to find the warmest/clearest for each grade tier.
 // Chrome has "Google US English", iOS has "Samantha", etc. — we pick the best one.
@@ -134,6 +148,7 @@ function speakText(text, rate = 1.0, pitch = 1.0) {
 // Falls back to Web Speech API automatically if no voice is configured.
 async function speakWithVoice(text, voiceIdRef, mutedRef, gradeRef) {
   if (mutedRef?.current || !text) return;
+  stopCurrentAudio(); // kill any playing audio before starting a new phrase
   const voiceId = voiceIdRef?.current;
   const grade   = gradeRef?.current || "3";
   if (voiceId) {
@@ -147,10 +162,13 @@ async function speakWithVoice(text, voiceIdRef, mutedRef, gradeRef) {
         const { audioBase64 } = await r.json();
         if (audioBase64) {
           return new Promise(resolve => {
+            let done = false;
+            const once = () => { if (!done) { done = true; _currentAudio = null; resolve(); } };
             const audio = new Audio(audioBase64);
-            audio.onended = resolve;
-            audio.onerror = resolve;
-            audio.play().catch(resolve);
+            _currentAudio = audio;
+            audio.onended = once;
+            audio.onerror = once;
+            audio.play().catch(once);
           });
         }
       }
@@ -220,7 +238,7 @@ export default function CrosswordPuzzle() {
 
   if (loadState === "loading") {
     return (
-      <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", height:"100vh", background:"#faf7f0", fontFamily:"Georgia,serif" }}>
+      <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", minHeight:"100dvh", background:"#faf7f0", fontFamily:"Georgia,serif", paddingTop:"env(safe-area-inset-top)", paddingBottom:"env(safe-area-inset-bottom)" }}>
         <img src="/icon-192.png" alt="StoryClue" style={{ width:"80px", height:"80px", borderRadius:"18px", marginBottom:"16px", animation:"pulse 1.4s ease-in-out infinite" }} />
         <style>{`@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.75;transform:scale(.92)}}`}</style>
         <div style={{ fontFamily:"Lora,serif", fontSize:"15px", color:"#6a5a30" }}>Loading puzzle…</div>
@@ -230,7 +248,7 @@ export default function CrosswordPuzzle() {
 
   if (loadState === "error" || !puzzleData) {
     return (
-      <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", height:"100vh", background:"#faf7f0", fontFamily:"Georgia,serif" }}>
+      <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", minHeight:"100dvh", background:"#faf7f0", fontFamily:"Georgia,serif", paddingTop:"env(safe-area-inset-top)", paddingBottom:"env(safe-area-inset-bottom)" }}>
         <img src="/icon-192.png" alt="StoryClue" style={{ width:"72px", height:"72px", borderRadius:"16px", marginBottom:"16px", opacity:0.7 }} />
         <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"22px", color:"#2d4a18", marginBottom:"12px" }}>Puzzle not found</div>
         <div style={{ color:"#6a5a30", marginBottom:"24px", fontFamily:"Lora,serif", textAlign:"center", maxWidth:"360px", lineHeight:1.6 }}>
@@ -519,6 +537,8 @@ function PuzzleBoard({
   }, []);
 
   // K-2: detect word completion → confetti + audio celebration
+  // Guard: if completing this word also finishes the whole puzzle, skip per-word
+  // speech — the win useEffect fires on the same render cycle and owns the audio.
   useEffect(() => {
     if (!isEarlyLearner || won) return;
     let newCompletion = false;
@@ -530,6 +550,11 @@ function PuzzleBoard({
       }
     }
     if (newCompletion) {
+      // If all cells are now correct the win useEffect will handle sound/speech
+      const allDone = SOLUTION.every((row, r) =>
+        row.every((cell, c) => !cell || cells[r][c] === cell)
+      );
+      if (allDone) return; // let win effect own the celebration audio
       triggerConfetti();
       playCelebrationSound("word");
       const name = activeChildName;
@@ -568,6 +593,13 @@ function PuzzleBoard({
       }, 500);
     }
   }, [won]); // eslint-disable-line
+
+  // Stop any ongoing audio the moment the deployment message modal appears.
+  // The win celebration speech can run long (ElevenLabs); the 3.2s delay is
+  // not always enough — this guarantees silence before the parent audio plays.
+  useEffect(() => {
+    if (showDeployMsg) stopCurrentAudio();
+  }, [showDeployMsg]);
 
   // Context review: button only for all grades — never auto-fires
   // (previously auto-fired for K-5; removed because it costs money per
@@ -638,9 +670,10 @@ function PuzzleBoard({
 
   // Play a single phrase using parent's ElevenLabs voice, falling back to Web Speech API.
   // Returns a Promise that resolves when the audio finishes.
-  // Uses a once-safe resolver so onended / onerror can never resolve the same Promise twice.
+  // Calls stopCurrentAudio() first so no two voices ever play simultaneously.
   async function speakWithParentVoice(text) {
     if (muted || !text) return;
+    stopCurrentAudio(); // kill any playing audio before starting a new phrase
     if (parentVoiceId) {
       try {
         const r = await fetch("/api/voice", {
@@ -653,8 +686,9 @@ function PuzzleBoard({
           if (audioBase64) {
             return new Promise(resolve => {
               let done = false;
-              const once = () => { if (!done) { done = true; resolve(); } };
+              const once = () => { if (!done) { done = true; _currentAudio = null; resolve(); } };
               const audio = new Audio(audioBase64);
+              _currentAudio = audio;
               audio.onended = once;
               audio.onerror = once;
               audio.play().catch(once);
@@ -663,10 +697,9 @@ function PuzzleBoard({
         }
       } catch { /* fall through to Web Speech API */ }
     }
-    // Fallback: Web Speech API
+    // Fallback: Web Speech API (stopCurrentAudio already called cancel above)
     return new Promise(resolve => {
       if (!window.speechSynthesis) { resolve(); return; }
-      window.speechSynthesis.cancel();
       let done = false;
       const once = () => { if (!done) { done = true; resolve(); } };
       const utt   = new SpeechSynthesisUtterance(text);
@@ -847,7 +880,7 @@ function PuzzleBoard({
     setMuted(m => {
       const next = !m;
       localStorage.setItem("sc-muted", next ? "1" : "0");
-      if (next) window.speechSynthesis?.cancel();
+      if (next) stopCurrentAudio(); // stops ElevenLabs Audio element AND Web Speech API
       return next;
     });
   }
@@ -961,7 +994,15 @@ function PuzzleBoard({
         *{box-sizing:border-box;margin:0;padding:0}
 
         html,body,#root{height:100%;overflow:hidden}
-        .puzzle-root{position:fixed;inset:0;display:flex;flex-direction:column;background:#faf7f0;font-family:Georgia,serif;}
+        /* viewport-fit=cover + safe-area-inset-* keeps content clear of the
+           iPhone notch/Dynamic Island (top) and home indicator (bottom).
+           env() falls back to 0 on devices/browsers that don't support it.  */
+        .puzzle-root{position:fixed;inset:0;display:flex;flex-direction:column;background:#faf7f0;font-family:Georgia,serif;
+          padding-top:env(safe-area-inset-top);
+          padding-bottom:env(safe-area-inset-bottom);
+          padding-left:env(safe-area-inset-left);
+          padding-right:env(safe-area-inset-right);
+        }
 
         :root{--cs:42px;--fs:17px;--ns:11px}
         @media(max-width:480px){:root{--cs:30px;--fs:13px}}
@@ -1518,9 +1559,9 @@ function PuzzleBoard({
           <button
             onClick={async () => {
               if (previewPlayingRef.current) {
-                // Already playing — cancel and reset so a second tap stops it
+                // Already playing — cancel everything so a second tap stops it
                 previewPlayingRef.current = false;
-                window.speechSynthesis?.cancel();
+                stopCurrentAudio(); // stops ElevenLabs audio AND Web Speech API
                 return;
               }
               await speakWithParentVoice(`Let's sing ${title}! Listen carefully!`);
@@ -1534,7 +1575,7 @@ function PuzzleBoard({
           <button
             onClick={() => {
               previewPlayingRef.current = false; // cancel any ongoing clue preview
-              window.speechSynthesis?.cancel();
+              stopCurrentAudio(); // stops ElevenLabs audio AND Web Speech API
               setShowSongIntro(false);
               // Speak encouragement when puzzle reveals
               setTimeout(() => speakWithParentVoice(`Ready! Fill in the missing words from ${title}!`), 300);

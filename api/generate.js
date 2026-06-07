@@ -301,6 +301,31 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  const body = req.body || {};
+
+  // ── Rate limiting — 20 puzzles per IP per hour ────────────────────────────
+  // Uses Vercel KV. Fails open so a KV outage never breaks puzzle generation.
+  // QA agent calls (_qaAgent flag) are exempt — they run from our own server.
+  if (!body._qaAgent) {
+    try {
+      const ip = (req.headers["x-forwarded-for"] || req.headers["x-real-ip"] || "unknown")
+        .split(",")[0].trim();
+      const hour = Math.floor(Date.now() / 3_600_000);
+      const key  = `rl:gen:${ip}:${hour}`;
+      const count = await kv.incr(key);
+      if (count === 1) await kv.expire(key, 3600); // TTL = 1 hour from first request
+      const LIMIT = 20;
+      res.setHeader("X-RateLimit-Limit",     LIMIT);
+      res.setHeader("X-RateLimit-Remaining", Math.max(0, LIMIT - count));
+      if (count > LIMIT) {
+        return res.status(429).json({
+          error: "You've generated a lot of puzzles this hour — please wait a few minutes and try again.",
+          retryAfterSeconds: 3600 - (Date.now() % 3_600_000) / 1000 | 0,
+        });
+      }
+    } catch { /* KV unavailable — fail open so puzzle generation always works */ }
+  }
+
   const {
     inputMode, bookRef, chapterText, urlRef,
     grade = "3", faith, language = "english", bilingualMode,
@@ -308,7 +333,7 @@ export default async function handler(req, res) {
     phonicsMode = false, pictureMode = false,
     songsMode = false,
     puzzleStyle = "topic",
-  } = req.body || {};
+  } = body;
 
   const limits   = GRADE_LIMITS[grade]  || GRADE_LIMITS["3"];
   const gradeDesc = GRADE_DESCRIPTIONS[grade] || GRADE_DESCRIPTIONS["3"];

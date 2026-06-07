@@ -491,6 +491,11 @@ export default function PuzzleGenerator() {
 
       const data = await res.json();
 
+      if (res.status === 429) {
+        setError("⏳ " + (data.error || "You've generated a lot of puzzles this hour — please wait a few minutes and try again."));
+        setLoading(false);
+        return;
+      }
       if (!res.ok || data.error) {
         setError(data.error || "Could not generate puzzle. Please try again.");
         setLoading(false);
