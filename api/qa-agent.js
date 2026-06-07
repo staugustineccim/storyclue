@@ -54,14 +54,15 @@ const QA_TESTS = [
     checks:      ["wordCount", "wordLength", "secular"],
   },
   {
-    name:        "Grade 2 — Phonics Mode (secular)",
-    grade:       "2",
-    faith:       "none",
-    puzzleStyle: "topic",
-    phonicsMode: true,
-    inputMode:   "lookup",
-    bookRef:     "Book of Jonah",
-    checks:      ["wordCount", "wordLength", "secular"],
+    name:         "Grade 2 — Phonics Mode (secular)",
+    grade:        "2",
+    faith:        "none",
+    puzzleStyle:  "topic",
+    phonicsMode:  true,
+    inputMode:    "lookup",
+    bookRef:      "Book of Jonah",
+    checks:       ["wordCount", "wordLength", "secular", "phonicsStoryConnection"],
+    storyKeywords: ["Jonah","whale","fish","ship","boat","storm","sea","Nineveh","pray","swallow","three","days","run","away","God"],
   },
 
   // Grade-level sweep
@@ -270,6 +271,30 @@ function validateResult(apiData, test) {
     if (englishClues.length > 0) {
       violations.push(`${englishClues.length} clue(s) are in English when Spanish clues are required: ${englishClues.map(w => w.word).join(", ")}`);
       suggestions.push("Bilingual es-clue-en-word constraint may not be holding — check languageNote in generate.js");
+    }
+  }
+
+  // ── phonicsStoryConnection — clues must contain story context, not just
+  //    generic phonics patterns. At least 70% of clues must either:
+  //    (a) contain a dash "—" or "–" (story-connection separator), OR
+  //    (b) contain a story keyword from the test's storyKeywords list.
+  //    Generic clue fail example: "A type of vehicle that travels on water"
+  //    Good clue example:         "Jonah ran away on this — starts with /sh/ — SHIP"
+  if (test.checks.includes("phonicsStoryConnection")) {
+    const storyKeywords = test.storyKeywords || [];
+    const storyKeywordRe = storyKeywords.length > 0
+      ? new RegExp(storyKeywords.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"), "i")
+      : null;
+    const genericClues = themeWords.filter(w => {
+      if (!w.clue) return false;
+      const hasDash = /—|–/.test(w.clue);
+      const hasStoryWord = storyKeywordRe ? storyKeywordRe.test(w.clue) : false;
+      return !hasDash && !hasStoryWord;
+    });
+    const genericRatio = genericClues.length / Math.max(themeWords.length, 1);
+    if (genericRatio > 0.3) {
+      violations.push(`${genericClues.length}/${themeWords.length} phonics clues appear generic (no story reference or dash separator): ${genericClues.slice(0,3).map(w => `${w.word} ("${w.clue.slice(0,55)}...")`).join(" | ")}`);
+      suggestions.push("Phonics clues must tie back to the story. Check phonicsNote in generate.js — clues should follow pattern: 'Story context — starts with /sound/ — WORD'");
     }
   }
 
