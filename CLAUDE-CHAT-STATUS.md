@@ -1,6 +1,6 @@
 # StoryClue.ai — Project Status for Claude Chat
 *Paste this entire document at the start of any Claude Chat session to avoid repeated recommendations.*
-*Last updated: June 6, 2026 (evening — brand refresh complete)*
+*Last updated: June 6, 2026 (late evening — word count enforcement complete)*
 
 ---
 
@@ -217,6 +217,7 @@ AI-generated crossword puzzle maker for K-12 students, homeschool families, teac
 12. Keyboard hiding active clue → `visualViewport` API listener detects keyboard open; active clue bar `position:fixed` floats just above keyboard with drop shadow; spacer div keeps flex layout stable
 13. Voice UX → FamilyDashboard loads voice_profiles on mount, shows ✅ Grandpa / ✅ Mom labels with "Grandpa's voice is the default" copy; button changes from "Set Up Voice" to "Add / Update Voice" once voices exist; VoiceSetup intro panel acknowledges current default voice; voice list refreshes after setup closes
 14. Brand refresh → spider icon fully retired; new AI-generated boy+magnifying glass icon at all sizes; in-game mascot changed to 🔍; all headers, nav bars, loading screens, and error states updated
+15. Word count enforcement → `wordCountInstruction()` now says "MAXIMUM N words — strictly do not exceed this count" for all grades 3+; Spanish `languageNote` adds explicit WORD COUNT clause; server-side `.slice(0, limits.wordCount)` hard cap remains as backstop. Fixes Spanish Reader Mode returning 39 words instead of 25.
 
 ---
 
