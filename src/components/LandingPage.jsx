@@ -41,7 +41,7 @@ export default function LandingPage() {
 
       {/* ── NAV ───────────────────────────────────────────────────────────── */}
       <nav style={{ background:G, padding:"14px 24px", display:"flex", alignItems:"center", gap:"20px", position:"sticky", top:0, zIndex:100, borderBottom:"2px solid "+A }}>
-        <span style={{ fontSize:"24px" }}>🕷️</span>
+        <img src="/icon-192.png" alt="StoryClue" style={{ width:"32px", height:"32px", borderRadius:"7px" }} />
         <span style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"20px", color:P, flex:1 }}>StoryClue</span>
         <a href="#how-it-works">How It Works</a>
         <a href="#features">Features</a>

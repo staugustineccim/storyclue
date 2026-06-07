@@ -110,7 +110,9 @@ export default function FamilyDashboard({ onSelectChild, onSkipToAudience }) {
 
       {/* Header */}
       <div style={{ background:"linear-gradient(135deg,#2d4a18,#4a7a22)", padding:"14px 20px", borderBottom:"3px solid #8a7a30", display:"flex", alignItems:"center", gap:"14px" }}>
-        <button onClick={() => navigate("/")} style={{ background:"none", border:"none", cursor:"pointer", fontSize:"28px", padding:0 }}>🕷️</button>
+        <button onClick={() => navigate("/")} style={{ background:"none", border:"none", cursor:"pointer", padding:0 }}>
+          <img src="/icon-192.png" alt="StoryClue" style={{ width:"34px", height:"34px", borderRadius:"7px" }} />
+        </button>
         <div style={{ flex:1 }}>
           <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"20px", color:"#f0ead8" }}>StoryClue</div>
           <div style={{ fontSize:"11px", color:"#a8d890", fontStyle:"italic" }}>AI Generated Crossword Puzzle Maker</div>

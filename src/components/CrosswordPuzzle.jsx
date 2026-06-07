@@ -221,8 +221,8 @@ export default function CrosswordPuzzle() {
   if (loadState === "loading") {
     return (
       <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", height:"100vh", background:"#faf7f0", fontFamily:"Georgia,serif" }}>
-        <div style={{ fontSize:"48px", marginBottom:"16px", animation:"spin 1.2s linear infinite" }}>🕷️</div>
-        <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+        <img src="/icon-192.png" alt="StoryClue" style={{ width:"80px", height:"80px", borderRadius:"18px", marginBottom:"16px", animation:"pulse 1.4s ease-in-out infinite" }} />
+        <style>{`@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.75;transform:scale(.92)}}`}</style>
         <div style={{ fontFamily:"Lora,serif", fontSize:"15px", color:"#6a5a30" }}>Loading puzzle…</div>
       </div>
     );
@@ -231,7 +231,7 @@ export default function CrosswordPuzzle() {
   if (loadState === "error" || !puzzleData) {
     return (
       <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", height:"100vh", background:"#faf7f0", fontFamily:"Georgia,serif" }}>
-        <div style={{ fontSize:"48px", marginBottom:"16px" }}>🕷️</div>
+        <img src="/icon-192.png" alt="StoryClue" style={{ width:"72px", height:"72px", borderRadius:"16px", marginBottom:"16px", opacity:0.7 }} />
         <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"22px", color:"#2d4a18", marginBottom:"12px" }}>Puzzle not found</div>
         <div style={{ color:"#6a5a30", marginBottom:"24px", fontFamily:"Lora,serif", textAlign:"center", maxWidth:"360px", lineHeight:1.6 }}>
           This puzzle link may be incorrect or the puzzle hasn't been saved yet.
@@ -1123,7 +1123,7 @@ function PuzzleBoard({
           filter: mascotMood === "happy" ? "drop-shadow(0 0 8px #ffeb3b)" : "none",
           pointerEvents:"none", userSelect:"none",
         }}>
-          🕷️
+          🔍
           {mascotMood === "happy"       && <span style={{ position:"absolute", top:"-6px", right:"-6px", fontSize:"1rem" }}>⭐</span>}
           {mascotMood === "encouraging" && <span style={{ position:"absolute", top:"-6px", right:"-6px", fontSize:"1rem" }}>💪</span>}
         </div>
@@ -1196,7 +1196,9 @@ function PuzzleBoard({
           borderBottom: isEarlyLearner ? "3px solid #66bb6a" : "3px solid #8a7a30",
           display:"flex", alignItems:"center", gap:"12px", flexShrink:0,
         }}>
-          <button onClick={() => navigate("/")} style={{ background:"none", border:"none", cursor:"pointer", fontSize:"26px", padding:0 }} title="StoryClue home">🕷️</button>
+          <button onClick={() => navigate("/")} style={{ background:"none", border:"none", cursor:"pointer", padding:0 }} title="StoryClue home">
+            <img src="/icon-192.png" alt="StoryClue" style={{ width:"30px", height:"30px", borderRadius:"6px" }} />
+          </button>
           <div style={{ flex:1, minWidth:0 }}>
             <div className="hdr-title" style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize: isEarlyLearner ? "18px" : "17px", color:"#f0ead8", lineHeight:1.2 }}>
               {title}
