@@ -1,6 +1,6 @@
 # StoryClue.ai — Project Status for Claude Chat
 *Paste this entire document at the start of any Claude Chat session to avoid repeated recommendations.*
-*Last updated: June 6, 2026*
+*Last updated: June 6, 2026 (evening — brand refresh complete)*
 
 ---
 
@@ -111,9 +111,24 @@ AI-generated crossword puzzle maker for K-12 students, homeschool families, teac
 ### PWA (Progressive Web App)
 - manifest.json: standalone display, #2d4a18 theme, portrait orientation
 - Service worker `sw.js`: network-first HTML, cache-first hashed assets, API calls always network-only
-- PNG icons: icon-192.png (192×192) and icon-512.png (512×512) — spider on green
-- apple-touch-icon: points to icon-192.png (PNG, not SVG — iOS Safari requires PNG)
-- Add to Home Screen works on iPhone Safari
+- PNG icons at every required size (see Brand Identity below)
+- apple-touch-icon: `apple-touch-icon.png` 180×180 (PNG — iOS Safari requires PNG, not SVG)
+- Favicons: `favicon-48.png` (primary) + `favicon-32.png` (fallback) — both PNG
+- Add to Home Screen confirmed working on iPhone Safari
+
+### Brand Identity — New Icon (June 6, 2026)
+- **Retired:** spider emoji 🕷️ — replaced everywhere
+- **New brand icon:** AI-generated illustration — curious boy leaning over an open book, peering through a gold magnifying glass with a crossword grid visible through the lens, forest green botanical background. Rounded corners already applied. 1254×1254 source PNG.
+- **Icon files in `public/`:**
+  - `icon-512.png` — 512×512, PWA maskable (Android home screen)
+  - `icon-192.png` — 192×192, PWA any-purpose + used inline in app headers
+  - `apple-touch-icon.png` — 180×180, iOS Add to Home Screen
+  - `favicon-48.png` — browser tab favicon (primary)
+  - `favicon-32.png` — browser tab favicon (fallback)
+- **Spider retired from every brand touchpoint:**
+  - Landing page nav, AudienceSelector header + hero, FamilyDashboard header, CrosswordPuzzle loading screen, CrosswordPuzzle error/404 state, CrosswordPuzzle header back button — all now use `<img src="/icon-192.png">`
+  - **In-game corner mascot** changed from 🕷️ to 🔍 (magnifying glass, on-brand)
+- Do NOT suggest reverting to the spider or adding any spider references anywhere
 
 ### Free APIs In Use
 - Wikipedia REST API: thumbnail images for K-2 picture mode
@@ -181,10 +196,12 @@ AI-generated crossword puzzle maker for K-12 students, homeschool families, teac
 - **Nightly QA runs** — changed to weekly (nightly was overkill at $8.50/month vs $1.20/month weekly)
 - **Public Supabase storage URLs** for voice recordings — security requirement: signed URLs only, always private bucket
 - **yt-dlp + Whisper as primary** — YouTube Caption Parser is used first (free); Whisper is a fallback option (approved but not yet wired)
+- **Spider icon / spider emoji** — brand retired June 6, 2026. Do not suggest reintroducing it anywhere.
+- **SVG as apple-touch-icon** — iOS Safari does not support SVG for Add to Home Screen; PNG is required and is now in place
 
 ---
 
-## 🔧 Recent Fixes (June 2026)
+## 🔧 Fixes & Builds Completed (June 2026)
 
 1. Classic Crossword sparse grid → 50 layout attempts, up to 20 filler words, longest-first sort
 2. Faith language in secular clues → SYSTEM_PROMPT-level enforcement, not just user prompt
@@ -193,12 +210,13 @@ AI-generated crossword puzzle maker for K-12 students, homeschool families, teac
 5. Spanish clues mixing English → isNonEnglish guard prevents English filler; Spanish constraint at SYSTEM_PROMPT level
 6. Show Answer looping → doReveal() always directly reveals for all grades
 7. K-2 audio clue repeating 3-4× → previewPlayingRef guard + concurrent call protection
-8. Deployment photo not showing → query now orders by created_at DESC; delete-then-insert prevents stale rows
+8. Deployment photo not showing → photo upload now uses correct MIME-based extension (was hardcoded .jpg even for HEIC/PNG); photo upload errors now surfaced to user; query orders by created_at DESC so newest row is returned
 9. TTS "AmazingJourney" no pause → comma added before child name in all celebration phrases
-10. PWA Add to Home Screen → PNG icons generated, apple-touch-icon changed from SVG to PNG
-11. QA Agent → weekly cron, analytics-isolated, admin dashboard QA Report tab
-12. Keyboard hiding active clue → visualViewport listener floats clue bar above keyboard when typing
-13. Voice UX → FamilyDashboard shows existing voice labels; VoiceSetup intro acknowledges current default voice
+10. PWA Add to Home Screen → full PNG icon set generated; apple-touch-icon changed from SVG to PNG (iOS requires PNG); confirmed working on iPhone Safari
+11. QA Agent (Build 7) → weekly cron every Monday 2am EST, 14 test puzzles, analytics-isolated (KV only), admin dashboard QA Report tab with Run Now button
+12. Keyboard hiding active clue → `visualViewport` API listener detects keyboard open; active clue bar `position:fixed` floats just above keyboard with drop shadow; spacer div keeps flex layout stable
+13. Voice UX → FamilyDashboard loads voice_profiles on mount, shows ✅ Grandpa / ✅ Mom labels with "Grandpa's voice is the default" copy; button changes from "Set Up Voice" to "Add / Update Voice" once voices exist; VoiceSetup intro panel acknowledges current default voice; voice list refreshes after setup closes
+14. Brand refresh → spider icon fully retired; new AI-generated boy+magnifying glass icon at all sizes; in-game mascot changed to 🔍; all headers, nav bars, loading screens, and error states updated
 
 ---
 
