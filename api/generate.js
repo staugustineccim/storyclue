@@ -292,7 +292,7 @@ function wordCountInstruction(grade, limits) {
   if (["1","2"].includes(grade)) {
     return `exactly ${limits.wordCount} important story words (${limits.minLen}–${limits.maxLen} letters each)`;
   }
-  return `${limits.wordCount} to ${Math.min(limits.wordCount + 3, 25)} important vocabulary words`;
+  return `MAXIMUM ${limits.wordCount} important vocabulary words — strictly do not exceed this count`;
 }
 
 // ── Main handler ───────────────────────────────────────────────────────────────
@@ -454,7 +454,7 @@ The child should fill in the answer word because they already know it from singi
   let langFlag = "english";
   if (language === "spanish" && !bilingualMode) {
     langFlag = "spanish";
-    languageNote = `\nSPANISH MODE — HARD CONSTRAINT: Generate ALL vocabulary WORDS and CLUES entirely in Spanish. NEVER write even a single clue in English under any circumstances — if you struggle with a word, rewrite the clue differently in Spanish. Answer words must be Spanish words in ALL CAPS using only the letters A-Z (no accents, tildes, or special characters — use plain ASCII: N for Ñ, etc.). Clues must be in Spanish at the appropriate grade level. VALIDATION: Before returning, re-read every single clue. If ANY clue is in English, replace it with a Spanish clue immediately. Every clue in the JSON must be in Spanish — this is an absolute non-negotiable requirement.`;
+    languageNote = `\nSPANISH MODE — HARD CONSTRAINT: Generate ALL vocabulary WORDS and CLUES entirely in Spanish. NEVER write even a single clue in English under any circumstances — if you struggle with a word, rewrite the clue differently in Spanish. Answer words must be Spanish words in ALL CAPS using only the letters A-Z (no accents, tildes, or special characters — use plain ASCII: N for Ñ, etc.). Clues must be in Spanish at the appropriate grade level. WORD COUNT: Return EXACTLY the number of words specified — do not add more words to compensate for any Spanish-mode adjustments. VALIDATION: Before returning, re-read every single clue. If ANY clue is in English, replace it with a Spanish clue immediately. Every clue in the JSON must be in Spanish — this is an absolute non-negotiable requirement.`;
   } else if (bilingualMode === "en-clue-es-word") {
     langFlag = "bilingual-en-clue-es-word";
     languageNote = `\nBILINGUAL MODE — HARD CONSTRAINT (English clues / Spanish answers): Write all CLUES in English, but the ANSWER WORDS must be their Spanish equivalents in ALL CAPS (A-Z only, no accents). For example, clue "A friendly spider" → answer ARANA (for araña). Each English clue describes what the Spanish word means. NEVER include an English answer word — every answer must be Spanish.`;
