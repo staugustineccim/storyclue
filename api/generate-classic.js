@@ -91,40 +91,62 @@ async function extractTopicAnswers(source, grade) {
 
 // Step 2: Generate pattern
 async function generatePattern(seed = 0) {
-  const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
+  const baseUrl = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : "http://localhost:3000";
+
+  console.log("[generatePattern] Using baseUrl:", baseUrl);
+
   try {
-    const res = await fetch(`${baseUrl}/api/pattern-generator`, {
+    const url = `${baseUrl}/api/pattern-generator`;
+    console.log("[generatePattern] Calling:", url);
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ seed }),
     });
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`Pattern generation failed: ${res.status} ${text.slice(0, 100)}`);
+      throw new Error(`Pattern generation failed: ${res.status} ${text.slice(0, 150)}`);
     }
-    return res.json();
+    const data = await res.json();
+    console.log("[generatePattern] Success:", data.pattern?.length, "rows,", data.slots?.length, "slots");
+    return data;
   } catch (err) {
-    console.error("[generatePattern] error:", err);
+    console.error("[generatePattern] error:", err.message);
     throw err;
   }
 }
 
 // Step 3: Fill grid
 async function fillGrid(pattern, slots, seed = 0) {
-  const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
+  const baseUrl = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : "http://localhost:3000";
+
+  console.log("[fillGrid] Using baseUrl:", baseUrl);
+
   try {
-    const res = await fetch(`${baseUrl}/api/grid-builder`, {
+    const url = `${baseUrl}/api/grid-builder`;
+    console.log("[fillGrid] Calling:", url, `with ${slots.length} slots`);
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pattern, slots, seed, timeLimit: 6 }),
     });
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`Grid fill failed: ${res.status} ${text.slice(0, 100)}`);
+      throw new Error(`Grid fill failed: ${res.status} ${text.slice(0, 150)}`);
     }
-    return res.json();
+    const data = await res.json();
+    console.log("[fillGrid] Success:", data.across?.length, "across,", data.down?.length, "down");
+    return data;
   } catch (err) {
-    console.error("[fillGrid] error:", err);
+    console.error("[fillGrid] error:", err.message);
     throw err;
   }
 }
