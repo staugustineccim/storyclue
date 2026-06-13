@@ -48,16 +48,27 @@ function generateClues(answers) {
     WHO: { rich: "What person or which individual", classic: "Which person" },
   };
 
-  for (const a of answers) {
+  const commonClues = [
+    { rich: "Most common English word", classic: "Article" },
+    { rich: "Conjunction joining words or phrases", classic: "Plus sign" },
+    { rich: "Preposition indicating purpose", classic: "Benefit" },
+    { rich: "Plural form of to be", classic: "Exist" },
+    { rich: "Expressing contrast or exception", classic: "Yet" },
+    { rich: "Negation word expressing denial", classic: "Nope" },
+    { rich: "Second person pronoun", classic: "You" },
+    { rich: "Complete set or everything", classic: "Whole" },
+    { rich: "Metal container", classic: "Container" },
+    { rich: "Feminine pronoun objective form", classic: "She obj" },
+  ];
+
+  for (let i = 0; i < answers.length; i++) {
+    const a = answers[i];
     const answerKey = a.answer.toUpperCase();
     if (clueTemplates[answerKey]) {
       clueMap[a.answer] = clueTemplates[answerKey];
     } else {
-      const word = a.answer.toUpperCase();
-      clueMap[a.answer] = {
-        rich: `${word}: common crossword word`,
-        classic: word.substring(0, 3)
-      };
+      const clueIdx = i % commonClues.length;
+      clueMap[a.answer] = commonClues[clueIdx];
     }
   }
   return clueMap;
