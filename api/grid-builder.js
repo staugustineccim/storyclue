@@ -316,9 +316,27 @@ export default async function handler(req, res) {
   }
 
   try {
-    const idx = buildIndex(BASE_WORDLIST);
-    const solver = makeSolver(BASE_WORDLIST, idx);
+    console.log("[grid-builder] Starting buildIndex...");
+    let idx;
+    try {
+      idx = buildIndex(BASE_WORDLIST);
+      console.log("[grid-builder] buildIndex OK");
+    } catch (err) {
+      return res.status(500).json({ error: "buildIndex failed: " + err.message });
+    }
+
+    console.log("[grid-builder] Starting makeSolver...");
+    let solver;
+    try {
+      solver = makeSolver(BASE_WORDLIST, idx);
+      console.log("[grid-builder] makeSolver OK");
+    } catch (err) {
+      return res.status(500).json({ error: "makeSolver failed: " + err.message });
+    }
+
+    console.log("[grid-builder] Starting solver...");
     const result = solver(pattern, slots, seed, timeLimit);
+    console.log("[grid-builder] solver OK");
 
     return res.status(200).json(result);
   } catch (e) {
