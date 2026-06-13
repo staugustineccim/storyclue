@@ -13,8 +13,6 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 
-const client = new Anthropic();
-
 const TOPIC_EXTRACTION_PROMPT = `You are a crossword puzzle designer. Extract 25-40 important topic words from this source:
 
 {source}
@@ -32,6 +30,7 @@ Return ONLY: ["WORD1", "WORD2", ...]`;
 
 async function extractTopicAnswers(source, grade) {
   try {
+    const client = new Anthropic(); // Initialize only when needed
     const prompt = TOPIC_EXTRACTION_PROMPT.replace("{source}", source).replace("{grade}", grade);
     const message = await client.messages.create({
       model: "claude-opus-4-1-20250805",
