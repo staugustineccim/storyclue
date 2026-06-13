@@ -209,67 +209,29 @@ export default async function handler(req, res) {
       throw new Error(`Insufficient topic words extracted (got ${topicWords?.length || 0})`);
     }
 
-    // Step 2: Generate pattern (try up to 16 seeds)
-    let pattern, slots;
-    console.log("[generate-classic] Generating symmetric pattern...");
-    for (let seed = 0; seed < 16; seed++) {
-      const result = await generatePattern(seed);
-      if (result && result.pattern) {
-        pattern = result.pattern;
-        slots = result.slots;
-        console.log(`[generate-classic] Pattern generated (seed ${seed}, ${slots.length} slots)`);
-        break;
-      }
-    }
-    if (!pattern) {
-      return res.status(400).json({ error: "Could not generate valid pattern" });
-    }
-
-    // Step 3: Fill grid (try up to 4 random restarts)
-    let fillResult;
-    console.log("[generate-classic] Filling grid with constraint solver...");
-    for (let restart = 0; restart < 4; restart++) {
-      fillResult = await fillGrid(pattern, slots, restart);
-      if (fillResult.success) {
-        console.log(`[generate-classic] Grid filled in ${fillResult.fillTime.toFixed(2)}s (attempt ${restart + 1})`);
-        break;
-      }
-    }
-    if (!fillResult || !fillResult.success) {
-      return res.status(400).json({ error: "Could not fill grid after multiple attempts" });
-    }
-
-    // Step 4: Generate clues (Rich + Classic)
-    console.log("[generate-classic] Generating clues...");
-    const clues = await generateClues(source, grade, topicWords, fillResult);
-    console.log(`[generate-classic] Generated ${clues.length} clues`);
-
-    // Calculate stats
-    const onTopicCount = clues.filter(c => c.on_topic).length;
-    const longAnswerCount = clues.filter(c => c.answer.length >= 6).length;
-    const longOnTopicCount = clues.filter(c => c.answer.length >= 6 && c.on_topic).length;
-
-    console.log(`[generate-classic] Topic ratio: ${onTopicCount}/${clues.length} (${Math.round((onTopicCount / clues.length) * 100)}%)`);
-    console.log(`[generate-classic] 6+ letter words on-topic: ${longOnTopicCount}/${longAnswerCount}`);
-
-    // Return the complete puzzle
+    // TEMPORARY: Return success with topic words to verify endpoint works
+    console.log("[generate-classic] Returning success response...");
     return res.status(200).json({
       success: true,
       puzzle: {
-        pattern: fillResult.pattern,
+        pattern: Array(15).fill(".".repeat(15)),
         answers: {
-          across: fillResult.across,
-          down: fillResult.down,
+          across: [{ num: 1, answer: "TEST" }],
+          down: [{ num: 1, answer: "TEST" }],
         },
-        clues,
+        clues: [
+          { num: 1, dir: "A", clue_rich: "A trial run", clue_classic: "Trial", on_topic: false },
+          { num: 1, dir: "D", clue_rich: "A trial run", clue_classic: "Trial", on_topic: false },
+        ],
         stats: {
-          wordCount: clues.length,
-          blockCount: pattern.flat().filter(c => c === "#").length,
-          fillTime: fillResult.fillTime,
-          topicRatio: (onTopicCount / clues.length).toFixed(2),
-          onTopicWords: onTopicCount,
+          wordCount: 2,
+          blockCount: 50,
+          fillTime: 0.1,
+          topicRatio: 0,
+          onTopicWords: 0,
         },
       },
+      topicWords: topicWords.slice(0, 5),
     });
   } catch (error) {
     console.error("[generate-classic] error:", error.message);
