@@ -39,30 +39,58 @@ export default function ClassicCrossword({ puzzle, onClose }) {
     clueMap[key] = clue;
   }
 
-  // Generate grid cells from pattern
-  const gridCells = [];
-  let cellNum = 1;
-  const cellNumberMap = {}; // { "row,col": number }
+  // Build solution grid from across/down answers
+  const rows = pattern.length;
+  const cols = pattern[0]?.length || 15;
+  const solutionGrid = Array(rows).fill(null).map(() => Array(cols).fill(""));
 
-  for (let r = 0; r < pattern.length; r++) {
-    for (let c = 0; c < pattern[r].length; c++) {
-      if (pattern[r][c] === ".") {
+  // Build numbering map: num → [r, c] and [r,c] → num
+  let cellNum = 1;
+  const numToCell = {}; // num → [r, c]
+  const cellToNum = {}; // "r,c" → num
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (pattern[r][c] !== "#") {
         const hasAcross = c === 0 || pattern[r][c - 1] === "#";
-        const hasDown = r === 0 || pattern[r - 1][c] === "#";
+        const hasDown = r === 0 || pattern[r - 1]?.[c] === "#";
         if (hasAcross || hasDown) {
-          cellNumberMap[`${r},${c}`] = cellNum;
+          numToCell[cellNum] = [r, c];
+          cellToNum[`${r},${c}`] = cellNum;
           cellNum++;
         }
       }
     }
   }
 
-  for (let r = 0; r < pattern.length; r++) {
-    for (let c = 0; c < pattern[r].length; c++) {
+  // Place across words
+  for (const word of across) {
+    const [r, c] = numToCell[word.num] || [-1, -1];
+    if (r >= 0 && c >= 0) {
+      for (let i = 0; i < word.answer.length && c + i < cols; i++) {
+        solutionGrid[r][c + i] = word.answer[i];
+      }
+    }
+  }
+
+  // Place down words
+  for (const word of down) {
+    const [r, c] = numToCell[word.num] || [-1, -1];
+    if (r >= 0 && c >= 0) {
+      for (let i = 0; i < word.answer.length && r + i < rows; i++) {
+        solutionGrid[r + i][c] = word.answer[i];
+      }
+    }
+  }
+
+  // Generate grid cells from pattern and solution grid
+  const gridCells = [];
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
       const key = `${r},${c}`;
       const isBlack = pattern[r][c] === "#";
-      const num = cellNumberMap[key];
-      const letter = showSolution ? answers.solution?.[r]?.[c] || "" : "";
+      const num = cellToNum[key];
+      const letter = showSolution ? solutionGrid[r][c] || "" : "";
 
       gridCells.push(
         <div

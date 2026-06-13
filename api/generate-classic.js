@@ -205,7 +205,10 @@ export default async function handler(req, res) {
       success: true,
       puzzle: {
         pattern: fillResult.pattern,
-        answers: fillResult,
+        answers: {
+          across: fillResult.across,
+          down: fillResult.down,
+        },
         clues,
         stats: {
           wordCount: clues.length,

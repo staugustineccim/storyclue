@@ -82,6 +82,9 @@ const FAITH_TRADITIONS = [
   { key:"other",                label:"Other Faith Tradition" },
 ];
 
+// Classic Crossword engine grades
+const CLASSIC_GRADES = ["3", "4", "5", "6", "7", "8", "9-10", "11-12", "adult"];
+
 // Update 2 — Audience-specific suggestion chips (no chip appears in more than one tier)
 const AUDIENCE_EXAMPLES = {
   "early-learner": [
@@ -212,6 +215,10 @@ export default function PuzzleGenerator() {
     setPuzzleStyleCookie(val);
   }
   const showStyleSelector = CLASSIC_GRADES.includes(grade);
+
+  // ── NYT-Style Classic Crossword Mode (new engine) ──────────────────────────
+  const [useClassicEngine, setUseClassicEngine] = useState(false);
+  const showClassicOption = CLASSIC_GRADES.includes(grade);
 
   // ── K-2 Early Learner features ────────────────────────────────────────────
   const [phonicsMode, setPhonicsMode] = useState(false);
@@ -494,7 +501,9 @@ export default function PuzzleGenerator() {
         struggleWords, // spaced repetition injection
       };
 
-      const res = await fetch("/api/generate", {
+      // Route to Classic (NYT-style) or traditional engine
+      const endpoint = useClassicEngine ? "/api/generate-classic" : "/api/generate";
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
@@ -507,6 +516,25 @@ export default function PuzzleGenerator() {
         setLoading(false);
         return;
       }
+
+      // Handle Classic engine response (different structure)
+      if (useClassicEngine) {
+        if (!res.ok || !data.success) {
+          setError(data.error || "Could not generate classic crossword. Please try again.");
+          setLoading(false);
+          return;
+        }
+
+        // Classic engine returns complete puzzle with pattern, answers, clues
+        const classicPuzzle = data.puzzle;
+        navigate(`/play`, {
+          state: { classicPuzzleData: classicPuzzle, isClassic: true }
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Traditional engine response handling
       if (!res.ok || data.error) {
         setError(data.error || "Could not generate puzzle. Please try again.");
         setLoading(false);
@@ -1309,6 +1337,27 @@ export default function PuzzleGenerator() {
                   </div>
                 );
               })()}
+            </div>
+          )}
+
+          {/* ── Classic Crossword Mode (grades 3+) ──────────────────────── */}
+          {CLASSIC_GRADES.includes(grade) && (
+            <div style={{ marginBottom:"24px", background:"#f0f4e8", border:"1.5px solid #c8b888", borderRadius:"6px", padding:"16px" }}>
+              <label style={{ display:"flex", alignItems:"center", gap:"10px", cursor:"pointer", marginBottom:0 }}>
+                <input type="checkbox" checked={useClassicEngine} onChange={e => setUseClassicEngine(e.target.checked)}
+                  style={{ accentColor:"#3a6a1a", width:"16px", height:"16px", cursor:"pointer" }} />
+                <span style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"14px", color:"#4a3a18" }}>
+                  📰 Classic Crossword Mode
+                </span>
+              </label>
+              <div style={{ fontSize:"12px", color:"#6a5a30", fontFamily:"Lora,serif", marginTop:"6px", marginLeft:"26px" }}>
+                NYT-style 15×15 symmetric grids with Rich teaching clues or Classic newspaper brevity. Topic-extracted from your content.
+              </div>
+              {useClassicEngine && (
+                <div style={{ marginTop:"12px", marginLeft:"26px", fontSize:"12px", color:"#3a6a1a", fontFamily:"Lora,serif", fontWeight:600 }}>
+                  ✨ Clue modes will be available after generation.
+                </div>
+              )}
             </div>
           )}
 

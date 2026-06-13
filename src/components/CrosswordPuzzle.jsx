@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { useSearchParams, useNavigate, useParams } from "react-router-dom";
+import { useSearchParams, useNavigate, useParams, useLocation } from "react-router-dom";
 import { decodePuzzle } from "../utils/urlEncoder";
+import ClassicCrossword from "./ClassicCrossword";
 import { buildGrid, buildNumbering } from "../utils/layoutBuilder";
 import FeedbackModal from "./FeedbackModal";
 import VocabModal from "./VocabModal";
@@ -215,6 +216,7 @@ function makeConfetti(count = 80) {
 export default function CrosswordPuzzle() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { slug } = useParams();
 
   const [loadState,  setLoadState]  = useState("loading");
@@ -223,7 +225,19 @@ export default function CrosswordPuzzle() {
   const isTeacher = searchParams.get("t") === "1";
   const songId    = searchParams.get("song") || null; // set when puzzle came from Songs library
 
+  // Check for classic puzzle passed via location.state
+  const classicPuzzleData = location.state?.classicPuzzleData;
+  const isClassic = location.state?.isClassic || false;
+
   useEffect(() => {
+    // Classic puzzle passed directly in state — no API call needed
+    if (isClassic && classicPuzzleData) {
+      setPuzzleData(classicPuzzleData);
+      setLoadState("ready");
+      return;
+    }
+
+    // Traditional puzzle load flow
     if (slug) {
       fetch(`/api/get-puzzle?slug=${encodeURIComponent(slug)}`)
         .then(r => { if (!r.ok) throw Object.assign(new Error(), { status: r.status }); return r.json(); })
@@ -235,7 +249,7 @@ export default function CrosswordPuzzle() {
       if (data) { setPuzzleData(data); setLoadState("ready"); }
       else setLoadState("error");
     }
-  }, [slug]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [slug, isClassic, classicPuzzleData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loadState === "loading") {
     return (
@@ -260,6 +274,11 @@ export default function CrosswordPuzzle() {
         </button>
       </div>
     );
+  }
+
+  // Render classic crossword if isClassic flag is set
+  if (isClassic) {
+    return <ClassicCrossword puzzle={puzzleData} />;
   }
 
   return <PuzzleBoard {...puzzleData} isTeacher={isTeacher} songId={songId} />;
