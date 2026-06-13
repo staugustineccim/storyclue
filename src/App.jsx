@@ -6,6 +6,7 @@ import CrosswordPuzzle from "./components/CrosswordPuzzle";
 import AdminDashboard from "./components/AdminDashboard";
 import TermsPage from "./components/TermsPage";
 import NotFound from "./components/NotFound";
+import ClassicTest from "./pages/ClassicTest";
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="/play/:slug" element={<CrosswordPuzzle />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/terms" element={<TermsPage />} />
+        <Route path="/classic-test" element={<ClassicTest />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AuthProvider>
