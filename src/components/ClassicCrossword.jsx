@@ -159,8 +159,8 @@ export default function ClassicCrossword({ puzzle, onClose }) {
         .cc-clues li b { font-family:Verdana,sans-serif; font-size:12px; color:#1e4d2b; margin-right:5px; }
         .cc-clue-rich { display:inline; }
         .cc-clue-classic { display:none; }
-        body.cc-classic .cc-clue-rich { display:none; }
-        body.cc-classic .cc-clue-classic { display:inline; }
+        .cc-clues.cc-classic .cc-clue-rich { display:none; }
+        .cc-clues.cc-classic .cc-clue-classic { display:inline; }
         .cc-footer { max-width:920px; margin:30px auto 0; font:11px/1.7 Verdana,sans-serif; color:#7a7466; border-top:1px solid #d9d4c5; padding-top:10px; }
       `}</style>
 
