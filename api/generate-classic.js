@@ -91,24 +91,42 @@ async function extractTopicAnswers(source, grade) {
 
 // Step 2: Generate pattern
 async function generatePattern(seed = 0) {
-  const res = await fetch(`${process.env.VERCEL_URL || "http://localhost:3000"}/api/pattern-generator`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ seed }),
-  });
-  if (!res.ok) throw new Error("Pattern generation failed");
-  return res.json();
+  const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
+  try {
+    const res = await fetch(`${baseUrl}/api/pattern-generator`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ seed }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Pattern generation failed: ${res.status} ${text.slice(0, 100)}`);
+    }
+    return res.json();
+  } catch (err) {
+    console.error("[generatePattern] error:", err);
+    throw err;
+  }
 }
 
 // Step 3: Fill grid
 async function fillGrid(pattern, slots, seed = 0) {
-  const res = await fetch(`${process.env.VERCEL_URL || "http://localhost:3000"}/api/grid-builder`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pattern, slots, seed, timeLimit: 6 }),
-  });
-  if (!res.ok) throw new Error("Grid fill failed");
-  return res.json();
+  const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
+  try {
+    const res = await fetch(`${baseUrl}/api/grid-builder`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pattern, slots, seed, timeLimit: 6 }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Grid fill failed: ${res.status} ${text.slice(0, 100)}`);
+    }
+    return res.json();
+  } catch (err) {
+    console.error("[fillGrid] error:", err);
+    throw err;
+  }
 }
 
 // Step 4: Generate clues (both Rich and Classic)
@@ -160,11 +178,15 @@ export default async function handler(req, res) {
 
   try {
     console.log("[generate-classic] Starting Classic crossword generation...");
+    console.log(`[generate-classic] Source length: ${source.length}, Grade: ${grade}`);
 
     // Step 1: Extract topic answers
     console.log("[generate-classic] Extracting topic answers...");
     const topicWords = await extractTopicAnswers(source, grade);
-    console.log(`[generate-classic] Extracted ${topicWords.length} topic words`);
+    console.log(`[generate-classic] Extracted ${topicWords.length} topic words: ${topicWords.slice(0, 10).join(", ")}`);
+    if (!topicWords || topicWords.length < 5) {
+      throw new Error(`Insufficient topic words extracted (got ${topicWords?.length || 0})`);
+    }
 
     // Step 2: Generate pattern (try up to 16 seeds)
     let pattern, slots;
