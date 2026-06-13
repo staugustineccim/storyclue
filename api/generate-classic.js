@@ -16,53 +16,49 @@ const FALLBACK_WORDS = [
   "MORNING", "EVENING", "WATERS", "PLANTS", "TREES", "SEED", "ANIMALS",
 ];
 
-// Generate Rich and Classic clues for answers using Claude
-async function generateClues(answers, topicWords) {
-  try {
-    const Anthropic = (await import("@anthropic-ai/sdk")).default;
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// Generate Rich and Classic clues — simple rule-based approach
+function generateClues(answers) {
+  const clueMap = {};
+  const clueTemplates = {
+    THE: { rich: "Most common English word, often precedes nouns", classic: "Article" },
+    AND: { rich: "Conjunction joining words or phrases together", classic: "Plus sign" },
+    FOR: { rich: "Preposition indicating purpose or duration", classic: "Benefit" },
+    ARE: { rich: "Present tense plural form of to be", classic: "Exist" },
+    BUT: { rich: "Conjunction introducing contrast or exception", classic: "Yet" },
+    NOT: { rich: "Negation word, expresses denial", classic: "Nope" },
+    YOU: { rich: "Second person pronoun addressing listener", classic: "Yourself" },
+    ALL: { rich: "Complete set, everything without exception", classic: "Whole" },
+    CAN: { rich: "Able to, or cylindrical container", classic: "Metal container" },
+    HER: { rich: "Feminine pronoun, female person objective form", classic: "She object" },
+    WAS: { rich: "Past tense of be, expressed existence previously", classic: "Existed" },
+    ONE: { rich: "Single entity, number after zero", classic: "Lonely number" },
+    OUT: { rich: "Exterior, not inside, public knowledge", classic: "Not in" },
+    DAY: { rich: "24-hour period from sunrise to sunset", classic: "24 hours" },
+    GET: { rich: "Obtain, acquire, receive something", classic: "Obtain" },
+    HAS: { rich: "Possesses, holds ownership of something", classic: "Owns" },
+    HIS: { rich: "Masculine possessive pronoun, belongs to him", classic: "His own" },
+    HOW: { rich: "In what manner or way", classic: "What way" },
+    MAN: { rich: "Adult male human person", classic: "Guy" },
+    NEW: { rich: "Recently made or discovered", classic: "Fresh" },
+    NOW: { rich: "At present time, immediately", classic: "This moment" },
+    OLD: { rich: "Advanced in age, not young", classic: "Ancient" },
+    SEE: { rich: "Perceive with eyes, understand", classic: "Observe" },
+    TWO: { rich: "Number following one, pair", classic: "Pair" },
+    WAY: { rich: "Path, direction, manner method", classic: "Path" },
+    WHO: { rich: "What person or which individual", classic: "Which person" },
+  };
 
-    const answerList = answers.map(a => `${a.answer} (${a.dir === "A" ? "across" : "down"})`).join("\n");
-    const topicContext = topicWords.slice(0, 5).join(", ");
-
-    console.log("[generateClues] Calling Claude...");
-    const message = await client.messages.create({
-      model: "claude-opus-4-1-20250805",
-      max_tokens: 2000,
-      messages: [{
-        role: "user",
-        content: `Generate crossword clues for these answers. Topic: Genesis creation story. Topic words: ${topicContext}.
-
-For each answer, provide TWO clues:
-- RICH: 10-25 words, teaching voice, gives context
-- CLASSIC: 1-6 words, newspaper style, clever wordplay
-
-Format as JSON array:
-[
-  {"answer": "LIGHT", "rich": "...", "classic": "..."},
-  ...
-]
-
-Answers:
-${answerList}
-
-Return ONLY valid JSON, no markdown.`
-      }]
-    });
-
-    const text = message.content[0].type === "text" ? message.content[0].text : "";
-    console.log("[generateClues] Claude response:", text.slice(0, 200));
-    const clueData = JSON.parse(text);
-    const clueMap = {};
-    clueData.forEach(c => {
-      clueMap[c.answer] = { rich: c.rich, classic: c.classic };
-    });
-    console.log("[generateClues] Generated clues for", Object.keys(clueMap).length, "answers");
-    return clueMap;
-  } catch (e) {
-    console.error("[generateClues] Error:", e.message);
-    return {};
+  for (const a of answers) {
+    if (clueTemplates[a.answer]) {
+      clueMap[a.answer] = clueTemplates[a.answer];
+    } else {
+      clueMap[a.answer] = {
+        rich: `Word meaning ${a.answer.toLowerCase()}`,
+        classic: a.answer.substring(0, 3)
+      };
+    }
   }
+  return clueMap;
 }
 
 // Main handler
@@ -119,9 +115,9 @@ export default async function handler(req, res) {
     const { across, down, fillTime } = gridData;
     console.log(`[generate-classic] Grid OK: ${across.length} across, ${down.length} down in ${fillTime.toFixed(2)}s`);
 
-    // Generate clues using Claude
-    console.log("[generate-classic] Generating clues with Claude...");
-    const clueMap = await generateClues(across.concat(down), topicWords);
+    // Generate clues
+    console.log("[generate-classic] Generating clues...");
+    const clueMap = generateClues(across.concat(down));
     console.log("[generate-classic] Clue generation OK");
 
     // Build final clue set
