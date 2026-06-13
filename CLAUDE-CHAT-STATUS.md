@@ -258,10 +258,38 @@ AI-generated crossword puzzle maker for K-12 students, homeschool families, teac
 
 ---
 
+## ✅ June 12 Commit Deployed
+- Branch: `june3-complete`
+- Commit: "Build: Vocabulary Dashboard, Cross-Device Sync, and Classic Crossword Engine"
+- Status: All core features built, syntax-checked, build passes ✓
+
+## Pre-Production Checklist (Before Main Merge)
+
+**Essential (blocking):**
+- [ ] Run the Classic Crossword engine end-to-end (test pattern → fill → clues)
+- [ ] Integrate Classic mode into PuzzleGenerator UI (add "Classic" radio button)
+- [ ] Update save-puzzle.js to store dual clues (rich + classic)
+- [ ] Update get-puzzle.js to return both clue sets
+- [ ] Add route `/play/:slug/classic` → ClassicCrossword component
+- [ ] Test on iPhone/iPad (grid responsiveness, clue toggle)
+- [ ] Run full QA test suite Monday 2am EST (automatic via `/api/qa-agent`)
+
+**High Priority (strongly recommended):**
+- [ ] Upgrade wordlist: load from pre-built frequency-scored JSON (wordfreq package)
+- [ ] Validate topic ratio ≥50% before returning puzzle
+- [ ] Test blocklist enforcement (no unsafe words in grid)
+- [ ] Verify analytics events fire (puzzle_generated, puzzle_completed for Classic mode)
+
+**Nice-to-Have (can be V2):**
+- [ ] Add wordlist stats to admin dashboard (topic ratio per puzzle)
+- [ ] Fill-time monitoring (alert if > 5s)
+- [ ] Teacher answer key toggle for Classic mode
+- [ ] Print modes for Classic puzzles
+
 ## Current Branch Status
 - `june3-complete` → preview URL: `https://storyclue-git-june3-complete-robert-buckmaster-s-projects.vercel.app`
 - `main` → live at `storyclue.ai` — NOT updated yet (Bob reviews on iPhone/iPad before merging)
-- Do not recommend merging to main or deploying to production — Bob controls that gate
+- Commit ready for testing; do not merge to main until checklist items verified
 
 ---
 
