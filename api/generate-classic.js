@@ -11,11 +11,56 @@
 //
 // This endpoint orchestrates the full generation — the user never inputs words or clues.
 
-// TODO: Hardcoded topic words (skip Claude for now to focus on pattern/grid generation)
 const FALLBACK_WORDS = [
   "LIGHT", "DARKNESS", "STARS", "SKY", "EARTH", "HEAVEN", "NIGHT", "DAY",
   "MORNING", "EVENING", "WATERS", "PLANTS", "TREES", "SEED", "ANIMALS",
 ];
+
+// Generate Rich and Classic clues for answers using Claude
+async function generateClues(answers, topicWords) {
+  try {
+    const { Anthropic } = await import("@anthropic-ai/sdk");
+    const client = new Anthropic();
+
+    const answerList = answers.map(a => `${a.answer} (${a.dir === "A" ? "across" : "down"})`).join("\n");
+    const topicContext = topicWords.slice(0, 5).join(", ");
+
+    const message = await client.messages.create({
+      model: "claude-opus-4-1-20250805",
+      max_tokens: 2000,
+      messages: [{
+        role: "user",
+        content: `Generate crossword clues for these answers. Topic: Genesis creation story. Topic words: ${topicContext}.
+
+For each answer, provide TWO clues:
+- RICH: 10-25 words, teaching voice, gives context
+- CLASSIC: 1-6 words, newspaper style, clever wordplay
+
+Format as JSON array:
+[
+  {"answer": "LIGHT", "rich": "...", "classic": "..."},
+  ...
+]
+
+Answers:
+${answerList}
+
+Return ONLY valid JSON, no markdown.`
+      }]
+    });
+
+    const text = message.content[0].type === "text" ? message.content[0].text : "";
+    const clueData = JSON.parse(text);
+    const clueMap = {};
+    clueData.forEach(c => {
+      clueMap[c.answer] = { rich: c.rich, classic: c.classic };
+    });
+    return clueMap;
+  } catch (e) {
+    console.error("[generateClues] Claude failed:", e.message);
+    return {};
+  }
+}
 
 // Main handler
 export default async function handler(req, res) {
@@ -71,19 +116,30 @@ export default async function handler(req, res) {
     const { across, down, fillTime } = gridData;
     console.log(`[generate-classic] Grid OK: ${across.length} across, ${down.length} down in ${fillTime.toFixed(2)}s`);
 
+    // Generate clues using Claude
+    console.log("[generate-classic] Generating clues with Claude...");
+    const clueMap = await generateClues(across.concat(down), topicWords);
+    console.log("[generate-classic] Clue generation OK");
+
+    // Build final clue set
+    const clues = across.concat(down).map(a => {
+      const clueSet = clueMap[a.answer] || { rich: `${a.answer} clue`, classic: a.answer };
+      return {
+        num: a.num,
+        dir: a.dir,
+        clue_rich: clueSet.rich,
+        clue_classic: clueSet.classic,
+        on_topic: true,
+      };
+    });
+
     // Return complete puzzle
     return res.status(200).json({
       success: true,
       puzzle: {
         pattern,
         answers: { across, down },
-        clues: across.concat(down).map((a, i) => ({
-          num: a.num,
-          dir: a.dir,
-          clue_rich: `${topicWords[i % topicWords.length]} related clue`,
-          clue_classic: topicWords[i % topicWords.length],
-          on_topic: true,
-        })),
+        clues,
         stats: {
           wordCount: across.length + down.length,
           blockCount: pattern.flat().filter(c => c === "#").length,
