@@ -61,9 +61,14 @@ export default async function handler(req, res) {
       body: JSON.stringify({ pattern, slots, seed: 0, timeLimit: 6 }),
     });
     if (!gridRes.ok) {
-      throw new Error(`Grid filling failed: ${gridRes.status}`);
+      const errorText = await gridRes.text();
+      throw new Error(`Grid filling failed: ${gridRes.status} - ${errorText.slice(0, 200)}`);
     }
-    const { across, down, fillTime } = await gridRes.json();
+    const gridData = await gridRes.json();
+    if (!gridData.success) {
+      throw new Error(`Grid solving failed: ${gridData.error}`);
+    }
+    const { across, down, fillTime } = gridData;
     console.log(`[generate-classic] Grid OK: ${across.length} across, ${down.length} down in ${fillTime.toFixed(2)}s`);
 
     // Return complete puzzle
