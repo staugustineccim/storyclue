@@ -144,9 +144,18 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { source, grade = "6-12", theme = "", contentType = "text" } = req.body;
-  if (!source) {
-    return res.status(400).json({ error: "Missing source" });
+  const {
+    inputMode = "lookup",
+    bookRef = "",
+    chapterText = "",
+    urlRef = "",
+    grade = "6-12",
+  } = req.body || {};
+
+  // Extract source from available fields (chapterText > bookRef > urlRef)
+  const source = chapterText || bookRef || urlRef;
+  if (!source || source.trim().length < 20) {
+    return res.status(400).json({ error: "Missing or insufficient source material" });
   }
 
   try {
