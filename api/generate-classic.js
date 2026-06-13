@@ -49,12 +49,14 @@ function generateClues(answers) {
   };
 
   for (const a of answers) {
-    if (clueTemplates[a.answer]) {
-      clueMap[a.answer] = clueTemplates[a.answer];
+    const answerKey = a.answer.toUpperCase();
+    if (clueTemplates[answerKey]) {
+      clueMap[a.answer] = clueTemplates[answerKey];
     } else {
+      const word = a.answer.toUpperCase();
       clueMap[a.answer] = {
-        rich: `Word meaning ${a.answer.toLowerCase()}`,
-        classic: a.answer.substring(0, 3)
+        rich: `${word}: common crossword word`,
+        classic: word.substring(0, 3)
       };
     }
   }
