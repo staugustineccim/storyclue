@@ -1123,33 +1123,33 @@ export default function PuzzleGenerator() {
             </div>
           )}
 
-          {/* ── Puzzle Style (Update 3) — 6th grade and above + Reader Mode only ── */}
+          {/* ── Puzzle Type (Traditional vs Classic Engine) ── */}
           {showStyleSelector && (
             <div style={{ marginBottom:"24px" }}>
-              <label style={labelStyle}>Puzzle Style</label>
+              <label style={labelStyle}>Puzzle Type</label>
               <div style={{ display:"flex", gap:"10px" }}>
                 <button
                   type="button"
-                  className={`mode-btn${puzzleStyle==="topic"?" on":""}`}
+                  className={`mode-btn${!useClassicEngine?" on":""}`}
                   style={{ flex:1, padding:"14px 10px", lineHeight:1.4 }}
-                  onClick={() => setPuzzleStyle("topic")}
+                  onClick={() => { setUseClassicEngine(false); setPuzzleStyle("topic"); }}
                 >
                   <div style={{ fontSize:"18px", marginBottom:"4px" }}>📖</div>
-                  <div style={{ fontWeight:700, fontSize:"13px" }}>Topic Focus</div>
+                  <div style={{ fontWeight:700, fontSize:"13px" }}>Traditional</div>
                   <div style={{ fontSize:"11px", opacity:.8, marginTop:"2px", fontFamily:"Lora,serif", fontWeight:400 }}>
-                    Vocabulary from your topic only. Clean, fast grid.
+                    Flexible size, focused on your topic.
                   </div>
                 </button>
                 <button
                   type="button"
-                  className={`mode-btn${puzzleStyle==="classic"?" on":""}`}
+                  className={`mode-btn${useClassicEngine?" on":""}`}
                   style={{ flex:1, padding:"14px 10px", lineHeight:1.4 }}
-                  onClick={() => setPuzzleStyle("classic")}
+                  onClick={() => setUseClassicEngine(true)}
                 >
                   <div style={{ fontSize:"18px", marginBottom:"4px" }}>🗞️</div>
                   <div style={{ fontWeight:700, fontSize:"13px" }}>Classic Crossword</div>
                   <div style={{ fontSize:"11px", opacity:.8, marginTop:"2px", fontFamily:"Lora,serif", fontWeight:400 }}>
-                    Dense grid with filler words. NYT-style appearance.
+                    NYT-style 15×15 symmetric grid.
                   </div>
                 </button>
               </div>
@@ -1337,27 +1337,6 @@ export default function PuzzleGenerator() {
                   </div>
                 );
               })()}
-            </div>
-          )}
-
-          {/* ── Classic Crossword Mode (grades 3+) ──────────────────────── */}
-          {CLASSIC_GRADES.includes(grade) && (
-            <div style={{ marginBottom:"24px", background:"#f0f4e8", border:"1.5px solid #c8b888", borderRadius:"6px", padding:"16px" }}>
-              <label style={{ display:"flex", alignItems:"center", gap:"10px", cursor:"pointer", marginBottom:0 }}>
-                <input type="checkbox" checked={useClassicEngine} onChange={e => setUseClassicEngine(e.target.checked)}
-                  style={{ accentColor:"#3a6a1a", width:"16px", height:"16px", cursor:"pointer" }} />
-                <span style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"14px", color:"#4a3a18" }}>
-                  📰 Classic Crossword Mode
-                </span>
-              </label>
-              <div style={{ fontSize:"12px", color:"#6a5a30", fontFamily:"Lora,serif", marginTop:"6px", marginLeft:"26px" }}>
-                NYT-style 15×15 symmetric grids with Rich teaching clues or Classic newspaper brevity. Topic-extracted from your content.
-              </div>
-              {useClassicEngine && (
-                <div style={{ marginTop:"12px", marginLeft:"26px", fontSize:"12px", color:"#3a6a1a", fontFamily:"Lora,serif", fontWeight:600 }}>
-                  ✨ Clue modes will be available after generation.
-                </div>
-              )}
             </div>
           )}
 
