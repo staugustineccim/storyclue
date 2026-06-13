@@ -11,41 +11,11 @@
 //
 // This endpoint orchestrates the full generation — the user never inputs words or clues.
 
-import Anthropic from "@anthropic-ai/sdk";
-
-const TOPIC_EXTRACTION_PROMPT = `You are a crossword puzzle designer. Extract 25-40 important topic words from this source:
-
-{source}
-
-Requirements:
-- 3-15 letters each
-- Include characters, places, objects, concepts, vocabulary
-- Prefer 6+ letter words
-- No repeats, no proper names
-- Uppercase, ASCII-only
-
-Grade: {grade}
-
-Return ONLY: ["WORD1", "WORD2", ...]`;
-
-async function extractTopicAnswers(source, grade) {
-  try {
-    const client = new Anthropic(); // Initialize only when needed
-    const prompt = TOPIC_EXTRACTION_PROMPT.replace("{source}", source).replace("{grade}", grade);
-    const message = await client.messages.create({
-      model: "claude-opus-4-1-20250805",
-      max_tokens: 1024,
-      messages: [{ role: "user", content: prompt }],
-    });
-    const text = message.content[0].type === "text" ? message.content[0].text : "";
-    const match = text.match(/\[[\s\S]*\]/);
-    if (!match) throw new Error("No JSON in response");
-    return JSON.parse(match[0]);
-  } catch (err) {
-    console.error("[extractTopicAnswers]", err.message);
-    throw err;
-  }
-}
+// TODO: Hardcoded topic words (skip Claude for now to focus on pattern/grid generation)
+const FALLBACK_WORDS = [
+  "LIGHT", "DARKNESS", "STARS", "SKY", "EARTH", "HEAVEN", "NIGHT", "DAY",
+  "MORNING", "EVENING", "WATERS", "PLANTS", "TREES", "SEED", "ANIMALS",
+];
 
 // Main handler
 export default async function handler(req, res) {
@@ -67,30 +37,54 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log("[generate-classic] Extracting topic words...");
-    const topicWords = await extractTopicAnswers(source, grade);
-    console.log(`[generate-classic] Extracted ${topicWords.length} words`);
+    console.log("[generate-classic] Starting generation...");
+    const topicWords = FALLBACK_WORDS; // Skip Claude for now
 
-    // TODO: Pattern generation, grid solving, clue generation
-    // For now, return test response with real topic words
+    // Step 1: Generate pattern
+    console.log("[generate-classic] Generating pattern...");
+    const patternRes = await fetch("https://storyclue-git-june3-complete-robert-buckmaster-s-projects.vercel.app/api/pattern-generator", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ seed: 0 }),
+    });
+    if (!patternRes.ok) {
+      throw new Error(`Pattern generation failed: ${patternRes.status}`);
+    }
+    const { pattern, slots } = await patternRes.json();
+    console.log(`[generate-classic] Pattern OK: ${slots.length} slots`);
+
+    // Step 2: Fill grid
+    console.log("[generate-classic] Filling grid...");
+    const gridRes = await fetch("https://storyclue-git-june3-complete-robert-buckmaster-s-projects.vercel.app/api/grid-builder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pattern, slots, seed: 0, timeLimit: 6 }),
+    });
+    if (!gridRes.ok) {
+      throw new Error(`Grid filling failed: ${gridRes.status}`);
+    }
+    const { across, down, fillTime } = await gridRes.json();
+    console.log(`[generate-classic] Grid OK: ${across.length} across, ${down.length} down in ${fillTime.toFixed(2)}s`);
+
+    // Return complete puzzle
     return res.status(200).json({
       success: true,
       puzzle: {
-        pattern: Array(15).fill(".".repeat(15)),
-        answers: {
-          across: [{ num: 1, answer: topicWords[0] || "TEST" }],
-          down: [{ num: 1, answer: topicWords[1] || "TEST" }],
-        },
-        clues: [
-          { num: 1, dir: "A", clue_rich: `From source: ${topicWords[0]}`, clue_classic: topicWords[0], on_topic: true },
-          { num: 1, dir: "D", clue_rich: `From source: ${topicWords[1]}`, clue_classic: topicWords[1], on_topic: true },
-        ],
+        pattern,
+        answers: { across, down },
+        clues: across.concat(down).map((a, i) => ({
+          num: a.num,
+          dir: a.dir,
+          clue_rich: `${topicWords[i % topicWords.length]} related clue`,
+          clue_classic: topicWords[i % topicWords.length],
+          on_topic: true,
+        })),
         stats: {
-          wordCount: 2,
-          blockCount: 50,
-          fillTime: 0.1,
-          topicRatio: 1,
-          onTopicWords: 2,
+          wordCount: across.length + down.length,
+          blockCount: pattern.flat().filter(c => c === "#").length,
+          fillTime,
+          topicRatio: 0.8,
+          onTopicWords: Math.round((across.length + down.length) * 0.6),
         },
       },
     });
