@@ -110,44 +110,26 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Missing or insufficient source material" });
   }
 
-  try {
-    console.log("[generate-classic] Starting Classic crossword generation...");
-    console.log(`[generate-classic] Source length: ${source.length}, Grade: ${grade}`);
-
-    // Step 1: Extract topic answers
-    console.log("[generate-classic] Extracting topic answers...");
-    const topicWords = await extractTopicAnswers(source, grade);
-    console.log(`[generate-classic] Extracted ${topicWords.length} topic words: ${topicWords.slice(0, 10).join(", ")}`);
-    if (!topicWords || topicWords.length < 5) {
-      throw new Error(`Insufficient topic words extracted (got ${topicWords?.length || 0})`);
-    }
-
-    // TEMPORARY: Return success with topic words to verify endpoint works
-    console.log("[generate-classic] Returning success response...");
-    return res.status(200).json({
-      success: true,
-      puzzle: {
-        pattern: Array(15).fill(".".repeat(15)),
-        answers: {
-          across: [{ num: 1, answer: "TEST" }],
-          down: [{ num: 1, answer: "TEST" }],
-        },
-        clues: [
-          { num: 1, dir: "A", clue_rich: "A trial run", clue_classic: "Trial", on_topic: false },
-          { num: 1, dir: "D", clue_rich: "A trial run", clue_classic: "Trial", on_topic: false },
-        ],
-        stats: {
-          wordCount: 2,
-          blockCount: 50,
-          fillTime: 0.1,
-          topicRatio: 0,
-          onTopicWords: 0,
-        },
+  // HARDCODED TEST: Just return success without any processing
+  return res.status(200).json({
+    success: true,
+    puzzle: {
+      pattern: Array(15).fill(".".repeat(15)),
+      answers: {
+        across: [{ num: 1, answer: "TEST" }],
+        down: [{ num: 1, answer: "TEST" }],
       },
-      topicWords: topicWords.slice(0, 5),
-    });
-  } catch (error) {
-    console.error("[generate-classic] error:", error.message);
-    return res.status(500).json({ error: error.message });
-  }
+      clues: [
+        { num: 1, dir: "A", clue_rich: "A trial run", clue_classic: "Trial", on_topic: false },
+        { num: 1, dir: "D", clue_rich: "A trial run", clue_classic: "Trial", on_topic: false },
+      ],
+      stats: {
+        wordCount: 2,
+        blockCount: 50,
+        fillTime: 0.1,
+        topicRatio: 0,
+        onTopicWords: 0,
+      },
+    },
+  });
 }
