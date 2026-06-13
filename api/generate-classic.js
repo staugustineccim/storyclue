@@ -12,7 +12,6 @@
 // This endpoint orchestrates the full generation — the user never inputs words or clues.
 
 import Anthropic from "@anthropic-ai/sdk";
-import { kv } from "@vercel/kv";
 
 const client = new Anthropic();
 
