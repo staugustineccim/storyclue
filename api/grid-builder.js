@@ -6,7 +6,7 @@
 // Port of fill_v7.py (least-constraining-value + forward checking).
 // Never ask Claude to fill grids — this is pure code.
 
-import { performance } from "perf_hooks";
+// Use Date.now() instead of perf_hooks for Vercel compatibility
 
 // ── Wordlist: frequency-scored English words (curated for crosswords) ─────────
 // In production, load from a pre-built JSON file. For now, we'll use a minimal
@@ -112,7 +112,7 @@ function makeSolver(wordsByLength, idx) {
       };
     })();
 
-    const t0 = performance.now();
+    const t0 = Date.now();
     const grid = {};
     const assignment = {};
     const used = new Set();
@@ -187,7 +187,7 @@ function makeSolver(wordsByLength, idx) {
 
     // Backtracking CSP solver
     const doSolve = () => {
-      if (performance.now() - t0 > timeLimit * 1000) return false;
+      if (Date.now() - t0 > timeLimit * 1000) return false;
 
       const unfilled = [];
       for (let si = 0; si < slots.length; si++) {
@@ -264,7 +264,7 @@ function makeSolver(wordsByLength, idx) {
 
     doSolve();
 
-    const fillTime = (performance.now() - t0) / 1000;
+    const fillTime = (Date.now() - t0) / 1000;
     if (Object.keys(assignment).length < slots.length) {
       return { success: false, fillTime };
     }
