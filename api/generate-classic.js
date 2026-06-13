@@ -19,12 +19,13 @@ const FALLBACK_WORDS = [
 // Generate Rich and Classic clues for answers using Claude
 async function generateClues(answers, topicWords) {
   try {
-    const { Anthropic } = await import("@anthropic-ai/sdk");
-    const client = new Anthropic();
+    const Anthropic = (await import("@anthropic-ai/sdk")).default;
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
     const answerList = answers.map(a => `${a.answer} (${a.dir === "A" ? "across" : "down"})`).join("\n");
     const topicContext = topicWords.slice(0, 5).join(", ");
 
+    console.log("[generateClues] Calling Claude...");
     const message = await client.messages.create({
       model: "claude-opus-4-1-20250805",
       max_tokens: 2000,
@@ -50,14 +51,16 @@ Return ONLY valid JSON, no markdown.`
     });
 
     const text = message.content[0].type === "text" ? message.content[0].text : "";
+    console.log("[generateClues] Claude response:", text.slice(0, 200));
     const clueData = JSON.parse(text);
     const clueMap = {};
     clueData.forEach(c => {
       clueMap[c.answer] = { rich: c.rich, classic: c.classic };
     });
+    console.log("[generateClues] Generated clues for", Object.keys(clueMap).length, "answers");
     return clueMap;
   } catch (e) {
-    console.error("[generateClues] Claude failed:", e.message);
+    console.error("[generateClues] Error:", e.message);
     return {};
   }
 }
