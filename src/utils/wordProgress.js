@@ -199,6 +199,30 @@ export function getMasteryStats(childId) {
   };
 }
 
+// ── Background sync to Supabase (cross-device support) ───────────────────────
+// Fires-and-forgets after every localStorage update when the user is logged in.
+// Uses the user's JWT so the server can verify ownership before writing.
+// Fails silently — localStorage remains the source of truth.
+export async function syncProgressToServer(childId, updatedEntries) {
+  if (!childId || !updatedEntries || updatedEntries.length === 0) return;
+  try {
+    // Lazy-import supabase to avoid circular deps and keep this util framework-agnostic
+    const { supabase } = await import("./supabase.js");
+    if (!supabase) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return;  // anonymous user — localStorage only
+
+    fetch("/api/track-words", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ childId, words: updatedEntries }),
+    }).catch(() => { /* background sync failure — ignore */ });
+  } catch { /* supabase not available — ignore */ }
+}
+
 // ── Get a device/anon ID from localStorage (created on first use) ─────────────
 export function getDeviceId() {
   let id = localStorage.getItem("sc_device_id");

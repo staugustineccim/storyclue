@@ -6,7 +6,7 @@ import FeedbackModal from "./FeedbackModal";
 import VocabModal from "./VocabModal";
 import ContextReviewModal from "./ContextReviewModal";
 import { trackEvent } from "../utils/analytics";
-import { updateWordProgress, getDueWords, getActiveChildId } from "../utils/wordProgress";
+import { updateWordProgress, getDueWords, getActiveChildId, syncProgressToServer } from "../utils/wordProgress";
 
 function formatTime(s) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -784,7 +784,14 @@ function PuzzleBoard({
           mistakes:       wordMistakes,
         };
       });
-      updateWordProgress(childId, wordResults);
+      const updatedProgress = updateWordProgress(childId, wordResults);
+      // Background-sync to Supabase for cross-device support (logged-in users only)
+      if (childId && updatedProgress) {
+        const updatedWords = wordResults
+          .map(r => updatedProgress[(r.word || "").toUpperCase().replace(/[^A-Z]/g, "")])
+          .filter(Boolean);
+        syncProgressToServer(childId, updatedWords);
+      }
     } catch { /* tracking failure must never affect the puzzle UX */ }
   }
 

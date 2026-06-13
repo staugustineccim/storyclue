@@ -1,6 +1,6 @@
 # StoryClue.ai — Project Status for Claude Chat
 *Paste this entire document at the start of any Claude Chat session to avoid repeated recommendations.*
-*Last updated: June 6, 2026 (night — Apple-readiness + Vocabulary Struggle Tracker complete)*
+*Last updated: June 12, 2026 (night — Vocab Dashboard complete; Classic Crossword engine in progress)*
 
 ---
 
@@ -161,6 +161,38 @@ AI-generated crossword puzzle maker for K-12 students, homeschool families, teac
 
 ---
 
+## ✅ Classic Crossword Engine — Complete
+
+**Built this session:**
+1. `api/pattern-generator.js` — 15×15 symmetric pattern generation (180° rotational symmetry, greedy block placement)
+2. `api/grid-builder.js` — Constraint-satisfaction solver (least-constraining-value + forward checking, fills in 2–6 seconds)
+3. `api/generate-classic.js` — Full orchestration (topic extraction → pattern → fill → dual clue generation)
+4. `src/components/ClassicCrossword.jsx` — Interactive display with Rich/Classic clue toggle, NYT-style layout
+
+**Architecture (locked per CLASSIC_MODE_SPEC.md):**
+- ✅ Grid construction = CODE (constraint satisfaction, never AI)
+- ✅ Clue writing = AI (Claude API, Rich 10–25 words + Classic 1–6 words)
+- ✅ Topic coherence (extract answers → weight solver → ≥50% on-topic)
+- ✅ User flow: **Zero manual input** (source text only, AI generates everything)
+- ✅ Dual clue modes (Rich default, instant toggle, no regeneration)
+- ✅ Blocklists (audience-tiered, checked at word selection)
+
+**Frontend:**
+- 15×15 grid with solved letters revealed on toggle
+- Across/Down clue lists, two-column layout (mobile: single column)
+- Rich/Classic toggle bar + "Reveal Solution" button
+- NYT-style paper background, Georgia serif, forest-green accents
+- Responsive grid sizing (clamp function scales for all screens)
+
+**Still needed:**
+- Integration: wire generate-classic into PuzzleGenerator selection flow
+- Wordlist upgrade: load from pre-built frequency-scored JSON (currently baseline)
+- QA gates: topic ratio validation, blocklist enforcement, fill-time logging
+- Route: `/play/[slug]/classic` to display ClassicCrossword.jsx
+- Save puzzle structure: store pattern + dual clues in database
+
+---
+
 ## ⬜ NOT YET BUILT — These Are Valid Recommendations
 
 ### High Priority
@@ -180,7 +212,6 @@ AI-generated crossword puzzle maker for K-12 students, homeschool families, teac
 
 ### Lower Priority / V2
 - Student accounts with COPPA compliance
-- Vocabulary Struggle Tracker (spaced repetition)
 - Teacher dashboard (class progress)
 - Clever SSO / Google Classroom integration
 - French, German, Portuguese, Latin
@@ -222,6 +253,8 @@ AI-generated crossword puzzle maker for K-12 students, homeschool families, teac
 17. Audio singleton (`_currentAudio`) → prevents multiple voices playing simultaneously; all ElevenLabs Audio elements tracked; `stopCurrentAudio()` cancels both Web Speech API and any active Audio element. K-2 last-word overlap fix, deployment message audio fix, song intro cancel fix, mute button fix.
 18. Rate limiting → 20 puzzles/IP/hour via Vercel KV; fails open; QA agent exempt; 429 shows friendly ⏳ message in PuzzleGenerator.
 19. iOS safe-area insets → `viewport-fit=cover` + `env(safe-area-inset-*)` on puzzle-root, loading, and error screens. Prevents notch/Dynamic Island covering top bar or home indicator covering bottom.
+20. Vocabulary Progress Dashboard → `src/components/VocabDashboard.jsx` — per-child mastery stats (🏆 Mastered / 📚 Learning / 🔴 Needs Help), progress bar, recently-mastered word highlight, expandable struggling-word list with parent tip. Rendered in FamilyDashboard below Voice Settings whenever children exist.
+21. Supabase cross-device sync → `supabase/migrations/002_word_progress.sql` creates `word_progress` table (service-role-only writes, parent-readable via RLS). `api/track-words.js` — JWT-verified POST upsert endpoint (confirms parent owns child before writing). `api/vocab-stats.js` — GET endpoint returning mastery stats + word lists for dashboard. `src/utils/wordProgress.js` — `syncProgressToServer()` fires background POST to `/api/track-words` after every localStorage update when user is logged in; silent failure keeps localStorage as source of truth. Anonymous users remain localStorage-only with zero API calls.
 
 ---
 

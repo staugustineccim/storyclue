@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../utils/supabase";
 import VoiceSetup from "./VoiceSetup";
+import VocabDashboard from "./VocabDashboard";
 
 // ── FamilyDashboard ───────────────────────────────────────────────────────────
 // Shown to signed-in users before audience selection.
@@ -291,6 +292,11 @@ export default function FamilyDashboard({ onSelectChild, onSkipToAudience }) {
             </button>
           </div>
         </div>
+
+        {/* Vocabulary Progress — only show when children exist */}
+        {children.length > 0 && (
+          <VocabDashboard children={children} user={user} />
+        )}
 
         {/* Parent / no-child option */}
         <div style={{ textAlign:"center", paddingTop:"16px", borderTop:"1px solid #e0d8c8" }}>

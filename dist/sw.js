@@ -1,79 +1,64 @@
 // StoryClue Service Worker
-// Cache-first for static assets, network-first for API calls
+// Network-first for HTML so new deploys are picked up immediately.
+// Cache-first for hashed assets (JS/CSS/fonts) which never change content.
 
-const CACHE_NAME = 'storyclue-v1';
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/icon.svg',
-  '/manifest.json'
-];
+const CACHE_NAME = 'storyclue-v3';
 
-// Install: pre-cache shell
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
-    })
-  );
-  self.skipWaiting();
-});
-
-// Activate: clean up old caches
+// Activate: delete ALL old caches so stale JS never gets served
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
-      )
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
     )
   );
   self.clients.claim();
 });
 
-// Fetch strategy:
-//   /api/*         → network-only (AI generation must always be fresh)
-//   everything else → cache-first, fall back to network, then cache update
+// Install: no pre-caching — let the fetch handler populate the cache
+self.addEventListener('install', () => self.skipWaiting());
+
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-
-  // Skip non-GET requests and cross-origin requests except fonts
   if (event.request.method !== 'GET') return;
 
-  // API calls: always hit the network
+  // API calls: always network-only
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(fetch(event.request));
     return;
   }
 
-  // Google Fonts: cache-first (they change rarely)
-  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
+  // HTML pages (index.html and all SPA routes): NETWORK-FIRST
+  // This ensures new deploys are loaded immediately, not after two page loads.
+  const isHTML = url.pathname === '/' ||
+    url.pathname.endsWith('.html') ||
+    !url.pathname.includes('.');   // SPA routes have no extension
+
+  if (isHTML) {
     event.respondWith(
-      caches.match(event.request).then(
-        (cached) => cached || fetch(event.request).then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+      fetch(event.request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((c) => c.put(event.request, clone));
+          }
           return response;
         })
-      )
+        .catch(() => caches.match(event.request)) // offline fallback only
     );
     return;
   }
 
-  // App shell and static assets: cache-first, refresh in background
+  // Hashed JS/CSS/image assets: cache-first (content-addressed, never stale)
   event.respondWith(
     caches.match(event.request).then((cached) => {
-      const networkFetch = fetch(event.request).then((response) => {
+      if (cached) return cached;
+      return fetch(event.request).then((response) => {
         if (response.ok) {
           const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          caches.open(CACHE_NAME).then((c) => c.put(event.request, clone));
         }
         return response;
-      }).catch(() => cached); // offline fallback to cached version
-
-      return cached || networkFetch;
+      });
     })
   );
 });
