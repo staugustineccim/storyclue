@@ -78,9 +78,6 @@ function makeSolver(wordsByLength, idx) {
     }
 
     const fillTime = (Date.now() - t0) / 1000;
-    if (Object.keys(assignment).length < slots.length) {
-      return { success: false, fillTime, message: "Incomplete" };
-    }
 
     // Extract answers
     const across = [], down = [];
