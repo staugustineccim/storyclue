@@ -11,10 +11,46 @@
 //
 // This endpoint orchestrates the full generation — the user never inputs words or clues.
 
-const FALLBACK_WORDS = [
+const DEFAULT_WORDS = [
   "LIGHT", "DARKNESS", "STARS", "SKY", "EARTH", "HEAVEN", "NIGHT", "DAY",
   "MORNING", "EVENING", "WATERS", "PLANTS", "TREES", "SEED", "ANIMALS",
 ];
+
+// Query user's struggle words from Supabase for vocabulary reinforcement
+async function getTopicWords(userId) {
+  try {
+    if (!userId) return DEFAULT_WORDS;
+
+    const { createClient } = await import("@supabase/supabase-js");
+    const supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+
+    // Get top struggle words (most hints used + wrong answers)
+    const { data, error } = await supabase
+      .from("word_progress")
+      .select("word, hints_used, wrong_answers")
+      .eq("user_id", userId)
+      .gt("hints_used", 0)
+      .order("hints_used", { ascending: false })
+      .limit(15);
+
+    if (error || !data || data.length === 0) {
+      return DEFAULT_WORDS;
+    }
+
+    // Extract struggle words and merge with defaults
+    const struggleWords = data
+      .map(row => row.word.toUpperCase())
+      .filter(w => w.length >= 3 && w.length <= 8 && /^[A-Z]+$/.test(w));
+
+    return [...struggleWords, ...DEFAULT_WORDS].slice(0, 25);
+  } catch (e) {
+    console.error("[getTopicWords] Error:", e.message);
+    return DEFAULT_WORDS;
+  }
+}
 
 // Generate Rich and Classic clues — simple rule-based approach
 function generateClues(answers) {
@@ -95,7 +131,10 @@ export default async function handler(req, res) {
 
   try {
     console.log("[generate-classic] Starting generation...");
-    const topicWords = FALLBACK_WORDS; // Skip Claude for now
+    const userId = req.headers["x-user-id"] || null;
+    const topicWords = await getTopicWords(userId);
+    console.log(`[generate-classic] Using ${topicWords.length} topic words (${topicWords.slice(0, 5).join(", ")}...)`);
+
 
     // Step 1: Generate pattern
     console.log("[generate-classic] Generating pattern...");

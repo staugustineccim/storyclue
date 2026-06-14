@@ -505,7 +505,10 @@ export default function PuzzleGenerator() {
       const endpoint = useClassicEngine ? "/api/generate-classic" : "/api/generate";
       const res = await fetch(endpoint, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          "x-user-id": user?.id || "",
+        },
         body: JSON.stringify(body),
       });
 
