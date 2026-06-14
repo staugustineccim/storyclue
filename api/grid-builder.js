@@ -121,25 +121,39 @@ export default async function handler(req, res) {
       row.map(cell => cell === null ? "#" : ".").join("")
     );
 
-    // Extract across and down words
+    // Extract across and down words from crossword-generator result
+    // crossword-generator uses: direction ("horizontal"/"vertical"), startRow, startCol, word
     const across = [];
     const down = [];
+    const rows = result.grid.length;
+    const cols = result.grid[0]?.length || 0;
 
-    console.log(`[grid-builder] placedWords count: ${result.placedWords.length}`);
-    console.log(`[grid-builder] Sample word:`, result.placedWords[0]);
-
-    for (const pw of result.placedWords) {
-      if (pw.orientation === "across") {
-        across.push({ num: pw.number, dir: "A", answer: pw.word });
+    // Build numbering map
+    const cellNum = {};
+    let num = 1;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const cell = result.grid[r][c];
+        if (cell !== null) {
+          cellNum[`${r},${c}`] = num;
+          num++;
+        }
       }
     }
+
+    // Extract words
     for (const pw of result.placedWords) {
-      if (pw.orientation === "down") {
-        down.push({ num: pw.number, dir: "D", answer: pw.word });
+      const key = `${pw.startRow},${pw.startCol}`;
+      const number = cellNum[key];
+
+      if (pw.direction === "horizontal") {
+        across.push({ num: number, dir: "A", answer: pw.word });
+      } else if (pw.direction === "vertical") {
+        down.push({ num: number, dir: "D", answer: pw.word });
       }
     }
 
-    console.log(`[grid-builder] Result: ${across.length} across, ${down.length} down`);
+    console.log(`[grid-builder] Extracted: ${across.length} across, ${down.length} down`);
 
     // Return result
     return res.status(200).json({
