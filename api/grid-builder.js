@@ -74,8 +74,7 @@ function buildWordList(topicWords, wordsByLengthBase, grade = "6-12") {
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Not allowed" });
-  const { pattern, slots, topicWords = [], seed = 0, grade = "6-12" } = req.body;
-  if (!pattern || !slots) return res.status(400).json({ error: "Missing data" });
+  const { topicWords = [], grade = "6-12" } = req.body;
 
   try {
     // Load wordlist and build word list
@@ -91,32 +90,33 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Failed to generate crossword" });
     }
 
-    // Convert result to our expected format
-    const fillTime = 0.1; // cwgen is fast
+    // Convert grid to pattern format (# for black, . for white)
+    const pattern = result.grid.map(row =>
+      row.map(cell => cell === null ? "#" : ".").join("")
+    );
+
+    // Extract across and down words
     const across = [];
     const down = [];
-    let num = 1;
 
-    // Extract across and down words from placed words
     for (const pw of result.placedWords) {
       if (pw.orientation === "across") {
-        across.push({ num: num++, dir: "A", answer: pw.word });
+        across.push({ num: pw.number, dir: "A", answer: pw.word });
       }
     }
-    num = 1;
     for (const pw of result.placedWords) {
       if (pw.orientation === "down") {
-        down.push({ num: num++, dir: "D", answer: pw.word });
+        down.push({ num: pw.number, dir: "D", answer: pw.word });
       }
     }
 
-    // Return result matching expected format
+    // Return result
     return res.status(200).json({
       success: true,
-      pattern: pattern,
+      pattern,
       across,
       down,
-      fillTime,
+      fillTime: 0.05,
     });
 
   } catch (e) {

@@ -138,35 +138,22 @@ export default async function handler(req, res) {
     // Build base URL from environment
     const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
 
-    // Step 1: Generate pattern
-    console.log("[generate-classic] Generating pattern...");
-    const patternRes = await fetch(`${baseUrl}/api/pattern-generator`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ seed: 0 }),
-    });
-    if (!patternRes.ok) {
-      throw new Error(`Pattern generation failed: ${patternRes.status}`);
-    }
-    const { pattern, slots } = await patternRes.json();
-    console.log(`[generate-classic] Pattern OK: ${slots.length} slots`);
-
-    // Step 2: Fill grid (with topic words prioritized)
-    console.log("[generate-classic] Filling grid with topic words...");
+    // Generate crossword using proven grid-builder (single step)
+    console.log("[generate-classic] Generating crossword...");
     const gridRes = await fetch(`${baseUrl}/api/grid-builder`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pattern, slots, topicWords, seed: 0, grade }),
+      body: JSON.stringify({ topicWords, grade }),
     });
     if (!gridRes.ok) {
       const errorText = await gridRes.text();
-      throw new Error(`Grid filling failed: ${gridRes.status} - ${errorText.slice(0, 200)}`);
+      throw new Error(`Grid generation failed: ${gridRes.status} - ${errorText.slice(0, 200)}`);
     }
     const gridData = await gridRes.json();
     if (!gridData.success) {
-      throw new Error(`Grid solving failed: ${gridData.error}`);
+      throw new Error(`Grid generation failed: ${gridData.error}`);
     }
-    const { across, down, fillTime } = gridData;
+    const { pattern, across, down, fillTime } = gridData;
     console.log(`[generate-classic] Grid OK: ${across.length} across, ${down.length} down in ${fillTime.toFixed(2)}s`);
 
     // Generate clues
