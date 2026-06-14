@@ -110,12 +110,12 @@ export default async function handler(req, res) {
     const { pattern, slots } = await patternRes.json();
     console.log(`[generate-classic] Pattern OK: ${slots.length} slots`);
 
-    // Step 2: Fill grid
-    console.log("[generate-classic] Filling grid...");
+    // Step 2: Fill grid (with topic words prioritized)
+    console.log("[generate-classic] Filling grid with topic words...");
     const gridRes = await fetch("https://storyclue-git-june3-complete-robert-buckmaster-s-projects.vercel.app/api/grid-builder", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pattern, slots, seed: 0, timeLimit: 6 }),
+      body: JSON.stringify({ pattern, slots, topicWords, seed: 0, timeLimit: 6 }),
     });
     if (!gridRes.ok) {
       const errorText = await gridRes.text();
