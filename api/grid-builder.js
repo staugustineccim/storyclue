@@ -171,15 +171,16 @@ export default async function handler(req, res) {
 
     console.log(`[grid-builder] Filling for grade: ${grade}, max word length: ${Object.keys(wordsByLength).pop()}`);
 
-    // Random-restart greedy: try up to 20 times with different slot orders
-    for (let attempt = 0; attempt < 20; attempt++) {
+    // Random-restart greedy: try up to 100 times with different slot orders
+    for (let attempt = 0; attempt < 100; attempt++) {
       const result = greedyFill(pattern, slots, wordsByLength, attempt);
       if (result && result.success) {
+        console.log(`[grid-builder] Success on attempt ${attempt + 1}`);
         return res.status(200).json(result);
       }
     }
 
-    return res.status(400).json({ error: "Could not fill grid after 20 attempts" });
+    return res.status(400).json({ error: "Could not fill grid after 100 attempts" });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
