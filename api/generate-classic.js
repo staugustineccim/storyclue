@@ -125,8 +125,11 @@ export default async function handler(req, res) {
   } = req.body || {};
 
   const source = chapterText || bookRef || urlRef;
-  if (!source || source.trim().length < 20) {
-    return res.status(400).json({ error: "Missing or insufficient source material" });
+  // Book lookups accept short references (e.g., "Genesis Chapter 1")
+  // Pasted text/URLs need more substance for meaningful word extraction
+  const minLen = (inputMode === "lookup" || bookRef) ? 3 : 20;
+  if (!source || source.trim().length < minLen) {
+    return res.status(400).json({ error: `Missing source material (need ${minLen}+ characters)` });
   }
 
   try {
