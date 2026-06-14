@@ -87,12 +87,29 @@ export default async function handler(req, res) {
     console.log(`[grid-builder] Calling generateCrossword with ${words.length} words`);
     console.log(`[grid-builder] Sample words:`, words.slice(0, 10));
 
-    const result = cwgen.generateCrossword(words);
+    // Generate with minimum size enforcement
+    let result;
+    let attempts = 0;
+    const MIN_SIZE = 8; // Minimum 8x8 grid
 
-    console.log(`[grid-builder] Generated grid: ${result.grid.length} rows × ${result.grid[0]?.length} cols`);
-    console.log(`[grid-builder] Placed words: ${result.placedWords.length}`);
-    if (result.placedWords.length > 0) {
-      console.log(`[grid-builder] First word:`, result.placedWords[0]);
+    while (attempts < 3) {
+      result = cwgen.generateCrossword(words);
+      const rows = result.grid.length;
+      const cols = result.grid[0]?.length || 0;
+
+      console.log(`[grid-builder] Attempt ${attempts + 1}: ${rows}×${cols} grid, ${result.placedWords.length} words`);
+
+      // Accept if grid is large enough AND has words placed
+      if (rows >= MIN_SIZE && cols >= MIN_SIZE && result.placedWords.length > 5) {
+        console.log(`[grid-builder] ✓ Grid meets minimum size (${rows}×${cols})`);
+        break;
+      }
+
+      attempts++;
+      if (attempts >= 3) {
+        console.warn(`[grid-builder] Grid too small after 3 attempts, using best result`);
+        break;
+      }
     }
 
     if (!result || !result.grid || result.placedWords.length === 0) {
