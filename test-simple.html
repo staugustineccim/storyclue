@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Classic Engine - Simple Test</title>
+  <style>
+    body { font-family: Georgia, serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+    button { padding: 10px 20px; background: #1e4d2b; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
+    button:disabled { opacity: 0.6; }
+    .section { margin: 20px 0; padding: 15px; background: #f5f3ee; border-radius: 8px; }
+    .error { color: #c2185b; background: #fce4ec; padding: 10px; border-radius: 4px; margin: 10px 0; }
+    .success { color: #1b5e20; background: #e8f5e9; padding: 10px; border-radius: 4px; margin: 10px 0; }
+    .grid { display: grid; grid-template-columns: repeat(15, 25px); gap: 1px; background: #333; padding: 3px; width: fit-content; margin: 10px 0; }
+    .cell { width: 25px; height: 25px; background: #fff; }
+    .cell.black { background: #333; }
+    pre { background: #fff; padding: 10px; border: 1px solid #ccc; overflow-x: auto; font-size: 11px; max-height: 200px; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Classic Crossword Engine - Core Test</h1>
+  <p>Testing the pattern generator and grid builder (the computational core)</p>
+
+  <div class="section">
+    <h2>Step 1: Generate Pattern</h2>
+    <button onclick="testPattern()">Generate 15×15 Pattern</button>
+    <div id="pattern-result"></div>
+  </div>
+
+  <div class="section">
+    <h2>Step 2: Fill Grid</h2>
+    <p><em>(First generate a pattern above)</em></p>
+    <button onclick="testFill()" id="fill-btn" disabled>Fill Grid with Solver</button>
+    <div id="fill-result"></div>
+  </div>
+
+  <script>
+    let lastPattern = null;
+    let lastSlots = null;
+
+    async function testPattern() {
+      const result = document.getElementById('pattern-result');
+      result.innerHTML = '<p>Generating...</p>';
+
+      try {
+        const res = await fetch('/api/pattern-generator', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ seed: 0 })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          result.innerHTML = `<div class="error">Error: ${data.error || 'Unknown error'}</div>`;
+          return;
+        }
+
+        lastPattern = data.pattern;
+        lastSlots = data.slots;
+
+        let gridHtml = '<div class="grid">';
+        for (const row of data.pattern) {
+          for (const cell of row) {
+            gridHtml += `<div class="cell${cell === '#' ? ' black' : ''}"></div>`;
+          }
+        }
+        gridHtml += '</div>';
+
+        result.innerHTML = `
+          <div class="success">✅ Pattern generated!</div>
+          <p>Grid: ${data.pattern[0].length}×${data.pattern.length}</p>
+          <p>Slots: ${data.slots.length}</p>
+          ${gridHtml}
+        `;
+
+        // Enable fill button
+        document.getElementById('fill-btn').disabled = false;
+      } catch (e) {
+        result.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+      }
+    }
+
+    async function testFill() {
+      if (!lastPattern) return;
+      const result = document.getElementById('fill-result');
+      result.innerHTML = '<p>Filling grid...</p>';
+
+      try {
+        const res = await fetch('/api/grid-builder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pattern: lastPattern,
+            slots: lastSlots,
+            seed: 0,
+            timeLimit: 6
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          result.innerHTML = `<div class="error">Error: ${data.error || 'Grid fill failed'}</div><pre>${JSON.stringify(data, null, 2)}</pre>`;
+          return;
+        }
+
+        result.innerHTML = `
+          <div class="success">✅ Grid filled in ${data.fillTime.toFixed(2)}s!</div>
+          <p>Across: ${data.across.length} words</p>
+          <p>Down: ${data.down.length} words</p>
+          <h4>Sample answers:</h4>
+          <pre>${data.across.slice(0, 5).map(a => `${a.num}A: ${a.answer}`).join('\n')}</pre>
+        `;
+      } catch (e) {
+        result.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+      }
+    }
+  </script>
+</body>
+</html>

@@ -82,8 +82,6 @@ const FAITH_TRADITIONS = [
   { key:"other",                label:"Other Faith Tradition" },
 ];
 
-// Classic Crossword engine grades
-const CLASSIC_GRADES = ["3", "4", "5", "6", "7", "8", "9-10", "11-12", "adult"];
 
 // Update 2 — Audience-specific suggestion chips (no chip appears in more than one tier)
 const AUDIENCE_EXAMPLES = {
@@ -216,9 +214,6 @@ export default function PuzzleGenerator() {
   }
   const showStyleSelector = CLASSIC_GRADES.includes(grade);
 
-  // ── NYT-Style Classic Crossword Mode (new engine) ──────────────────────────
-  const [useClassicEngine, setUseClassicEngine] = useState(false);
-  const showClassicOption = CLASSIC_GRADES.includes(grade);
 
   // ── K-2 Early Learner features ────────────────────────────────────────────
   const [phonicsMode, setPhonicsMode] = useState(false);
@@ -501,8 +496,8 @@ export default function PuzzleGenerator() {
         struggleWords, // spaced repetition injection
       };
 
-      // Route to Classic (NYT-style) or traditional engine
-      const endpoint = useClassicEngine ? "/api/generate-classic" : "/api/generate";
+      // Route to generation endpoint
+      const endpoint = "/api/generate";
       const res = await fetch(endpoint, {
         method: "POST",
         headers: {
@@ -528,13 +523,6 @@ export default function PuzzleGenerator() {
           return;
         }
 
-        // Classic engine returns complete puzzle with pattern, answers, clues
-        const classicPuzzle = data.puzzle;
-        navigate(`/play`, {
-          state: { classicPuzzleData: classicPuzzle, isClassic: true }
-        });
-        setLoading(false);
-        return;
       }
 
       // Traditional engine response handling
@@ -1126,38 +1114,6 @@ export default function PuzzleGenerator() {
             </div>
           )}
 
-          {/* ── Puzzle Type (Traditional vs Classic Engine) ── */}
-          {showStyleSelector && (
-            <div style={{ marginBottom:"24px" }}>
-              <label style={labelStyle}>Puzzle Type</label>
-              <div style={{ display:"flex", gap:"10px" }}>
-                <button
-                  type="button"
-                  className={`mode-btn${!useClassicEngine?" on":""}`}
-                  style={{ flex:1, padding:"14px 10px", lineHeight:1.4 }}
-                  onClick={() => { setUseClassicEngine(false); setPuzzleStyle("topic"); }}
-                >
-                  <div style={{ fontSize:"18px", marginBottom:"4px" }}>📖</div>
-                  <div style={{ fontWeight:700, fontSize:"13px" }}>Traditional</div>
-                  <div style={{ fontSize:"11px", opacity:.8, marginTop:"2px", fontFamily:"Lora,serif", fontWeight:400 }}>
-                    Flexible size, focused on your topic.
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  className={`mode-btn${useClassicEngine?" on":""}`}
-                  style={{ flex:1, padding:"14px 10px", lineHeight:1.4 }}
-                  onClick={() => setUseClassicEngine(true)}
-                >
-                  <div style={{ fontSize:"18px", marginBottom:"4px" }}>🗞️</div>
-                  <div style={{ fontWeight:700, fontSize:"13px" }}>Classic Crossword</div>
-                  <div style={{ fontSize:"11px", opacity:.8, marginTop:"2px", fontFamily:"Lora,serif", fontWeight:400 }}>
-                    NYT-style 15×15 symmetric grid.
-                  </div>
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* ── Faith Tradition ─────────────────────────────────────────── */}
           <div style={{ marginBottom:"24px" }}>

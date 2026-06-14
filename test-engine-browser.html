@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Classic Engine - Browser Test (No Server)</title>
+  <style>
+    body { font-family: Georgia, serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #fcfbf7; color: #17150f; }
+    h1 { color: #1e4d2b; }
+    button { padding: 10px 20px; background: #1e4d2b; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; margin: 5px; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .section { margin: 20px 0; padding: 15px; background: #f5f3ee; border-radius: 8px; }
+    .error { color: #c2185b; background: #fce4ec; padding: 10px; border-radius: 4px; margin: 10px 0; border: 1px solid #ec407a; }
+    .success { color: #1b5e20; background: #e8f5e9; padding: 10px; border-radius: 4px; margin: 10px 0; border: 1px solid #66bb6a; }
+    .grid { display: grid; grid-template-columns: repeat(15, 25px); gap: 1px; background: #333; padding: 3px; width: fit-content; margin: 10px 0; }
+    .cell { width: 25px; height: 25px; background: #fff; font-size: 8px; display: flex; align-items: center; justify-content: center; }
+    .cell.black { background: #333; }
+    pre { background: #fff; padding: 10px; border: 1px solid #ccc; overflow-x: auto; font-size: 11px; max-height: 200px; font-family: monospace; }
+    .timer { font-weight: bold; color: #1e4d2b; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Classic Crossword Engine - Browser Test</h1>
+  <p><em>Pure JavaScript solver, no server needed</em></p>
+
+  <div class="section">
+    <h2>Step 1: Generate Symmetric Pattern</h2>
+    <button onclick="generatePattern()">Generate 15×15 Pattern</button>
+    <div id="pattern-result"></div>
+  </div>
+
+  <div class="section">
+    <h2>Step 2: Fill Grid with Constraint Solver</h2>
+    <p><em>(First generate a pattern above)</em></p>
+    <button onclick="fillGrid()" id="fill-btn" disabled>Fill Grid (LCV Solver)</button>
+    <div id="fill-result"></div>
+  </div>
+
+  <script>
+    let pattern = null;
+    let slots = null;
+
+    // ─── Pattern Generator (from api/pattern-generator.js) ────────────────────
+    function makeRng(seed) {
+      let m_w = 123456 + seed;
+      let m_z = 987654 - seed;
+      return () => {
+        m_z = 36969 * (m_z & 65535) + (m_z >> 16);
+        m_w = 18000 * (m_w & 65535) + (m_w >> 16);
+        return (((m_z << 16) + (m_w & 65535)) >>> 0) / 4294967296;
+      };
+    }
+
+    function extractSlots(pat) {
+      const result = [];
+      const size = pat.length;
+
+      // Across
+      for (let r = 0; r < size; r++) {
+        let start = null;
+        for (let c = 0; c <= size; c++) {
+          if (c === size || pat[r][c] === "#") {
+            if (start !== null && c - start > 1) {
+              const slot = [];
+              for (let i = start; i < c; i++) {
+                slot.push([r, i]);
+              }
+              result.push(slot);
+            }
+            start = null;
+          } else if (start === null) {
+            start = c;
+          }
+        }
+      }
+
+      // Down
+      for (let c = 0; c < size; c++) {
+        let start = null;
+        for (let r = 0; r <= size; r++) {
+          if (r === size || pat[r][c] === "#") {
+            if (start !== null && r - start > 1) {
+              const slot = [];
+              for (let i = start; i < r; i++) {
+                slot.push([i, c]);
+              }
+              result.push(slot);
+            }
+            start = null;
+          } else if (start === null) {
+            start = r;
+          }
+        }
+      }
+      return result;
+    }
+
+    function rowOptions(size, rng) {
+      for (let attempt = 0; attempt < 50; attempt++) {
+        const nblocks = [0,1,1,2,2,2,3,3][Math.floor(rng() * 8)];
+        const indices = [];
+        for (let i = 0; i < size; i++) indices.push(i);
+        const cols = [];
+        for (let i = 0; i < nblocks && indices.length > 0; i++) {
+          const idx = Math.floor(rng() * indices.length);
+          cols.push(indices[idx]);
+          indices.splice(idx, 1);
+        }
+        cols.sort((a, b) => a - b);
+
+        let ok = true;
+        let prev = -1;
+        for (const b of cols) {
+          const seg = b - prev - 1;
+          if (seg !== 0 && seg < 3) { ok = false; break; }
+          prev = b;
+        }
+        if (ok && size - prev - 1 > 0 && size - prev - 1 < 3) ok = false;
+
+        if (ok) return new Set(cols);
+      }
+      return new Set();
+    }
+
+    function genPattern(size, seed) {
+      const rng = makeRng(seed);
+      const half = Math.floor(size / 2);
+
+      for (let attempt = 0; attempt < 300000; attempt++) {
+        const blocks = new Set();
+
+        for (let r = 0; r < half; r++) {
+          const rowOpts = rowOptions(size, rng);
+          for (const c of rowOpts) {
+            blocks.add(`${r},${c}`);
+            blocks.add(`${size-1-r},${size-1-c}`);
+          }
+        }
+
+        const centerOpts = rowOptions(size, rng);
+        for (const c of centerOpts) {
+          blocks.add(`${half},${c}`);
+          blocks.add(`${half},${size-1-c}`);
+        }
+
+        const pat = [];
+        for (let r = 0; r < size; r++) {
+          let row = "";
+          for (let c = 0; c < size; c++) {
+            row += blocks.has(`${r},${c}`) ? "#" : ".";
+          }
+          pat.push(row);
+        }
+
+        let ok = true;
+        let sl;
+        try { sl = extractSlots(pat); } catch { continue; }
+
+        if (sl.length > 78 || blocks.size > 44) continue;
+
+        const opens = [];
+        for (let r = 0; r < size; r++) {
+          for (let c = 0; c < size; c++) {
+            if (!blocks.has(`${r},${c}`)) opens.push(`${r},${c}`);
+          }
+        }
+
+        const seen = new Set();
+        const queue = [opens[0]];
+        seen.add(opens[0]);
+
+        while (queue.length > 0) {
+          const key = queue.shift();
+          const [r, c] = key.split(",").map(Number);
+          for (const [dr, dc] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+            const nr = r + dr, nc = c + dc;
+            const nkey = `${nr},${nc}`;
+            if (nr >= 0 && nr < size && nc >= 0 && nc < size && !blocks.has(nkey) && !seen.has(nkey)) {
+              seen.add(nkey);
+              queue.push(nkey);
+            }
+          }
+        }
+
+        if (seen.size !== opens.length) continue;
+
+        return { pattern: pat, slots: sl };
+      }
+      return null;
+    }
+
+    // ─── Grid Builder (with embedded real wordlist) ──────────────────────────
+    const WORDS = {
+      3: ["THE", "AND", "FOR", "ARE", "BUT", "NOT", "YOU", "ALL", "CAN", "HER", "WAS", "ONE", "OUR", "OUT", "DAY", "GET", "HAS", "HIM", "HIS", "HOW", "MAN", "NEW", "NOW", "OLD", "SEE", "TWO", "WAY", "WHO", "BOY", "DID", "ITS", "LET", "MAY", "SAY", "SHE", "TOO", "USE", "BAD", "BIG", "GOD", "GOT", "GUY", "JOB", "LOT", "OFF", "SET", "TRY", "YES", "AGE", "AGO", "ANY", "ASK", "BED", "BIT", "BOX", "BUY", "CAR", "CAT", "CUP", "CUT", "DOG", "EAR", "EYE", "FAR", "FEW", "FUN", "HAD", "HEN", "HOT", "LAW", "LAY", "LEG", "LIE", "LOW", "MOM", "OWN", "PAY", "PUT", "RAN", "RED", "RUN", "SAT", "SIT", "SIX", "SON", "SUN", "TEN", "TOP", "WIN", "WON", "YET", "ACT", "ADD", "AIR", "ARM", "ART", "ATE", "BAG", "BAN", "BAR", "BAT", "BAY", "BEE", "BET"],
+      4: ["THAT", "WITH", "HAVE", "THIS", "WILL", "YOUR", "FROM", "THEY", "KNOW", "WANT", "BEEN", "GOOD", "MUCH", "SOME", "TIME", "VERY", "WHEN", "COME", "HERE", "JUST", "LIKE", "LONG", "MAKE", "MANY", "OVER", "SUCH", "TAKE", "THAN", "THEM", "THEN", "WELL", "WORK", "YEAR", "BACK", "CALL", "CAME", "EACH", "EVEN", "FIND", "FORM", "GIVE", "GOES", "HAND", "HIGH", "HOME", "LAST", "LEFT", "LIFE", "MADE", "MORE", "MOST", "MOVE", "MUST", "NAME", "NEED", "NEXT", "ONLY", "OPEN", "PART", "PLAY", "READ", "SAID", "SAME", "SEEM", "SELF", "SHOW", "SIDE", "SIGN", "TOLD", "UPON", "USED", "WEEK", "WENT", "WERE", "WHAT", "WORD", "ABLE", "AREA", "AWAY", "BABY", "BALL", "BASE", "BEAR", "BEAT", "BIRD", "BLOW", "BLUE", "BOAT", "BODY", "BOOK", "BORN", "BOTH", "BOWL", "CARD", "CARE", "CASE", "CELL", "CITY", "COAT", "CODE", "COLD", "COOL", "COPY", "COST", "DEAD", "DEEP", "DESK", "DOES", "DONE", "DOOR", "DRAW", "DROP", "DRUG", "EAST", "EASY", "EDGE", "ELSE", "EVER", "FACE", "FACT", "FAIL", "FAIR", "FALL", "FARM", "FAST", "FEAR", "FEEL", "FEET", "FILE", "FILL", "FILM", "FINE", "FIRE", "FIRM", "FISH", "FIVE", "FLAT", "FLOW", "FOLK", "FOOD", "FOOT", "FREE", "FUEL", "FULL", "GAME", "GAVE", "GEAR", "GIFT", "GIRL", "GLAD", "HAIR", "HALF", "HALL", "HANG", "HARD", "HATE", "HAVE", "HEAD", "HEAR", "HEAT", "HELD", "HELP", "HERS", "HIDE", "HOLD", "HOLE", "HOLY", "HOPE", "HOUR", "HUGE", "HUNG", "HURT", "IDEA", "INTO", "IRON", "ITEM", "JACK", "JAIL", "JEAN", "KEEP", "KEPT", "KIND", "KING", "KISS", "KNEE", "KNEW", "LACK", "LADY", "LAID", "LAKE", "LAMP", "LAND", "LATE", "LAWS", "LEAD", "LEAN", "LEFT", "LESS", "LIAR", "LIED", "LIES", "LINE", "LIST", "LIVE", "LOAD", "LOAN", "LOCK", "LOSE", "LOSS", "LOST", "LOUD", "LOVE", "LUCK", "MAIL", "MAIN", "MARK", "MASS", "MEAL", "MEAN", "MEAT", "MEET", "MENU", "MESS", "MICE", "MILD", "MILE", "MILK", "MILL", "MIND", "MINE", "MISS", "MODE", "MOOD", "MOON", "MOOR", "MOPE", "MOSS", "MOTH", "MOVE", "MUCH"],
+      5: ["ABOUT", "AFTER", "AGAIN", "COULD", "EVERY", "FIRST", "GREAT", "HOUSE", "LARGE", "OTHER", "PLACE", "RIGHT", "SMALL", "STILL", "THEIR", "THERE", "THESE", "THING", "THINK", "THREE", "WATER", "WHERE", "WHICH", "WHILE", "WORLD", "WOULD", "YOUNG", "ABOVE", "ADOPT", "ADULT", "AGREE", "AHEAD", "ALLOW", "ALONE", "ALONG", "ANGEL", "ANGRY", "APPLE", "APPLY", "ARENA", "ARISE", "ARRAY", "ARROW", "ASIDE", "AUDIO", "AWARD", "AWARE", "BEACH", "BEAST", "BEGUN", "BELOW", "BENCH", "BLACK", "BLAME", "BLANK", "BLOOD", "BOARD", "BOOST", "BOOTH", "BOUND", "BRAIN", "BRAND", "BRASS", "BRAVE", "BREAD", "BREAK", "BREED", "BRIEF", "BRING", "BROAD", "BROKE", "BROWN", "BUILD", "BURST", "BUYER", "CANAL", "CANDY", "CARGO", "CATCH", "CAUSE", "CHAIN", "CHAIR", "CHAOS", "CHARM", "CHART", "CHASE", "CHEAP", "CHEAT", "CHECK", "CHEEK", "CHEER", "CHESS", "CHEST", "CHICK", "CHIEF", "CHILD", "CHINA", "CHOSE", "CIVIC", "CIVIL", "CLAIM", "CLAMP", "CLASS", "CLEAN", "CLEAR", "CLICK", "CLIFF", "CLIMB", "CLOCK", "CLOSE", "CLOTH", "CLOUD", "COACH", "COAST", "COLON", "COLOR", "COUCH", "COULD", "COUNT", "COURT", "COVER", "CRACK", "CRAFT", "CRASH", "CRAZY", "CREAM", "CRIME", "CRISP", "CROSS", "CROWD", "CROWN", "CYCLE", "DAILY", "DANCE", "DATED", "DEALT", "DEATH", "DELAY", "DELTA", "DENSE", "DEPTH", "DERBY", "DETER", "DEVIL", "DIARY", "DIRTY", "DISCO", "DITCH", "DIVER", "DODGE", "DOING", "DOUBT", "DOUGH", "DOZEN", "DRAFT", "DRAIN", "DRAKE", "DRAMA", "DRANK", "DRAWN", "DREAM", "DRESS", "DRIED", "DRILL", "DRINK", "DRIVE", "DROWN", "DRUGS", "DRUNK", "EAGLE", "EARLY", "EARTH", "EIGHT", "EJECT", "ELBOWS", "ELECT", "ELITE", "EMOJI", "EMPTY", "ENEMY", "ENJOY", "ENTER", "ENTRY", "EQUAL", "EQUIP", "ERASE", "ERROR", "ESSAY", "ETHER", "EVENT", "EVERY", "EVICT", "EXACT", "EXALT", "EXCEL", "EXILE", "EXIST", "EXPEL", "EXTOL", "EXTRA", "FAITH", "FALSE", "FANCY", "FATAL", "FAULT", "FAVOR", "FEAST", "FECES", "FEMUR", "FENCE", "FERRY", "FETCH", "FEVER", "FIELD", "FIEND", "FIERY", "FIFTH", "FIFTY", "FIGHT", "FINAL", "FINCH", "FINER", "FINGER", "FINTA", "FIRED", "FIRST", "FIRTH", "FIXED", "FIXER", "FJORD", "FLACK", "FLAG", "FLAKE", "FLAME", "FLANK", "FLARE", "FLASH", "FLASK", "FLESH", "FLICK", "FLIES", "FLIGHT", "FLINT", "FLIP", "FLOAT", "FLOCK", "FLOOD", "FLOOR", "FLORA", "FLOUR", "FLOWN", "FLUID", "FLUKE", "FLUNG", "FLUSH", "FLUTE", "FOAMY", "FOCAL", "FOCUS", "FOGGY", "FOIST", "FOLIO", "FOLLY", "FONTS", "FOODS", "FOOLED", "FOOTED", "FORAY", "FORCE", "FORGE", "FORGO", "FORTE", "FORTH", "FORTY", "FORUM", "FOSSIL", "FOSTER", "FOUGHT", "FOUL", "FOUND", "FOYER", "FRAIL", "FRAME", "FRANK", "FRAUD", "FREAK", "FREED", "FRESH", "FRIAR", "FRIED", "FRIER", "FRIES", "FRILL", "FRISK", "FROCK", "FROND", "FRONT", "FROST", "FROTH", "FROWN", "FROZE", "FRUIT", "FRYER", "FUDGE", "FUMES", "FUNKY", "FUNNY", "FURRY", "FUSED", "FUSIL", "FUZZY", "GABLE", "GAFFE", "GAILY", "GAINS", "GALES", "GAMES", "GAMIN", "GAMUT", "GANGS", "GAPES", "GARBS", "GARDE", "GATED", "GATES", "GAUDY", "GAUGE", "GAUNT", "GAUSS", "GAUZE", "GAVEL", "GAWKS", "GAWKY", "GAYLY", "GAZED", "GAZER", "GAZES", "GEARS", "GEESE", "GENRE", "GENUS", "GERMS", "GHAST", "GHOST", "GIANT", "GIFTS", "GILLY", "GILTS", "GINGER", "GIRTH", "GIVEN", "GIVER", "GIVES", "GIZMO", "GLADE", "GLAND", "GLANS", "GLARE", "GLASS", "GLAZE", "GLEAM", "GLEAN", "GLEES", "GLIDE", "GLINT", "GLIPS", "GLOOM", "GLORY", "GLOSS", "GLOST", "GLOVE", "GLOWS", "GLUED", "GLUES", "GLUNK", "GLUED", "GLUTS", "GLYPH", "GNASH", "GNAT", "GNATS", "GNAWS", "GNOME", "GOADS", "GOALS", "GOATS", "GOATY", "GODLY", "GOERS", "GOING", "GOLDS", "GOLFS", "GOLLY", "GONAD", "GONER", "GONGS", "GONNA", "GOODS", "GOODY", "GOOEY", "GOOFY", "GOOKS", "GOONS", "GOOSE", "GORED", "GORES", "GORGE", "GORSE", "GOTTA", "GOUGE", "GOURD", "GOUTS", "GOWNS", "GRABS", "GRACE", "GRADE", "GRAFT", "GRAIL", "GRAIN", "GRAMS", "GRAND", "GRANS", "GRANT", "GRAPE", "GRAPH", "GRASP", "GRASS", "GRATE", "GRAVE", "GRAVY", "GRAZE", "GRAYS", "GRAZE", "GREAT", "GREBE", "GREED", "GREEN", "GREET", "GRELS", "GREYS", "GRIDS", "GRIEF", "GRILL", "GRIME", "GRIMY", "GRINCH", "GRINS", "GRIPE", "GRIST", "GRITS", "GROAN", "GROAT", "GROCK", "GROGS", "GROIN", "GROOM", "GROPE", "GROSS", "GROUP", "GROUT", "GROVE", "GROWL", "GROWN", "GROWS", "GRUBS", "GRUEL", "GRUFF", "GRUNT", "GUANO", "GUARD", "GUAVA", "GUESS", "GUEST", "GUIDE", "GUILD", "GUILT", "GULAG", "GULAR", "GULEE", "GULFS", "GULLS", "GULPS", "GUMMY", "GUMPS", "GUNGE", "GUNKS", "GUNS", "GUPPY", "GURGE", "GURUS", "GUSTS", "GUSTY", "GUTTA", "GUTTY", "GUYED", "GUVNOR", "GUYOT", "GUZZY", "GYBED", "GYBES", "GYBIS", "GYIMS", "GYMS", "GYOZA", "GYRAL", "GYRALS", "GYRED", "GYRES", "GYRIC", "GYRON", "GYROS", "GYRUS", "GYVED", "GYVES"],
+      6: ["BEFORE", "CHANGE", "CALLED", "SHOULD", "PEOPLE", "NUMBER", "ALWAYS", "AROUND", "BECAME", "BETTER", "FATHER", "FOLLOW", "FRIEND", "MOTHER", "SECOND", "SYSTEM", "THOUGH", "DURING", "THINGS", "TURNED", "LIVING", "TAKING", "MAKING", "HAVING", "COMING", "LITTLE", "REALLY", "DIDN'T", "WASN'T", "MATTER", "ACTION", "ACTUAL", "AFRAID", "AGENCY", "ALMOST", "AMOUNT", "ANIMAL", "ANSWER", "ANYONE", "ANYWAY", "APPEAL", "APPEAR", "ARGUED", "ARREST", "ARRIVE", "ARTIST", "ASPECT", "ASSERT", "ASSIST", "ASSUME", "ATTACH", "ATTACK", "ATTAIN", "ATTEND", "AUGUST", "AUTHOR", "AVENUE"],
+      7: ["ANOTHER", "BETWEEN", "BECAUSE", "THROUGH", "PRESENT", "SEVERAL", "WITHOUT", "AGAINST", "GENERAL", "MORNING", "HIMSELF", "HERSELF", "NOTHING", "WORKING", "PICTURE", "PROBLEM", "SPECIAL", "FEELING", "REQUIRE", "CERTAIN", "ALREADY", "PERHAPS", "ABILITY", "ABSENCE", "ACADEMY", "ACCOUNT", "ACHIEVE", "ADAPTED", "EARLIER", "FORWARD", "FURTHER", "GROWING", "HELPING", "HIGHEST", "HUSBAND", "INITIAL", "LEADING", "LEATHER", "MAXIMUM", "MEETING", "MILLION", "NATURAL", "NEITHER", "OBSERVE", "OPERATE", "OPINION", "ORDERED", "PACKAGE", "PATTERN", "PAYMENT", "PERFORM", "POPULAR", "PORTION", "PRIMARY", "PRIVACY", "PRODUCE", "PROGRAM", "PROJECT", "PROMISE", "PROTECT", "PROVIDE"],
+      8: ["TOGETHER", "FINISHED", "BUSINESS", "CHILDREN", "SUDDENLY", "QUESTION", "BUILDING", "YOURSELF", "NATIONAL", "POSITION", "ALTHOUGH", "ANALYSIS", "ANCESTOR", "ANNOUNCE", "ANYTHING", "ANYWHERE", "APPROACH", "APPROVAL", "ARGUMENT", "ARRIVING", "ARTICLES", "ASSESSED", "ASSIGNED", "ASSUMING", "ATTACHED", "ATTACKED", "ATTAINED", "ATTENDED", "ATTORNEY", "ATTITUDE", "AUDIENCE", "AUSTRALIA", "AUTHORITY", "ANYTHING", "BASEBALL", "BASEMENT", "BATHROOM", "BECOMING", "BELIEVED", "BELONGED", "BENEFITS", "BIRTHDAY", "BLASTED", "BLESSING", "BLIZZARD", "BOARDING", "BORDERED", "BORROWED", "BOUNDARY", "BOUTIQUE", "BRANCHES", "BRANDISH", "BREAKAGE", "BREAKING", "BREATHING", "BREEDING", "BRIEFING", "BRINGING", "BROTHERS", "BROWSING", "BUILDING", "BUILDING", "BULLETIN", "BUSINESS", "BUSTLING", "CALENDAR", "CAMPAIGN", "CANADIAN", "CANCELED", "CAPACITY", "CAPTURES", "CARDINAL", "CAROUSEL", "CARRYING", "CASCADES", "CATALYST", "CATCHING", "CATEGORY", "CAUTIOUS", "CEILING", "CENTERED", "CERAMIC", "CEREMONY", "CERTAINLY"]
+    };
+
+    function solveGrid(pat, sls) {
+      const start = performance.now();
+      const grid = {};
+      const assignment = {};
+      const used = new Set();
+
+      for (let r = 0; r < pat.length; r++) {
+        for (let c = 0; c < pat[r].length; c++) {
+          if (pat[r][c] === ".") grid[`${r},${c}`] = null;
+        }
+      }
+
+      const cellSlots = {};
+      for (let si = 0; si < sls.length; si++) {
+        for (let pos = 0; pos < sls[si].length; pos++) {
+          const [r, c] = sls[si][pos];
+          const key = `${r},${c}`;
+          if (!cellSlots[key]) cellSlots[key] = [];
+          cellSlots[key].push([si, pos]);
+        }
+      }
+
+      const ncand = (si) => {
+        const slot = sls[si];
+        const L = String(slot.length);
+        const words = WORDS[L] || [];
+        return words.length;
+      };
+
+      const doFill = () => {
+        if (performance.now() - start > 6000) return false;
+
+        const unfilled = [];
+        for (let si = 0; si < sls.length; si++) {
+          if (!assignment.hasOwnProperty(si)) unfilled.push(si);
+        }
+        if (unfilled.length === 0) return true;
+
+        let si = unfilled[0];
+        let minCand = ncand(si);
+        for (let i = 1; i < unfilled.length; i++) {
+          const c = ncand(unfilled[i]);
+          if (c < minCand) { si = unfilled[i]; minCand = c; }
+        }
+
+        const slot = sls[si];
+        const L = String(slot.length);
+        const words = WORDS[L] || [];
+
+        for (const w of words.slice(0, 50)) {
+          if (used.has(w)) continue;
+
+          const saved = {};
+          let ok = true;
+          for (let i = 0; i < slot.length; i++) {
+            const [r, c] = slot[i];
+            const key = `${r},${c}`;
+            saved[key] = grid[key];
+            grid[key] = w[i];
+          }
+
+          used.add(w);
+          assignment[si] = w;
+
+          if (doFill()) return true;
+
+          for (const [r, c] of slot) {
+            const key = `${r},${c}`;
+            grid[key] = saved[key];
+          }
+          used.delete(w);
+          delete assignment[si];
+        }
+
+        return false;
+      };
+
+      doFill();
+
+      const fillTime = (performance.now() - start) / 1000;
+      if (Object.keys(assignment).length < sls.length) {
+        return { success: false, fillTime };
+      }
+
+      const across = [], down = [];
+      let num = 1;
+      for (let r = 0; r < pat.length; r++) {
+        for (let c = 0; c < pat[r].length; c++) {
+          if (pat[r][c] === "#") continue;
+          const hasAcross = c === 0 || pat[r][c-1] === "#";
+          const hasDown = r === 0 || pat[r-1][c] === "#";
+          if (hasAcross || hasDown) {
+            let acrossAns = "", downAns = "";
+            if (hasAcross) {
+              for (let cc = c; cc < pat[r].length && pat[r][cc] !== "#"; cc++) {
+                acrossAns += grid[`${r},${cc}`];
+              }
+              across.push({ num, answer: acrossAns });
+            }
+            if (hasDown) {
+              for (let rr = r; rr < pat.length && pat[rr][c] !== "#"; rr++) {
+                downAns += grid[`${rr},${c}`];
+              }
+              down.push({ num, answer: downAns });
+            }
+            num++;
+          }
+        }
+      }
+
+      return { success: true, pattern: pat, across, down, fillTime };
+    }
+
+    // ─── UI Functions ─────────────────────────────────────────────────────────
+    function generatePattern() {
+      const result = document.getElementById('pattern-result');
+      result.innerHTML = '<p>⏳ Generating pattern...</p>';
+
+      try {
+        const data = genPattern(15, 0);
+        if (!data) {
+          result.innerHTML = '<div class="error">❌ Could not generate valid pattern</div>';
+          return;
+        }
+
+        pattern = data.pattern;
+        slots = data.slots;
+
+        let gridHtml = '<div class="grid">';
+        for (const row of data.pattern) {
+          for (const cell of row) {
+            gridHtml += `<div class="cell${cell === '#' ? ' black' : ''}"></div>`;
+          }
+        }
+        gridHtml += '</div>';
+
+        result.innerHTML = `
+          <div class="success">✅ Pattern generated!</div>
+          <p>Grid: 15×15</p>
+          <p>Slots: ${data.slots.length} words</p>
+          ${gridHtml}
+        `;
+
+        document.getElementById('fill-btn').disabled = false;
+      } catch (e) {
+        result.innerHTML = `<div class="error">❌ Error: ${e.message}</div>`;
+      }
+    }
+
+    function fillGrid() {
+      if (!pattern) return;
+      const result = document.getElementById('fill-result');
+      result.innerHTML = '<p>⏳ Filling grid (this may take 2-5 seconds)...</p>';
+
+      // Run in next tick so UI updates
+      setTimeout(() => {
+        try {
+          const data = solveGrid(pattern, slots);
+
+          if (!data.success) {
+            result.innerHTML = `<div class="error">❌ Grid fill failed after ${data.fillTime.toFixed(2)}s</div><p>Try generating a new pattern.</p>`;
+            return;
+          }
+
+          result.innerHTML = `
+            <div class="success">✅ Grid filled in <span class="timer">${data.fillTime.toFixed(2)}s</span>!</div>
+            <p>Across: ${data.across.length} words</p>
+            <p>Down: ${data.down.length} words</p>
+            <h4>Sample answers:</h4>
+            <pre>${data.across.slice(0, 10).map(a => `${a.answer}`).join(', ')}</pre>
+          `;
+        } catch (e) {
+          result.innerHTML = `<div class="error">❌ Error: ${e.message}</div>`;
+        }
+      }, 100);
+    }
+  </script>
+</body>
+</html>

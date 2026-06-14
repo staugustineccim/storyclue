@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Classic Crossword Test</title>
+  <style>
+    body { font-family: Georgia, serif; max-width: 1000px; margin: 0 auto; padding: 20px; color: #17150f; }
+    .form { background: #f5f3ee; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+    textarea { width: 100%; min-height: 100px; padding: 10px; font-family: monospace; border: 1px solid #c8b888; border-radius: 4px; }
+    button { padding: 10px 24px; background: #1e4d2b; color: #fff; border: none; border-radius: 6px; font-family: Georgia, serif; font-size: 16px; font-weight: bold; cursor: pointer; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .error { background: #fce4ec; border: 2px solid #ec407a; border-radius: 8px; padding: 15px; margin-bottom: 20px; color: #c2185b; }
+    .success { background: #e8f5e9; border: 2px solid #66bb6a; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(15, 30px); gap: 1px; background: #17150f; padding: 4px; width: fit-content; margin: 20px 0; }
+    .cell { width: 30px; height: 30px; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; }
+    .cell.black { background: #17150f; }
+    .clues { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+    .clue-list { list-style: none; padding: 0; }
+    .clue-list li { margin-bottom: 10px; font-size: 13px; }
+    .clue-list strong { color: #1e4d2b; margin-right: 5px; }
+    h3 { margin-top: 0; color: #1e4d2b; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Classic Crossword Engine Test</h1>
+
+  <div class="form">
+    <div style="margin-bottom: 15px;">
+      <label style="display: block; font-weight: bold; margin-bottom: 5px;">Source Text</label>
+      <textarea id="source">The Tale of Jonah: A prophet named Jonah was called by God to preach to the city of Nineveh. But Jonah did not want to go, so he ran away and sailed on a ship across the sea. A great storm came, and Jonah knew it was because of him. He asked the sailors to throw him overboard. When they did, a great fish swallowed him. Inside the fish for three days and nights, Jonah prayed to God. The fish then spit Jonah out on shore, and he finally went to Nineveh.</textarea>
+    </div>
+    <div style="margin-bottom: 15px;">
+      <label style="display: block; font-weight: bold; margin-bottom: 5px;">Grade Level</label>
+      <select id="grade">
+        <option value="k">Kindergarten</option>
+        <option value="1">1st Grade</option>
+        <option value="2">2nd Grade</option>
+        <option value="3">3rd Grade</option>
+        <option value="6-12" selected>6th-12th Grade</option>
+        <option value="adult">Reader Mode</option>
+      </select>
+    </div>
+    <button onclick="generate()" id="btn">Generate Puzzle</button>
+  </div>
+
+  <div id="error" class="error" style="display: none;"></div>
+  <div id="success" class="success" style="display: none;"></div>
+  <div id="results"></div>
+
+  <script>
+    async function generate() {
+      const btn = document.getElementById('btn');
+      const errorDiv = document.getElementById('error');
+      const successDiv = document.getElementById('success');
+      const resultsDiv = document.getElementById('results');
+
+      errorDiv.style.display = 'none';
+      successDiv.style.display = 'none';
+      resultsDiv.innerHTML = '';
+
+      btn.disabled = true;
+      btn.textContent = 'Generating...';
+
+      try {
+        const source = document.getElementById('source').value;
+        const grade = document.getElementById('grade').value;
+
+        const res = await fetch('/api/generate-classic', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source, grade, theme: 'Test', contentType: 'text' })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          errorDiv.textContent = '❌ Error: ' + (data.error || 'Generation failed');
+          errorDiv.style.display = 'block';
+          return;
+        }
+
+        const puzzle = data.puzzle;
+        successDiv.innerHTML = `<strong>✅ Puzzle generated!</strong><ul style="margin: 10px 0;">
+          <li>Words: ${puzzle.stats.wordCount}</li>
+          <li>Blocks: ${puzzle.stats.blockCount}</li>
+          <li>Fill time: ${puzzle.stats.fillTime.toFixed(2)}s</li>
+          <li>Topic ratio: ${(puzzle.stats.topicRatio * 100).toFixed(0)}% (${puzzle.stats.onTopicWords} on-topic)</li>
+        </ul>`;
+        successDiv.style.display = 'block';
+
+        // Render grid
+        let gridHtml = '<h3>Grid (15×15)</h3><div class="grid">';
+        for (let r = 0; r < puzzle.pattern.length; r++) {
+          for (let c = 0; c < puzzle.pattern[r].length; c++) {
+            const cell = puzzle.pattern[r][c];
+            gridHtml += `<div class="cell${cell === '#' ? ' black' : ''}"></div>`;
+          }
+        }
+        gridHtml += '</div>';
+
+        // Sample clues
+        const acrossClues = puzzle.clues.filter(c => c.dir === 'A').slice(0, 8);
+        const downClues = puzzle.clues.filter(c => c.dir === 'D').slice(0, 8);
+
+        let cluesHtml = '<h3>Sample Clues (Rich mode)</h3><div class="clues"><div>';
+        cluesHtml += '<h4>Across</h4><ul class="clue-list">';
+        for (const clue of acrossClues) {
+          cluesHtml += `<li><strong>${clue.num}.</strong> ${clue.clue_rich}${clue.on_topic ? ' ★' : ''}</li>`;
+        }
+        cluesHtml += '</ul></div><div><h4>Down</h4><ul class="clue-list">';
+        for (const clue of downClues) {
+          cluesHtml += `<li><strong>${clue.num}.</strong> ${clue.clue_rich}${clue.on_topic ? ' ★' : ''}</li>`;
+        }
+        cluesHtml += '</ul></div></div>';
+        cluesHtml += '<p style="font-size: 12px; color: #888;">★ = topic-connected clue</p>';
+
+        resultsDiv.innerHTML = gridHtml + cluesHtml;
+
+      } catch (e) {
+        errorDiv.textContent = '❌ Error: ' + e.message;
+        errorDiv.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Generate Puzzle';
+      }
+    }
+  </script>
+</body>
+</html>
