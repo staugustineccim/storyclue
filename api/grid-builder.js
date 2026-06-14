@@ -84,10 +84,19 @@ export default async function handler(req, res) {
     console.log(`[grid-builder] Using proven crossword-generator for grade: ${grade}, words: ${words.length}`);
 
     // Use proven crossword-generator package
+    console.log(`[grid-builder] Calling generateCrossword with ${words.length} words`);
+    console.log(`[grid-builder] Sample words:`, words.slice(0, 10));
+
     const result = cwgen.generateCrossword(words);
 
+    console.log(`[grid-builder] Generated grid: ${result.grid.length} rows × ${result.grid[0]?.length} cols`);
+    console.log(`[grid-builder] Placed words: ${result.placedWords.length}`);
+    if (result.placedWords.length > 0) {
+      console.log(`[grid-builder] First word:`, result.placedWords[0]);
+    }
+
     if (!result || !result.grid || result.placedWords.length === 0) {
-      return res.status(400).json({ error: "Failed to generate crossword" });
+      return res.status(400).json({ error: "Failed to generate crossword - no words placed" });
     }
 
     // Convert grid to pattern format (# for black, . for white)
