@@ -135,10 +135,12 @@ export default async function handler(req, res) {
     const topicWords = await getTopicWords(userId);
     console.log(`[generate-classic] Using ${topicWords.length} topic words (${topicWords.slice(0, 5).join(", ")}...)`);
 
+    // Build base URL from environment
+    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
 
     // Step 1: Generate pattern
     console.log("[generate-classic] Generating pattern...");
-    const patternRes = await fetch("https://storyclue-git-june3-complete-robert-buckmaster-s-projects.vercel.app/api/pattern-generator", {
+    const patternRes = await fetch(`${baseUrl}/api/pattern-generator`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ seed: 0 }),
@@ -151,10 +153,10 @@ export default async function handler(req, res) {
 
     // Step 2: Fill grid (with topic words prioritized)
     console.log("[generate-classic] Filling grid with topic words...");
-    const gridRes = await fetch("https://storyclue-git-june3-complete-robert-buckmaster-s-projects.vercel.app/api/grid-builder", {
+    const gridRes = await fetch(`${baseUrl}/api/grid-builder`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pattern, slots, topicWords, seed: 0, timeLimit: 6 }),
+      body: JSON.stringify({ pattern, slots, topicWords, seed: 0 }),
     });
     if (!gridRes.ok) {
       const errorText = await gridRes.text();
