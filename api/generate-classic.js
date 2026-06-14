@@ -163,14 +163,16 @@ export default async function handler(req, res) {
 
     // Build final clue set
     const clues = across.concat(down).map(a => {
-      const clueSet = clueMap[a.answer] || { rich: `${a.answer} clue`, classic: a.answer };
-      return {
+      const clueSet = clueMap[a.answer] || { rich: `${a.answer}`, classic: a.answer };
+      const clueObj = {
         num: a.num,
         dir: a.dir,
-        clue_rich: clueSet.rich,
-        clue_classic: clueSet.classic,
+        clue_rich: clueSet.rich || `${a.answer} clue`,
+        clue_classic: clueSet.classic || a.answer,
         on_topic: true,
       };
+      console.log(`[generate-classic] Clue for ${a.num}${a.dir} (${a.answer}): ${clueObj.clue_rich}`);
+      return clueObj;
     });
 
     // Return complete puzzle
