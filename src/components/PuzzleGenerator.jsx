@@ -242,6 +242,9 @@ export default function PuzzleGenerator() {
   const [generatedPuzzle, setGeneratedPuzzle] = useState(null); // {title, studentUrl, teacherUrl, playPath}
   const [copiedLink,      setCopiedLink]      = useState("");   // "student" | "teacher" | ""
 
+  // ── Puzzle Mode: Traditional vs Small Crossword ─────────────────────────────
+  const [puzzleMode, setPuzzleMode] = useState("traditional"); // "traditional" | "crossword"
+
   // ── Persist prefs whenever they change ─────────────────────────────────
   useEffect(() => {
     savePrefs({ inputMode, grade, faith, language, bilingualMode });
@@ -496,15 +499,23 @@ export default function PuzzleGenerator() {
         struggleWords, // spaced repetition injection
       };
 
-      // Route to generation endpoint
-      const endpoint = "/api/generate";
+      // Route to generation endpoint based on puzzle mode
+      const endpoint = puzzleMode === "crossword" ? "/api/generate-crossword" : "/api/generate";
+
+      // For crossword mode, send different request format
+      const crosswordBody = puzzleMode === "crossword" ? {
+        content: text || chapterText || bookRef || urlRef,
+        grade,
+        gridSize: 7
+      } : body;
+
       const res = await fetch(endpoint, {
         method: "POST",
         headers: {
           "content-type": "application/json",
           "x-user-id": user?.id || "",
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify(crosswordBody),
       });
 
       const data = await res.json();
@@ -515,35 +526,61 @@ export default function PuzzleGenerator() {
         return;
       }
 
-      // Traditional engine response handling
+      // Response handling
       if (!res.ok || data.error) {
         setError(data.error || "Could not generate puzzle. Please try again.");
         setLoading(false);
         return;
       }
 
-      if (!data.words || data.words.length < 3) {
-        setError("No vocabulary found. Try being more specific about the book and chapter.");
-        setLoading(false);
-        return;
+      let puzzleData;
+
+      if (puzzleMode === "crossword") {
+        // Small Crossword response format
+        if (!data.puzzle || !data.puzzle.grid) {
+          setError("Failed to generate crossword grid. Try different content.");
+          setLoading(false);
+          return;
+        }
+
+        const { grid, answers, clues } = data.puzzle;
+        puzzleData = {
+          title: title.trim() || "Small Crossword Puzzle",
+          grade,
+          language: "english",
+          rows: grid.length,
+          cols: grid[0]?.length || 7,
+          words: [...answers.across, ...answers.down],
+          grid,
+          answers,
+          clues,
+          isSmallCrossword: true,
+        };
+      } else {
+        // Traditional response format
+        if (!data.words || data.words.length < 3) {
+          setError("No vocabulary found. Try being more specific about the book and chapter.");
+          setLoading(false);
+          return;
+        }
+
+        const layout = buildLayout(data.words, grade, data.puzzleStyle || puzzleStyle);
+
+        if (!layout) {
+          setError("Couldn't build a grid from this content. Try a different chapter or paste the text directly.");
+          setLoading(false);
+          return;
+        }
+
+        puzzleData = {
+          title: title.trim() || data.title || "StoryClue Puzzle",
+          grade,
+          language: data.language || "english",
+          rows: layout.rows,
+          cols: layout.cols,
+          words: layout.words,
+        };
       }
-
-      const layout = buildLayout(data.words, grade, data.puzzleStyle || puzzleStyle);
-
-      if (!layout) {
-        setError("Couldn't build a grid from this content. Try a different chapter or paste the text directly.");
-        setLoading(false);
-        return;
-      }
-
-      const puzzleData = {
-        title: title.trim() || data.title || "StoryClue Puzzle",
-        grade,
-        language: data.language || "english",
-        rows: layout.rows,
-        cols: layout.cols,
-        words: layout.words,
-      };
 
       // Items 1 + 6: save puzzle to Postgres, get back a permanent readable slug
       const saveRes = await fetch("/api/save-puzzle", {
@@ -831,6 +868,37 @@ export default function PuzzleGenerator() {
                   📄 Upload PDF
                 </button>
               )}
+            </div>
+          </div>
+
+          {/* ── PUZZLE TYPE: Traditional vs Small Crossword ────────────────── */}
+          <div style={{ marginBottom:"24px" }}>
+            <label style={labelStyle}>Puzzle Type</label>
+            <div style={{ display:"flex", gap:"12px" }}>
+              <button
+                type="button"
+                className={`mode-btn${puzzleMode==="traditional"?" on":""}`}
+                onClick={() => setPuzzleMode("traditional")}
+                style={{ flex:1, padding:"14px 10px", lineHeight:1.4 }}
+              >
+                <div style={{ fontSize:"18px", marginBottom:"4px" }}>📖</div>
+                <div style={{ fontWeight:700, fontSize:"13px" }}>Traditional</div>
+                <div style={{ fontSize:"11px", opacity:.8, marginTop:"2px", fontFamily:"Lora,serif", fontWeight:400 }}>
+                  Flexible size, on-topic words
+                </div>
+              </button>
+              <button
+                type="button"
+                className={`mode-btn${puzzleMode==="crossword"?" on":""}`}
+                onClick={() => setPuzzleMode("crossword")}
+                style={{ flex:1, padding:"14px 10px", lineHeight:1.4 }}
+              >
+                <div style={{ fontSize:"18px", marginBottom:"4px" }}>🔲</div>
+                <div style={{ fontWeight:700, fontSize:"13px" }}>Small Crossword</div>
+                <div style={{ fontSize:"11px", opacity:.8, marginTop:"2px", fontFamily:"Lora,serif", fontWeight:400 }}>
+                  7×7 symmetric grid
+                </div>
+              </button>
             </div>
           </div>
 
