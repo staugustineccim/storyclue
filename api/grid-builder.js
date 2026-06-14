@@ -79,9 +79,13 @@ export default async function handler(req, res) {
   try {
     // Load wordlist and build word list
     const wordlistData = await loadWordlist();
+    console.log(`[grid-builder] Topic words received: ${topicWords?.length || 0}`);
+    console.log(`[grid-builder] Sample topic words:`, topicWords?.slice(0, 5));
+
     const words = buildWordList(topicWords, wordlistData, grade);
 
-    console.log(`[grid-builder] Using proven crossword-generator for grade: ${grade}, words: ${words.length}`);
+    console.log(`[grid-builder] Total words for crossword: ${words.length}`);
+    console.log(`[grid-builder] Grade: ${grade}`);
 
     // Use proven crossword-generator package
     console.log(`[grid-builder] Calling generateCrossword with ${words.length} words`);
