@@ -171,7 +171,14 @@ export default async function handler(req, res) {
     const wordlistData = await loadWordlist();
     const wordsByLength = buildWordList(topicWords, wordlistData, grade);
 
-    console.log(`[grid-builder] Filling for grade: ${grade}, max word length: ${Object.keys(wordsByLength).pop()}`);
+    // Debug: log wordlist sizes
+    let totalWords = 0;
+    for (let len = 3; len <= 8; len++) {
+      const count = (wordsByLength[len] || []).length;
+      totalWords += count;
+      console.log(`[grid-builder] Length ${len}: ${count} words`);
+    }
+    console.log(`[grid-builder] Total: ${totalWords} words, Grade: ${grade}, Slots: ${slots.length}`);
 
     // Random-restart greedy: try up to 100 times with different slot orders
     for (let attempt = 0; attempt < 100; attempt++) {
