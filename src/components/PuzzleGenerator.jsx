@@ -515,16 +515,6 @@ export default function PuzzleGenerator() {
         return;
       }
 
-      // Handle Classic engine response (different structure)
-      if (useClassicEngine) {
-        if (!res.ok || !data.success) {
-          setError(data.error || "Could not generate classic crossword. Please try again.");
-          setLoading(false);
-          return;
-        }
-
-      }
-
       // Traditional engine response handling
       if (!res.ok || data.error) {
         setError(data.error || "Could not generate puzzle. Please try again.");
