@@ -99,6 +99,9 @@ export default async function handler(req, res) {
     const across = [];
     const down = [];
 
+    console.log(`[grid-builder] placedWords count: ${result.placedWords.length}`);
+    console.log(`[grid-builder] Sample word:`, result.placedWords[0]);
+
     for (const pw of result.placedWords) {
       if (pw.orientation === "across") {
         across.push({ num: pw.number, dir: "A", answer: pw.word });
@@ -109,6 +112,8 @@ export default async function handler(req, res) {
         down.push({ num: pw.number, dir: "D", answer: pw.word });
       }
     }
+
+    console.log(`[grid-builder] Result: ${across.length} across, ${down.length} down`);
 
     // Return result
     return res.status(200).json({
