@@ -80,20 +80,19 @@ function greedyFill(pattern, slots, wordsByLength, attempt = 0) {
 
   // Randomize slot order for each attempt
   const slotOrder = Array.from({ length: slots.length }, (_, i) => i);
-  if (attempt > 0) {
-    for (let i = slotOrder.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [slotOrder[i], slotOrder[j]] = [slotOrder[j], slotOrder[i]];
-    }
+  for (let i = slotOrder.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [slotOrder[i], slotOrder[j]] = [slotOrder[j], slotOrder[i]];
   }
 
-  // Greedy fill: for each slot, pick first matching word
+  // Greedy fill: for each slot, find candidates and pick randomly (not just first)
   for (const si of slotOrder) {
     const slot = slots[si];
     const len = slot.length;
     const words = wordsByLength[len] || [];
 
-    let placed = false;
+    // Find all matching candidates
+    const candidates = [];
     for (const word of words) {
       if (used.has(word)) continue;
 
@@ -108,19 +107,22 @@ function greedyFill(pattern, slots, wordsByLength, attempt = 0) {
       }
 
       if (matches) {
-        // Place word
-        for (let i = 0; i < len; i++) {
-          const [r, c] = slot[i];
-          grid[`${r},${c}`] = word[i];
-        }
-        used.add(word);
-        assignment[si] = word;
-        placed = true;
-        break;
+        candidates.push(word);
       }
     }
 
-    if (!placed) return null; // Dead end, restart
+    if (candidates.length === 0) return null; // Dead end, restart
+
+    // Pick random candidate (not just first) to increase diversity
+    const word = candidates[Math.floor(Math.random() * candidates.length)];
+
+    // Place word
+    for (let i = 0; i < len; i++) {
+      const [r, c] = slot[i];
+      grid[`${r},${c}`] = word[i];
+    }
+    used.add(word);
+    assignment[si] = word;
   }
 
   const fillTime = (Date.now() - t0) / 1000;
