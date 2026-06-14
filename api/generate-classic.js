@@ -156,7 +156,7 @@ export default async function handler(req, res) {
     const gridRes = await fetch(`${baseUrl}/api/grid-builder`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pattern, slots, topicWords, seed: 0 }),
+      body: JSON.stringify({ pattern, slots, topicWords, seed: 0, grade }),
     });
     if (!gridRes.ok) {
       const errorText = await gridRes.text();

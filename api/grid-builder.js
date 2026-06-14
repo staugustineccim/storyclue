@@ -24,20 +24,37 @@ async function loadWordlist() {
   }
 }
 
-function buildWordList(topicWords, wordsByLengthBase) {
-  const wordsByLength = {};
+function filterWordListByGrade(wordsByLengthBase, grade = "6-12") {
+  // Grade levels determine max word length
+  const maxLenByGrade = {
+    "K": 5,
+    "1st": 6,
+    "2nd": 6,
+    "3rd-5th": 8,
+    "6-12": 8,
+    "Reader Mode": 8,
+  };
 
-  // Initialize from loaded wordlist
-  for (let len = 3; len <= 8; len++) {
-    wordsByLength[len] = Array.isArray(wordsByLengthBase[len]) ? [...wordsByLengthBase[len]] : [];
+  const maxLen = maxLenByGrade[grade] || 8;
+
+  const filtered = {};
+  for (let len = 3; len <= maxLen; len++) {
+    filtered[len] = Array.isArray(wordsByLengthBase[len]) ? [...wordsByLengthBase[len]] : [];
   }
+  return filtered;
+}
+
+function buildWordList(topicWords, wordsByLengthBase, grade = "6-12") {
+  // Filter wordlist by grade first
+  const wordsByLength = filterWordListByGrade(wordsByLengthBase, grade);
 
   // Add topic words first (prioritized, at the beginning)
   if (topicWords && Array.isArray(topicWords)) {
     for (const word of topicWords) {
       const w = String(word).toUpperCase();
       const len = w.length;
-      if (len >= 3 && len <= 8 && !wordsByLength[len].includes(w)) {
+      const maxLen = filterWordListByGrade(wordsByLengthBase, grade);
+      if (len >= 3 && len <= 8 && maxLen[len] && !wordsByLength[len].includes(w)) {
         wordsByLength[len].unshift(w);
       }
     }
@@ -144,13 +161,15 @@ function greedyFill(pattern, slots, wordsByLength, attempt = 0) {
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Not allowed" });
-  const { pattern, slots, topicWords = [], seed = 0 } = req.body;
+  const { pattern, slots, topicWords = [], seed = 0, grade = "6-12" } = req.body;
   if (!pattern || !slots) return res.status(400).json({ error: "Missing data" });
 
   try {
     // Load wordlist
     const wordlistData = await loadWordlist();
-    const wordsByLength = buildWordList(topicWords, wordlistData);
+    const wordsByLength = buildWordList(topicWords, wordlistData, grade);
+
+    console.log(`[grid-builder] Filling for grade: ${grade}, max word length: ${Object.keys(wordsByLength).pop()}`);
 
     // Random-restart greedy: try up to 20 times with different slot orders
     for (let attempt = 0; attempt < 20; attempt++) {
