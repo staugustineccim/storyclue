@@ -61,9 +61,31 @@ const CARDS = [
     bg:        "#f1f8e9",
     border:    "#a5d6a7",
   },
+  {
+    id:        "church",
+    icon:      "⛪",
+    title:     "Church & Sermon Recap",
+    subtitle:  "Free for every pastor",
+    desc:      "Turn your weekly sermon into an engaging crossword recap for your congregation. Automated. Free. Every Sunday.",
+    pills:     ["Sermon Recap", "Auto-Send Sunday", "Engagement Dashboard", "Free Forever"],
+    accent:    "#2D5A1A",
+    bg:        "#f1f8e9",
+    border:    "#2D5A1A",
+    churchRoute: true,
+  },
 ];
 
 export default function AudienceSelector({ onSelect }) {
+  // Church card redirects to /church — needs navigate
+  // We use a simple window.location since AudienceSelector doesn't use router context directly
+  function handleSelect(cardId) {
+    if (cardId === "church") {
+      window.location.href = "/church";
+      return;
+    }
+    onSelect(cardId);
+  }
+
   return (
     <div style={{
       minHeight: "100vh",
@@ -164,7 +186,7 @@ export default function AudienceSelector({ onSelect }) {
                 background: card.bg,
                 borderColor: card.border,
               }}
-              onClick={() => onSelect(card.id)}
+              onClick={() => handleSelect(card.id)}
             >
               <div style={{ fontSize: "3rem", marginBottom: "12px" }}>{card.icon}</div>
               <h2 style={{

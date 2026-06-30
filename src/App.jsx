@@ -4,6 +4,9 @@ import LandingPage from "./components/LandingPage";
 import PuzzleGenerator from "./components/PuzzleGenerator";
 import CrosswordPuzzle from "./components/CrosswordPuzzle";
 import AdminDashboard from "./components/AdminDashboard";
+import ChurchMode from "./components/ChurchMode";
+import ChurchOnboarding from "./components/ChurchOnboarding";
+import PastorDashboard from "./components/PastorDashboard";
 import NotFound from "./components/NotFound";
 
 export default function App() {
@@ -15,6 +18,9 @@ export default function App() {
         <Route path="/play" element={<CrosswordPuzzle />} />
         <Route path="/play/:slug" element={<CrosswordPuzzle />} />
         <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/church" element={<ChurchMode />} />
+        <Route path="/church/setup" element={<ChurchOnboarding />} />
+        <Route path="/church/dashboard" element={<PastorDashboard />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AuthProvider>

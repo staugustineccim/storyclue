@@ -2,6 +2,12 @@
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
+  "crons": [
+    {
+      "path": "/api/cron/pull-sunday-sermon",
+      "schedule": "15 15 * * 0"
+    }
+  ],
   "installCommand": "npm install",
   "buildCommand": "npm install && chmod +x ./node_modules/.bin/vite && npm run build",
   "framework": "vite"
