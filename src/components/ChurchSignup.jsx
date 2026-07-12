@@ -7,7 +7,7 @@ const P = "#F4EFE4";
 
 export default function ChurchSignup() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ pastorName:"", churchName:"", email:"", youtubeChannel:"", sendTime:"14:00" });
+  const [form, setForm] = useState({ pastorName:"", churchName:"", email:"", youtubeChannel:"", serviceTime:"10:00", sendTime:"14:00" });
   const [status, setStatus] = useState("idle"); // idle | saving | done | error
   const [error, setError] = useState("");
 
@@ -27,6 +27,7 @@ export default function ChurchSignup() {
         church_name: form.churchName,
         sender_email: form.email,
         youtube_channel: form.youtubeChannel || null,
+        service_time: form.serviceTime,
         send_time: form.sendTime,
       });
       if (dbError) throw dbError;
@@ -103,6 +104,15 @@ export default function ChurchSignup() {
             <label>YouTube Channel URL</label>
             <input value={form.youtubeChannel} onChange={e => set("youtubeChannel", e.target.value)} placeholder="https://www.youtube.com/@YourChurch" />
             <span className="hint">We'll watch this for new Sunday sermons. You can also paste sermon text manually.</span>
+          </div>
+          <div className="field">
+            <label>Sunday service start time</label>
+            <select value={form.serviceTime} onChange={e => set("serviceTime", e.target.value)}>
+              {["8:00","9:00","9:30","10:00","10:30","11:00","11:30","12:00"].map(t => (
+                <option key={t} value={t}>{t} AM</option>
+              ))}
+            </select>
+            <span className="hint">We'll look for a video posted within 2 hours of this time</span>
           </div>
           <div className="field">
             <label>Send puzzle to you by</label>
