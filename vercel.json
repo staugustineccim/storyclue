@@ -4,5 +4,9 @@
   ],
   "installCommand": "npm install",
   "buildCommand": "npm install && chmod +x ./node_modules/.bin/vite && npm run build",
-  "framework": "vite"
+  "framework": "vite",
+  "devCommand": "vite --port 5173",
+  "crons": [
+    { "path": "/api/cron/sunday-sermon", "schedule": "0 18 * * 0" }
+  ]
 }
