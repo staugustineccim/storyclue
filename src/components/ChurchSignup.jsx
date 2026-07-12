@@ -43,9 +43,9 @@ export default function ChurchSignup() {
       <div style={{ minHeight:"100vh", background:P, fontFamily:"Georgia,serif", display:"flex", alignItems:"center", justifyContent:"center", padding:"40px 24px" }}>
         <div style={{ maxWidth:"480px", textAlign:"center" }}>
           <div style={{ fontSize:"4rem", marginBottom:"16px" }}>✅</div>
-          <h1 style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"28px", color:"#2c1a08", marginBottom:"12px" }}>You're all set, Pastor {form.pastorName}!</h1>
+          <h1 style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"28px", color:"#2c1a08", marginBottom:"12px" }}>You're all set, {form.pastorName}!</h1>
           <p style={{ fontFamily:"Lora,serif", fontSize:"16px", color:"#5a4a28", lineHeight:1.7, marginBottom:"32px" }}>
-            We'll watch your YouTube channel every Sunday. After your service, we'll generate a crossword from your sermon and email it to <strong>{form.email}</strong> by {form.sendTime === "14:00" ? "2:00 PM" : form.sendTime}.
+            We'll watch your YouTube channel every Sunday. After your service, we'll generate a crossword from your sermon and email it to <strong>{form.email}</strong> by {{"13:00":"1:00 PM","14:00":"2:00 PM","15:00":"3:00 PM","16:00":"4:00 PM","17:00":"5:00 PM"}[form.sendTime] || form.sendTime}.
           </p>
           <p style={{ fontFamily:"Lora,serif", fontSize:"14px", color:"#8a7a5a", marginBottom:"32px" }}>
             Forward that link to your congregation however you normally reach them — email, church bulletin, text message.
