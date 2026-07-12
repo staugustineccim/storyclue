@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "../utils/supabase";
 
 const G = "#2D5A1A";
 const P = "#F4EFE4";
@@ -21,14 +22,17 @@ export default function ChurchSignup() {
     setStatus("saving");
     setError("");
     try {
-      const res = await fetch("/api/church-signup", {
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify(form),
+      const { error: dbError } = await supabase.from("church_accounts").insert({
+        pastor_name: form.pastorName,
+        church_name: form.churchName,
+        sender_email: form.email,
+        youtube_channel: form.youtubeChannel || null,
+        send_time: form.sendTime,
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (dbError) throw dbError;
       setStatus("done");
     } catch (err) {
+      console.error("church signup error:", err);
       setError("Something went wrong. Please try again.");
       setStatus("idle");
     }
