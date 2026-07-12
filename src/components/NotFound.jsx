@@ -5,7 +5,7 @@ export default function NotFound() {
   return (
     <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", minHeight:"100vh", background:"#faf7f0", fontFamily:"Georgia,serif", padding:"40px 24px", textAlign:"center" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Lora:ital,wght@0,400;1,400&display=swap');`}</style>
-      <div style={{ fontSize:"64px", marginBottom:"16px" }}>🕷️</div>
+      <div style={{ marginBottom:"16px" }}><img src="/logo.jpg" alt="StoryClue" style={{ width:"80px", height:"80px", borderRadius:"16px", objectFit:"cover" }} /></div>
       <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"80px", color:"#2d4a18", lineHeight:1, marginBottom:"8px" }}>404</div>
       <h1 style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"26px", color:"#2c1a08", marginBottom:"12px" }}>
         Charlotte couldn't find this page either

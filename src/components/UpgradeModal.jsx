@@ -93,7 +93,7 @@ export default function UpgradeModal({ onClose, forced = false }) {
           <>
             {/* Header */}
             <div style={{ textAlign: "center", marginBottom: "1.5rem" }}>
-              <div style={{ fontSize: "2.2rem", marginBottom: "6px" }}>🕷️</div>
+              <div style={{ marginBottom: "6px" }}><img src="/logo.jpg" alt="StoryClue" style={{ width:"48px", height:"48px", borderRadius:"10px", objectFit:"cover" }} /></div>
               <h2 style={heading}>
                 {isOver || inGrace
                   ? "Keep StoryClue going"

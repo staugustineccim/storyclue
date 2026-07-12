@@ -106,7 +106,7 @@ export default function AudienceSelector({ onSelect }) {
         gap: "12px",
         borderBottom: "2px solid #8A7A30",
       }}>
-        <span style={{ fontSize: "26px" }}>🕷️</span>
+        <img src="/logo.jpg" alt="StoryClue" style={{ width:"32px", height:"32px", borderRadius:"6px", objectFit:"cover" }} />
         <span style={{
           fontFamily: "'Playfair Display',serif",
           fontWeight: 900,
@@ -125,7 +125,7 @@ export default function AudienceSelector({ onSelect }) {
         justifyContent: "center",
         padding: "48px 24px",
       }}>
-        <div style={{ fontSize: "3rem", marginBottom: "12px" }}>🕷️</div>
+        <div style={{ marginBottom: "12px" }}><img src="/logo.jpg" alt="StoryClue" style={{ width:"72px", height:"72px", borderRadius:"14px", objectFit:"cover" }} /></div>
         <h1 style={{
           fontFamily: "'Playfair Display',serif",
           fontWeight: 900,

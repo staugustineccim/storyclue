@@ -41,7 +41,7 @@ export default function LandingPage() {
 
       {/* ── NAV ───────────────────────────────────────────────────────────── */}
       <nav style={{ background:G, padding:"14px 24px", display:"flex", alignItems:"center", gap:"20px", position:"sticky", top:0, zIndex:100, borderBottom:"2px solid "+A }}>
-        <span style={{ fontSize:"24px" }}>🕷️</span>
+        <img src="/logo.jpg" alt="StoryClue" style={{ width:"32px", height:"32px", borderRadius:"6px", objectFit:"cover" }} />
         <span style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"20px", color:P, flex:1 }}>StoryClue</span>
         <a href="#how-it-works">How It Works</a>
         <a href="#features">Features</a>
@@ -56,7 +56,7 @@ export default function LandingPage() {
       {/* ── HERO ──────────────────────────────────────────────────────────── */}
       <section style={{ background:`linear-gradient(160deg,${G} 0%,#4a7a22 60%,#3a6018 100%)`, padding:"80px 24px 72px", textAlign:"center" }}>
         <div style={{ maxWidth:"820px", margin:"0 auto" }}>
-          <div style={{ fontSize:"56px", marginBottom:"16px" }}>🕷️</div>
+          <div style={{ marginBottom:"16px" }}><img src="/logo.jpg" alt="StoryClue" style={{ width:"96px", height:"96px", borderRadius:"16px", objectFit:"cover" }} /></div>
           <h1 style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"clamp(30px,5vw,52px)", color:P, lineHeight:1.15, marginBottom:"20px" }}>
             AI Crossword Puzzles From Any Book,<br/>Chapter, Website, or Faith Text
           </h1>
@@ -351,7 +351,7 @@ export default function LandingPage() {
       {/* ── FOOTER ────────────────────────────────────────────────────────── */}
       <footer style={{ background:"#1a2e0a", padding:"28px 24px", textAlign:"center" }}>
         <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"18px", color:P, marginBottom:"8px" }}>
-          🕷️ StoryClue
+          <img src="/logo.jpg" alt="" style={{ width:"20px", height:"20px", borderRadius:"4px", objectFit:"cover", verticalAlign:"middle", marginRight:"6px" }} />StoryClue
         </div>
         <div style={{ fontFamily:"Lora,serif", fontSize:"13px", color:"rgba(240,234,216,.6)", marginBottom:"12px", fontStyle:"italic" }}>
           AI Generated Crossword Puzzle Maker · StoryClue.ai
