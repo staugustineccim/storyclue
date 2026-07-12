@@ -12,6 +12,8 @@
  *   adult          → Adult / Reader Mode
  */
 
+import { useNavigate } from "react-router-dom";
+
 const G  = "#2D5A1A";
 const P  = "#F4EFE4";
 const D  = "#2c1a08";
@@ -64,6 +66,7 @@ const CARDS = [
 ];
 
 export default function AudienceSelector({ onSelect }) {
+  const navigate = useNavigate();
   return (
     <div style={{
       minHeight: "100vh",
@@ -212,6 +215,27 @@ export default function AudienceSelector({ onSelect }) {
               </div>
             </div>
           ))}
+          {/* Church card */}
+          <div
+            className="aud-card"
+            style={{ background: "#f0f7ee", borderColor: "#81c784", cursor: "pointer" }}
+            onClick={() => navigate("/church")}
+          >
+            <div style={{ fontSize: "3rem", marginBottom: "12px" }}>⛪</div>
+            <h2 style={{ fontFamily: "'Playfair Display',serif", fontWeight: 900, fontSize: "20px", color: G, marginBottom: "4px" }}>Churches</h2>
+            <div style={{ fontFamily: "Lora,serif", fontSize: "13px", fontWeight: 600, color: "#666", marginBottom: "12px" }}>Sunday Sermon Crosswords</div>
+            <p style={{ fontFamily: "Lora,serif", fontSize: "14px", color: "#4a3a18", lineHeight: 1.65, marginBottom: "16px" }}>
+              Every Sunday, we watch your YouTube channel, pull the sermon, and email you a crossword puzzle your congregation will love.
+            </p>
+            <div>
+              {["Auto Every Sunday", "No Manual Work", "Pastor Email Delivery", "Free Forever"].map(pill => (
+                <span key={pill} className="aud-pill" style={{ background: G + "18", color: G, border: `1px solid ${G}44` }}>{pill}</span>
+              ))}
+            </div>
+            <div style={{ marginTop: "20px", padding: "10px 20px", background: G, color: "#fff", borderRadius: "8px", textAlign: "center", fontFamily: "'Playfair Display',serif", fontWeight: 700, fontSize: "14px" }}>
+              Set Up My Church →
+            </div>
+          </div>
         </div>
 
         <p style={{
