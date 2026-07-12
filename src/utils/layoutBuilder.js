@@ -66,17 +66,20 @@ function canPlace(word, row, col, orientation, grid, rows, cols) {
 
     if (existing !== null && existing !== letter) return false;
 
+    // Boundary checks always run — even at intersections — so numbering never breaks
+    if (i === 0) {
+      const pr = orientation === "down" ? r - 1 : r;
+      const pc = orientation === "across" ? c - 1 : c;
+      if (pr >= 0 && pc >= 0 && grid[pr]?.[pc] !== null) return false;
+    }
+    if (i === len - 1) {
+      const nr = orientation === "down" ? r + 1 : r;
+      const nc = orientation === "across" ? c + 1 : c;
+      if (nr < rows && nc < cols && grid[nr]?.[nc] !== null) return false;
+    }
+
+    // Parallel adjacency only for non-intersection cells
     if (existing === null) {
-      if (i === 0) {
-        const pr = orientation === "down" ? r - 1 : r;
-        const pc = orientation === "across" ? c - 1 : c;
-        if (pr >= 0 && pc >= 0 && grid[pr]?.[pc] !== null && grid[pr]?.[pc] !== undefined) return false;
-      }
-      if (i === len - 1) {
-        const nr = orientation === "down" ? r + 1 : r;
-        const nc = orientation === "across" ? c + 1 : c;
-        if (nr < rows && nc < cols && grid[nr]?.[nc] !== null && grid[nr]?.[nc] !== undefined) return false;
-      }
       if (orientation === "across") {
         if (r > 0 && grid[r-1][c] !== null) return false;
         if (r < rows-1 && grid[r+1][c] !== null) return false;
@@ -144,7 +147,10 @@ function shuffle(arr) {
 export function buildLayout(apiWords, grade = "3") {
   if (!apiWords?.length) return null;
 
-  const baseList = apiWords.map(w => ({ ...w, answer: w.word.toUpperCase(), clue: w.clue }));
+  const seen = new Set();
+  const baseList = apiWords
+    .filter(w => { const k = w.word.toUpperCase(); if (seen.has(k)) return false; seen.add(k); return true; })
+    .map(w => ({ ...w, answer: w.word.toUpperCase(), clue: w.clue }));
   const sorted = [...baseList].sort((a, b) => b.answer.length - a.answer.length);
 
   const longestLen = sorted[0].answer.length;

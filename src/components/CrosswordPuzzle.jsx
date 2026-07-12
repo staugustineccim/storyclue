@@ -1166,7 +1166,7 @@ function PuzzleBoard({
         <div style={{ flex:1, display:"flex", flexDirection:"column", minHeight:0, overflow:"hidden" }}>
 
           {/* GRID PANE */}
-          <div className="grid-pane" style={{ flex:"55", minHeight:0, overflowX:"auto", overflowY:"auto", WebkitOverflowScrolling:"touch", padding:"10px", background:"#faf7f0" }}>
+          <div className="grid-pane" style={{ flex:"55", minHeight:0, overflowX:"auto", overflowY:"auto", WebkitOverflowScrolling:"touch", padding:"10px", background:"#faf7f0", display:"flex", justifyContent:"center", alignItems:"flex-start" }}>
             <div style={{
               display:"inline-block",
               background:"rgba(255,254,245,.98)",
