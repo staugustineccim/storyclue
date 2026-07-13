@@ -3,14 +3,11 @@
 // fetches captions, generates puzzle, emails pastor the puzzle link.
 
 import { createClient } from "@supabase/supabase-js";
-import Anthropic from "@anthropic-ai/sdk";
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // ── YouTube RSS — no API key needed ──────────────────────────────────────────
 async function getChannelIdFromUrl(channelUrl) {
@@ -127,15 +124,18 @@ Return ONLY valid JSON in this exact format:
   ]
 }`;
 
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 1500,
-    messages: [{ role: "user", content: prompt }],
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": process.env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1500, messages: [{ role: "user", content: prompt }] }),
   });
-
-  const text = response.content[0].text;
-  const json = JSON.parse(text.replace(/```json\n?|\n?```/g, "").trim());
-  return json;
+  const data = await response.json();
+  const text = data.content[0].text;
+  return JSON.parse(text.replace(/```json\n?|\n?```/g, "").trim());
 }
 
 // ── Send email via Resend (free tier: 3000/month) ────────────────────────────

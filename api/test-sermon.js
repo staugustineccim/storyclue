@@ -1,10 +1,6 @@
 // Manual test endpoint — triggers full sermon pipeline for a specific video
 // Usage: POST /api/test-sermon with { "videoId": "a39qncc_RlU", "secret": "storyclue-sunday-2024" }
 
-import Anthropic from "@anthropic-ai/sdk";
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
 async function transcribeVideo(videoId) {
   const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
@@ -67,13 +63,17 @@ Return ONLY valid JSON:
   ]
 }`;
 
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 1500,
-    messages: [{ role: "user", content: prompt }],
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": process.env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1500, messages: [{ role: "user", content: prompt }] }),
   });
-
-  const text = response.content[0].text;
+  const data = await response.json();
+  const text = data.content[0].text;
   return JSON.parse(text.replace(/```json\n?|\n?```/g, "").trim());
 }
 
