@@ -1,12 +1,6 @@
 // Runs every Sunday at 1pm ET via Vercel cron
 // Submit transcription jobs (don't wait for results)
-
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// Uses Supabase REST API (no SDK, no WebSocket issues)
 
 // ── YouTube RSS — no API key needed ──────────────────────────────────────────
 async function getChannelIdFromUrl(channelUrl) {
@@ -162,6 +156,66 @@ async function emailPastor(toEmail, pastorName, puzzleUrl, sermonTitle) {
   });
 }
 
+// ── Supabase REST API helpers ──────────────────────────────────────────────
+async function getChurches() {
+  const res = await fetch(
+    `${process.env.SUPABASE_URL}/rest/v1/church_accounts?youtube_channel=not.is.null`,
+    {
+      headers: {
+        "apikey": process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    }
+  );
+  return res.json();
+}
+
+async function getExistingSermon(churchId, videoId) {
+  const res = await fetch(
+    `${process.env.SUPABASE_URL}/rest/v1/church_sermons?church_account_id=eq.${churchId}&video_id=eq.${videoId}`,
+    {
+      headers: {
+        "apikey": process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    }
+  );
+  const data = await res.json();
+  return data[0] || null;
+}
+
+async function createSermonRecord(churchId, videoId, title) {
+  const res = await fetch(`${process.env.SUPABASE_URL}/rest/v1/church_sermons`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
+      "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+      "Prefer": "return=representation",
+    },
+    body: JSON.stringify({
+      church_account_id: churchId,
+      video_id: videoId,
+      sermon_title: title,
+      status: "queued",
+    }),
+  });
+  const data = await res.json();
+  return data[0] || data;
+}
+
+async function updateSermonRecord(sermonId, updates) {
+  return fetch(`${process.env.SUPABASE_URL}/rest/v1/church_sermons?id=eq.${sermonId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
+      "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+    },
+    body: JSON.stringify(updates),
+  });
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -171,87 +225,67 @@ export default async function handler(req, res) {
   const today = new Date();
   const results = [];
 
-  const { data: churches, error } = await supabase
-    .from("church_accounts")
-    .select("*")
-    .not("youtube_channel", "is", null);
+  try {
+    const churches = await getChurches();
 
-  if (error) return res.status(500).json({ error: error.message });
+    for (const church of churches) {
+      try {
+        const channelId = await getChannelIdFromUrl(church.youtube_channel);
+        if (!channelId) { results.push({ church: church.church_name, status: "no channel ID" }); continue; }
 
-  for (const church of churches) {
-    try {
-      const channelId = await getChannelIdFromUrl(church.youtube_channel);
-      if (!channelId) { results.push({ church: church.church_name, status: "no channel ID" }); continue; }
+        const videos = await getRecentVideos(channelId);
 
-      const videos = await getRecentVideos(channelId);
+        const matches = findSermonVideo(videos, church.service_time || "10:00", today);
+        if (matches.length === 0) { results.push({ church: church.church_name, status: "no video found in window" }); continue; }
+        if (matches.length > 1)   { results.push({ church: church.church_name, status: "multiple videos found — pastor notified" }); continue; }
 
-      const matches = findSermonVideo(videos, church.service_time || "10:00", today);
-      if (matches.length === 0) { results.push({ church: church.church_name, status: "no video found in window" }); continue; }
-      if (matches.length > 1)   { results.push({ church: church.church_name, status: "multiple videos found — pastor notified" }); continue; }
+        const sermon = matches[0];
 
-      const sermon = matches[0];
+        const existing = await getExistingSermon(church.id, sermon.videoId);
+        if (existing) { results.push({ church: church.church_name, status: "already processed" }); continue; }
 
-      const { data: existing } = await supabase
-        .from("church_sermons")
-        .select("id")
-        .eq("church_account_id", church.id)
-        .eq("video_id", sermon.videoId)
-        .single();
-      if (existing) { results.push({ church: church.church_name, status: "already processed" }); continue; }
+        // Create sermon record
+        const sermonRecord = await createSermonRecord(church.id, sermon.videoId, sermon.title);
+        if (!sermonRecord.id) { results.push({ church: church.church_name, status: "db error creating record" }); continue; }
 
-      // Create sermon record
-      const { data: sermonRecord, error: insertError } = await supabase
-        .from("church_sermons")
-        .insert({
-          church_account_id: church.id,
-          video_id: sermon.videoId,
-          sermon_title: sermon.title,
-          status: "queued",
-        })
-        .select("id")
-        .single();
+        // Submit transcription job
+        const transcriptionResult = await submitTranscriptionJob(sermon.videoId);
 
-      if (insertError) { results.push({ church: church.church_name, status: "db error", error: insertError.message }); continue; }
+        if (transcriptionResult.transcript) {
+          // Got transcript immediately (video has captions) — generate puzzle now
+          const puzzleData = await generateSermonPuzzle(transcriptionResult.transcript, sermon.title, church.church_name, church.pastor_name);
 
-      // Submit transcription job
-      const transcriptionResult = await submitTranscriptionJob(sermon.videoId);
+          const slug = `${sermon.title.toLowerCase().replace(/[^a-z0-9]+/g,"-").slice(0,40)}-sermon-${Date.now()}`;
+          await fetch(`${process.env.VERCEL_URL ? "https://"+process.env.VERCEL_URL : "http://localhost:3000"}/api/save-puzzle`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ slug, title: puzzleData.title, words: puzzleData.words, grade: "adult", source: "church" }),
+          });
 
-      if (transcriptionResult.transcript) {
-        // Got transcript immediately (video has captions) — generate puzzle now
-        const puzzleData = await generateSermonPuzzle(transcriptionResult.transcript, sermon.title, church.church_name, church.pastor_name);
+          const puzzleUrl = `https://storyclue.ai/play/${slug}`;
 
-        const slug = `${sermon.title.toLowerCase().replace(/[^a-z0-9]+/g,"-").slice(0,40)}-sermon-${Date.now()}`;
-        await fetch(`${process.env.VERCEL_URL ? "https://"+process.env.VERCEL_URL : "http://localhost:3000"}/api/save-puzzle`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ slug, title: puzzleData.title, words: puzzleData.words, grade: "adult", source: "church" }),
-        });
+          await updateSermonRecord(sermonRecord.id, { puzzle_slug: slug, status: "sent", sent_at: new Date().toISOString() });
 
-        const puzzleUrl = `https://storyclue.ai/play/${slug}`;
+          await emailPastor(church.sender_email, church.pastor_name, puzzleUrl, sermon.title);
 
-        await supabase
-          .from("church_sermons")
-          .update({ puzzle_slug: slug, status: "sent", sent_at: new Date().toISOString() })
-          .eq("id", sermonRecord.id);
+          results.push({ church: church.church_name, status: "puzzle sent (instant)", puzzleUrl });
+        } else {
+          // Got jobId — background polling will handle it
+          await updateSermonRecord(sermonRecord.id, { job_id: transcriptionResult.jobId, status: "transcribing" });
 
-        await emailPastor(church.sender_email, church.pastor_name, puzzleUrl, sermon.title);
+          results.push({ church: church.church_name, status: "transcription queued (polling in background)", jobId: transcriptionResult.jobId });
+        }
 
-        results.push({ church: church.church_name, status: "puzzle sent (instant)", puzzleUrl });
-      } else {
-        // Got jobId — background polling will handle it
-        await supabase
-          .from("church_sermons")
-          .update({ job_id: transcriptionResult.jobId, status: "transcribing" })
-          .eq("id", sermonRecord.id);
-
-        results.push({ church: church.church_name, status: "transcription queued (polling in background)", jobId: transcriptionResult.jobId });
+      } catch (err) {
+        console.error(`[Church] Error for ${church.church_name}:`, err);
+        results.push({ church: church.church_name, status: "error", error: err.message });
       }
-
-    } catch (err) {
-      console.error(`[Church] Error for ${church.church_name}:`, err);
-      results.push({ church: church.church_name, status: "error", error: err.message });
     }
-  }
 
-  return res.status(200).json({ processed: churches.length, results });
+    return res.status(200).json({ processed: churches.length, results });
+
+  } catch (err) {
+    console.error("[Church Cron] Handler error:", err);
+    return res.status(500).json({ error: err.message });
+  }
 }
