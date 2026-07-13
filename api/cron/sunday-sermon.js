@@ -158,15 +158,23 @@ async function emailPastor(toEmail, pastorName, puzzleUrl, sermonTitle) {
 
 // ── Supabase REST API helpers ──────────────────────────────────────────────
 async function getChurches() {
-  const res = await fetch(
-    `${process.env.SUPABASE_URL}/rest/v1/church_accounts?youtube_channel=not.null`,
-    {
-      headers: {
-        "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()}`,
-      },
-    }
-  );
-  return res.json();
+  const url = `${process.env.SUPABASE_URL}/rest/v1/church_accounts?youtube_channel=not.null`;
+  const res = await fetch(url, {
+    headers: {
+      "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Supabase error: ${res.status} ${res.statusText}`);
+  }
+
+  const data = await res.json();
+  if (!Array.isArray(data)) {
+    throw new Error(`Supabase returned non-array: ${JSON.stringify(data)}`);
+  }
+
+  return data;
 }
 
 async function getExistingSermon(churchId, videoId) {
