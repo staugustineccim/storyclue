@@ -8,9 +8,11 @@
   "devCommand": "vite --port 5173",
   "functions": {
     "api/cron/sunday-sermon.js": { "maxDuration": 300 },
+    "api/cron/poll-transcriptions.js": { "maxDuration": 60 },
     "api/test-sermon.js": { "maxDuration": 300 }
   },
   "crons": [
-    { "path": "/api/cron/sunday-sermon", "schedule": "0 18 * * 0" }
+    { "path": "/api/cron/sunday-sermon", "schedule": "0 18 * * 0" },
+    { "path": "/api/cron/poll-transcriptions", "schedule": "* * * * *" }
   ]
 }
