@@ -3,12 +3,15 @@
 
 async function transcribeVideo(videoId) {
   // Supadata with aiFallback=true — uses captions if available, otherwise transcribes with Whisper
-  const res = await fetch(`https://api.supadata.ai/v1/youtube/transcript?videoId=${videoId}&text=true&aiFallback=true`, {
+  const res = await fetch(`https://api.supadata.ai/v1/transcript?url=https://www.youtube.com/watch?v=${videoId}`, {
     headers: { "x-api-key": process.env.SUPADATA_API_KEY },
   });
   const data = await res.json();
   if (!data || data.error) throw new Error(`Supadata error: ${JSON.stringify(data)}`);
-  return typeof data.content === "string" ? data.content : data.content.map(c => c.text).join(" ");
+  if (typeof data.content === "string") return data.content;
+  if (Array.isArray(data.content)) return data.content.map(c => c.text || c).join(" ");
+  if (data.transcript) return data.transcript;
+  throw new Error(`Supadata unexpected response: ${JSON.stringify(data)}`);
 }
 
 async function generatePuzzle(transcript) {
