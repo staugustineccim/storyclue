@@ -58,35 +58,14 @@ function findSermonVideo(videos, serviceTime, sunday) {
   return videos.filter(v => v.published >= windowStart && v.published <= windowEnd);
 }
 
-// ── Transcribe sermon via AssemblyAI ─────────────────────────────────────────
+// ── Transcribe sermon via Supadata ───────────────────────────────────────────
 async function fetchTranscript(videoId) {
-  const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-
-  // Submit transcription job — AssemblyAI accepts YouTube URLs directly
-  const submitRes = await fetch("https://api.assemblyai.com/v2/transcript", {
-    method: "POST",
-    headers: {
-      "Authorization": process.env.ASSEMBLYAI_API_KEY,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ audio_url: videoUrl }),
+  const res = await fetch(`https://api.supadata.ai/v1/youtube/transcript?videoId=${videoId}&text=true`, {
+    headers: { "x-api-key": process.env.SUPADATA_API_KEY },
   });
-  const { id, error: submitError } = await submitRes.json();
-  if (submitError) throw new Error(`AssemblyAI submit error: ${submitError}`);
-
-  // Poll until complete (max 8 minutes — sermons are long)
-  const deadline = Date.now() + 8 * 60 * 1000;
-  while (Date.now() < deadline) {
-    await new Promise(r => setTimeout(r, 10000)); // wait 10s between polls
-    const pollRes = await fetch(`https://api.assemblyai.com/v2/transcript/${id}`, {
-      headers: { "Authorization": process.env.ASSEMBLYAI_API_KEY },
-    });
-    const data = await pollRes.json();
-    if (data.status === "completed") return data.text;
-    if (data.status === "error") throw new Error(`AssemblyAI error: ${data.error}`);
-    // status is "queued" or "processing" — keep polling
-  }
-  throw new Error("AssemblyAI transcription timed out after 8 minutes");
+  const data = await res.json();
+  if (!data || data.error) throw new Error(`Supadata error: ${JSON.stringify(data)}`);
+  return typeof data.content === "string" ? data.content : data.content.map(c => c.text).join(" ");
 }
 
 // ── Generate puzzle from sermon text ─────────────────────────────────────────
