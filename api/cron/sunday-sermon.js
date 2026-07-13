@@ -162,7 +162,6 @@ async function getChurches() {
     `${process.env.SUPABASE_URL}/rest/v1/church_accounts?youtube_channel=not.is.null`,
     {
       headers: {
-        "apikey": process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
         "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
       },
     }
@@ -175,7 +174,6 @@ async function getExistingSermon(churchId, videoId) {
     `${process.env.SUPABASE_URL}/rest/v1/church_sermons?church_account_id=eq.${churchId}&video_id=eq.${videoId}`,
     {
       headers: {
-        "apikey": process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
         "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
       },
     }
