@@ -2,53 +2,13 @@
 // Usage: POST /api/test-sermon with { "videoId": "a39qncc_RlU", "secret": "storyclue-sunday-2024" }
 
 async function transcribeVideo(videoId) {
-  // Try Supadata first (uses YouTube captions — fast and free)
-  const supRes = await fetch(`https://api.supadata.ai/v1/youtube/transcript?videoId=${videoId}&text=true`, {
+  // Supadata with aiFallback=true — uses captions if available, otherwise transcribes with Whisper
+  const res = await fetch(`https://api.supadata.ai/v1/youtube/transcript?videoId=${videoId}&text=true&aiFallback=true`, {
     headers: { "x-api-key": process.env.SUPADATA_API_KEY },
   });
-  const supData = await supRes.json();
-  if (supData && !supData.error) {
-    return typeof supData.content === "string" ? supData.content : supData.content.map(c => c.text).join(" ");
-  }
-
-  // Fallback: Firecrawl extracts audio URL → AssemblyAI transcribes it
-  console.log(`[transcribe] No captions, falling back to Firecrawl+AssemblyAI for ${videoId}`);
-  const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
-
-  // Get audio URL from Firecrawl
-  const fcRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${process.env.FIRECRAWLAPIKEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ url: youtubeUrl, formats: ["extract"], extract: { schema: { audioUrl: "string" } } }),
-  });
-  const fcData = await fcRes.json();
-  const audioUrl = fcData?.data?.extract?.audioUrl || fcData?.data?.metadata?.og_audio;
-  if (!audioUrl) throw new Error("Firecrawl could not extract audio URL");
-
-  // Submit to AssemblyAI
-  const submitRes = await fetch("https://api.assemblyai.com/v2/transcript", {
-    method: "POST",
-    headers: { "Authorization": process.env.ASSEMBLYAI_API_KEY, "Content-Type": "application/json" },
-    body: JSON.stringify({ audio_url: audioUrl }),
-  });
-  const { id, error } = await submitRes.json();
-  if (error) throw new Error(`AssemblyAI: ${error}`);
-
-  // Poll up to 8 minutes
-  const deadline = Date.now() + 8 * 60 * 1000;
-  while (Date.now() < deadline) {
-    await new Promise(r => setTimeout(r, 10000));
-    const pollRes = await fetch(`https://api.assemblyai.com/v2/transcript/${id}`, {
-      headers: { "Authorization": process.env.ASSEMBLYAI_API_KEY },
-    });
-    const data = await pollRes.json();
-    if (data.status === "completed") return data.text;
-    if (data.status === "error") throw new Error(`AssemblyAI: ${data.error}`);
-  }
-  throw new Error("Transcription timed out");
+  const data = await res.json();
+  if (!data || data.error) throw new Error(`Supadata error: ${JSON.stringify(data)}`);
+  return typeof data.content === "string" ? data.content : data.content.map(c => c.text).join(" ");
 }
 
 async function generatePuzzle(transcript) {
