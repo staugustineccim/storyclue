@@ -94,28 +94,36 @@ async function fetchTranscript(videoId) {
 
 // ── Generate puzzle from sermon text ─────────────────────────────────────────
 async function generateSermonPuzzle(sermonText, sermonTitle, churchName, pastorName) {
-  const prompt = `You are creating a crossword puzzle from a church sermon to help the congregation remember the key points.
+  const prompt = `You are creating a crossword puzzle from a church sermon to help the congregation remember what they heard today.
 
 Sermon title: "${sermonTitle}"
 Church: ${churchName}
 Pastor: ${pastorName}
 
-Sermon transcript:
-${sermonText.slice(0, 4000)}
+Full sermon transcript:
+${sermonText.slice(0, 6000)}
 
-Extract 12-16 key vocabulary words from this sermon. Focus on:
-- Main theological concepts
-- Key scripture references
-- Central themes the pastor emphasized
-- Memorable phrases or names
+Your job is to identify the pastor's MAIN POINTS and KEY ILLUSTRATIONS — the things they repeated, emphasized, or built their outline around. These become the crossword words.
 
-For each word write a clue at an 8th-9th grade level that connects directly to what the pastor said.
+Look for:
+1. The numbered or named points the pastor walked through (e.g. "Point 1: Community", "Point 2: Experience")
+2. Key scripture words or names the pastor kept returning to
+3. Memorable illustrations or stories the pastor used (the object, person, or concept at the center of each story)
+4. Words or phrases the pastor asked the congregation to repeat out loud
+5. The central challenge or call to action at the end
+
+Rules:
+- Every word must connect directly to something the pastor actually said
+- Clues must reference the specific story or point from THIS sermon, not generic definitions
+- Words must be single words, all caps, 3-15 letters, no spaces
+- 15-20 words total
+- Clues written at a conversational adult level — like you're reminding a friend what the pastor said
 
 Return ONLY valid JSON in this exact format:
 {
   "title": "${sermonTitle} — Sermon Crossword",
   "words": [
-    {"word": "WORD", "clue": "Clue text connecting to the sermon"}
+    {"word": "WORD", "clue": "Clue referencing the specific story or point from the sermon"}
   ]
 }`;
 
