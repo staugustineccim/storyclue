@@ -1,6 +1,5 @@
 // Runs every Sunday at 1pm ET via Vercel cron
-// For each church account: finds the sermon video posted near service time,
-// checks for captions, and submits to Supadata for transcription via webhook callback.
+// Submit transcription jobs (don't wait for results)
 
 import { createClient } from "@supabase/supabase-js";
 
@@ -11,14 +10,12 @@ const supabase = createClient(
 
 // ── YouTube RSS — no API key needed ──────────────────────────────────────────
 async function getChannelIdFromUrl(channelUrl) {
-  // Handle @handle format — fetch the channel page and extract channel ID
   if (channelUrl.includes("/@")) {
     const res = await fetch(channelUrl);
     const html = await res.text();
     const match = html.match(/"channelId":"(UC[^"]+)"/);
     return match ? match[1] : null;
   }
-  // Handle /channel/UC... format
   const match = channelUrl.match(/\/channel\/(UC[^/?]+)/);
   return match ? match[1] : null;
 }
@@ -28,7 +25,6 @@ async function getRecentVideos(channelId) {
   const res = await fetch(rssUrl);
   const xml = await res.text();
 
-  // Parse entries from RSS XML
   const entries = [];
   const entryMatches = xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g);
   for (const m of entryMatches) {
@@ -48,7 +44,6 @@ async function getRecentVideos(channelId) {
 }
 
 function findSermonVideo(videos, serviceTime, sunday) {
-  // serviceTime is "10:00" — find video published within 3 hours after that on sunday
   const [hour, min] = serviceTime.split(":").map(Number);
   const windowStart = new Date(sunday);
   windowStart.setHours(hour, min, 0, 0);
@@ -58,32 +53,21 @@ function findSermonVideo(videos, serviceTime, sunday) {
   return videos.filter(v => v.published >= windowStart && v.published <= windowEnd);
 }
 
-// ── Transcribe sermon via Supadata with webhook callback ──────────────────────
-async function submitTranscriptionJob(videoId, churchId, sermonId) {
-  const webhookUrl = `${process.env.VERCEL_URL ? "https://" + process.env.VERCEL_URL : "http://localhost:3000"}/api/webhooks/supadata-complete`;
-
-  const res = await fetch(`https://api.supadata.ai/v1/transcript`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": process.env.SUPADATA_API_KEY,
-    },
-    body: JSON.stringify({
-      url: `https://www.youtube.com/watch?v=${videoId}`,
-      webhook_url: webhookUrl,
-      metadata: { churchId, sermonId, videoId }
-    })
+// ── Transcribe sermon via Supadata (submit job, don't wait) ──────────────────
+async function submitTranscriptionJob(videoId) {
+  const encodedUrl = encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`);
+  const res = await fetch(`https://api.supadata.ai/v1/transcript?url=${encodedUrl}`, {
+    headers: { "x-api-key": process.env.SUPADATA_API_KEY },
   });
-
   const data = await res.json();
   if (!data || data.error) throw new Error(`Supadata error: ${JSON.stringify(data)}`);
 
-  // If we got the transcript immediately (video has captions), return it
+  // If transcript is ready immediately (video has captions), return it
   if (typeof data.content === "string") return { transcript: data.content, jobId: null };
   if (Array.isArray(data.content)) return { transcript: data.content.map(c => c.text || c).join(" "), jobId: null };
   if (data.transcript) return { transcript: data.transcript, jobId: null };
 
-  // Otherwise return jobId — webhook will handle async transcription
+  // Otherwise return jobId — background polling will check for completion
   if (data.jobId) {
     return { transcript: null, jobId: data.jobId };
   }
@@ -140,7 +124,7 @@ Return ONLY valid JSON in this exact format:
   return JSON.parse(text.replace(/```json\n?|\n?```/g, "").trim());
 }
 
-// ── Send email via Resend (free tier: 3000/month) ────────────────────────────
+// ── Send email via Resend ────────────────────────────────────────────────────
 async function emailPastor(toEmail, pastorName, puzzleUrl, sermonTitle) {
   if (!process.env.RESEND_API_KEY) {
     console.log(`[Church] Would email ${toEmail} with puzzle: ${puzzleUrl}`);
@@ -180,7 +164,6 @@ async function emailPastor(toEmail, pastorName, puzzleUrl, sermonTitle) {
 
 // ── Main handler ──────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
-  // Protect cron endpoint
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: "Unauthorized" });
   }
@@ -188,7 +171,6 @@ export default async function handler(req, res) {
   const today = new Date();
   const results = [];
 
-  // Load all church accounts with YouTube channels
   const { data: churches, error } = await supabase
     .from("church_accounts")
     .select("*")
@@ -198,21 +180,17 @@ export default async function handler(req, res) {
 
   for (const church of churches) {
     try {
-      // Get YouTube channel ID
       const channelId = await getChannelIdFromUrl(church.youtube_channel);
       if (!channelId) { results.push({ church: church.church_name, status: "no channel ID" }); continue; }
 
-      // Get recent videos
       const videos = await getRecentVideos(channelId);
 
-      // Find sermon video near service time
       const matches = findSermonVideo(videos, church.service_time || "10:00", today);
       if (matches.length === 0) { results.push({ church: church.church_name, status: "no video found in window" }); continue; }
       if (matches.length > 1)   { results.push({ church: church.church_name, status: "multiple videos found — pastor notified" }); continue; }
 
       const sermon = matches[0];
 
-      // Check if we already processed this video
       const { data: existing } = await supabase
         .from("church_sermons")
         .select("id")
@@ -221,7 +199,7 @@ export default async function handler(req, res) {
         .single();
       if (existing) { results.push({ church: church.church_name, status: "already processed" }); continue; }
 
-      // Create sermon record with initial status
+      // Create sermon record
       const { data: sermonRecord, error: insertError } = await supabase
         .from("church_sermons")
         .insert({
@@ -235,15 +213,15 @@ export default async function handler(req, res) {
 
       if (insertError) { results.push({ church: church.church_name, status: "db error", error: insertError.message }); continue; }
 
-      // Submit transcription job — returns immediately or with instant transcript
-      const transcriptionResult = await submitTranscriptionJob(sermon.videoId, church.id, sermonRecord.id);
+      // Submit transcription job
+      const transcriptionResult = await submitTranscriptionJob(sermon.videoId);
 
       if (transcriptionResult.transcript) {
         // Got transcript immediately (video has captions) — generate puzzle now
         const puzzleData = await generateSermonPuzzle(transcriptionResult.transcript, sermon.title, church.church_name, church.pastor_name);
 
         const slug = `${sermon.title.toLowerCase().replace(/[^a-z0-9]+/g,"-").slice(0,40)}-sermon-${Date.now()}`;
-        const saveRes = await fetch(`${process.env.VERCEL_URL ? "https://"+process.env.VERCEL_URL : "http://localhost:3000"}/api/save-puzzle`, {
+        await fetch(`${process.env.VERCEL_URL ? "https://"+process.env.VERCEL_URL : "http://localhost:3000"}/api/save-puzzle`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ slug, title: puzzleData.title, words: puzzleData.words, grade: "adult", source: "church" }),
@@ -251,24 +229,22 @@ export default async function handler(req, res) {
 
         const puzzleUrl = `https://storyclue.ai/play/${slug}`;
 
-        // Update sermon record
         await supabase
           .from("church_sermons")
           .update({ puzzle_slug: slug, status: "sent", sent_at: new Date().toISOString() })
           .eq("id", sermonRecord.id);
 
-        // Email pastor
         await emailPastor(church.sender_email, church.pastor_name, puzzleUrl, sermon.title);
 
         results.push({ church: church.church_name, status: "puzzle sent (instant)", puzzleUrl });
       } else {
-        // Got jobId — webhook will handle it async
+        // Got jobId — background polling will handle it
         await supabase
           .from("church_sermons")
           .update({ job_id: transcriptionResult.jobId, status: "transcribing" })
           .eq("id", sermonRecord.id);
 
-        results.push({ church: church.church_name, status: "transcription submitted (webhook pending)", jobId: transcriptionResult.jobId });
+        results.push({ church: church.church_name, status: "transcription queued (polling in background)", jobId: transcriptionResult.jobId });
       }
 
     } catch (err) {
@@ -277,6 +253,5 @@ export default async function handler(req, res) {
     }
   }
 
-  // Return quickly — don't wait for webhooks
   return res.status(200).json({ processed: churches.length, results });
 }
