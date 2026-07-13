@@ -1,13 +1,6 @@
-// Runs every 30 seconds via Vercel cron
+// Runs every minute via Vercel cron
 // Polls Supadata for completed transcription jobs and generates puzzles
-
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  { realtime: { mode: "manual" } }
-);
+// Uses Supabase REST API (no SDK, no WebSocket issues)
 
 // ── Poll Supadata for transcription result ──────────────────────────────────
 async function checkTranscriptionStatus(jobId) {
@@ -17,22 +10,18 @@ async function checkTranscriptionStatus(jobId) {
   const data = await res.json();
   if (!data) throw new Error("Empty Supadata response");
 
-  // Check for completion
   if (typeof data.content === "string") return { transcript: data.content, done: true };
   if (Array.isArray(data.content)) return { transcript: data.content.map(c => c.text || c).join(" "), done: true };
   if (data.transcript) return { transcript: data.transcript, done: true };
 
-  // Check for error
   if (data.status === "failed" || data.error) {
     return { done: true, error: data.error || "Transcription failed" };
   }
 
-  // Still processing
   if (data.status === "processing" || data.status === "queued") {
     return { done: false };
   }
 
-  // Unknown state
   return { done: false };
 }
 
@@ -123,92 +112,110 @@ async function emailPastor(toEmail, pastorName, puzzleUrl, sermonTitle) {
   });
 }
 
+// ── Supabase REST API helpers ──────────────────────────────────────────────
+async function getTranscribingSermons() {
+  const res = await fetch(
+    `${process.env.SUPABASE_URL}/rest/v1/church_sermons?status=eq.transcribing&select=*,church_accounts(*)`,
+    {
+      headers: {
+        "apikey": process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    }
+  );
+  return res.json();
+}
+
+async function updateSermonRecord(sermonId, updates) {
+  const res = await fetch(
+    `${process.env.SUPABASE_URL}/rest/v1/church_sermons?id=eq.${sermonId}`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+      body: JSON.stringify(updates),
+    }
+  );
+  return res.json();
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const results = [];
+  try {
+    const sermons = await getTranscribingSermons();
+    const results = [];
 
-  // Find all sermons still transcribing
-  const { data: transcribingSermons, error } = await supabase
-    .from("church_sermons")
-    .select("*, church_accounts(*)")
-    .eq("status", "transcribing")
-    .not("job_id", "is", null);
+    for (const sermon of sermons || []) {
+      try {
+        const statusResult = await checkTranscriptionStatus(sermon.job_id);
 
-  if (error) return res.status(500).json({ error: error.message });
+        if (statusResult.error) {
+          await updateSermonRecord(sermon.id, { status: "error", error_message: statusResult.error });
+          results.push({ sermon: sermon.sermon_title, status: "error", error: statusResult.error });
+          continue;
+        }
 
-  for (const sermon of transcribingSermons || []) {
-    try {
-      // Check transcription status
-      const statusResult = await checkTranscriptionStatus(sermon.job_id);
+        if (!statusResult.done) {
+          results.push({ sermon: sermon.sermon_title, status: "still transcribing" });
+          continue;
+        }
 
-      if (statusResult.error) {
-        // Transcription failed
-        await supabase
-          .from("church_sermons")
-          .update({ status: "error", error_message: statusResult.error })
-          .eq("id", sermon.id);
+        // Transcription done — generate puzzle
+        const puzzleData = await generateSermonPuzzle(
+          statusResult.transcript,
+          sermon.sermon_title,
+          sermon.church_accounts.church_name,
+          sermon.church_accounts.pastor_name
+        );
 
-        results.push({ sermon: sermon.sermon_title, status: "error", error: statusResult.error });
-        continue;
-      }
+        // Save puzzle
+        const slug = `${sermon.sermon_title.toLowerCase().replace(/[^a-z0-9]+/g,"-").slice(0,40)}-sermon-${Date.now()}`;
+        const saveRes = await fetch(`${process.env.VERCEL_URL ? "https://"+process.env.VERCEL_URL : "http://localhost:3000"}/api/save-puzzle`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ slug, title: puzzleData.title, words: puzzleData.words, grade: "adult", source: "church" }),
+        });
 
-      if (!statusResult.done) {
-        // Still processing
-        results.push({ sermon: sermon.sermon_title, status: "still transcribing" });
-        continue;
-      }
+        if (!saveRes.ok) {
+          throw new Error(`Failed to save puzzle: ${saveRes.status}`);
+        }
 
-      // Transcription done — generate puzzle
-      const puzzleData = await generateSermonPuzzle(
-        statusResult.transcript,
-        sermon.sermon_title,
-        sermon.church_accounts.church_name,
-        sermon.church_accounts.pastor_name
-      );
+        const puzzleUrl = `https://storyclue.ai/play/${slug}`;
 
-      // Save puzzle
-      const slug = `${sermon.sermon_title.toLowerCase().replace(/[^a-z0-9]+/g,"-").slice(0,40)}-sermon-${Date.now()}`;
-      const saveRes = await fetch(`${process.env.VERCEL_URL ? "https://"+process.env.VERCEL_URL : "http://localhost:3000"}/api/save-puzzle`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, title: puzzleData.title, words: puzzleData.words, grade: "adult", source: "church" }),
-      });
-
-      if (!saveRes.ok) {
-        throw new Error(`Failed to save puzzle: ${saveRes.status}`);
-      }
-
-      const puzzleUrl = `https://storyclue.ai/play/${slug}`;
-
-      // Update sermon record
-      await supabase
-        .from("church_sermons")
-        .update({
+        // Update sermon record
+        await updateSermonRecord(sermon.id, {
           puzzle_slug: slug,
           status: "sent",
           sent_at: new Date().toISOString(),
-        })
-        .eq("id", sermon.id);
+        });
 
-      // Email pastor
-      await emailPastor(
-        sermon.church_accounts.sender_email,
-        sermon.church_accounts.pastor_name,
-        puzzleUrl,
-        sermon.sermon_title
-      );
+        // Email pastor
+        await emailPastor(
+          sermon.church_accounts.sender_email,
+          sermon.church_accounts.pastor_name,
+          puzzleUrl,
+          sermon.sermon_title
+        );
 
-      results.push({ sermon: sermon.sermon_title, status: "puzzle sent", puzzleUrl });
+        results.push({ sermon: sermon.sermon_title, status: "puzzle sent", puzzleUrl });
 
-    } catch (err) {
-      console.error(`[Church Polling] Error for ${sermon.sermon_title}:`, err);
-      results.push({ sermon: sermon.sermon_title, status: "error", error: err.message });
+      } catch (err) {
+        console.error(`[Church Polling] Error for ${sermon.sermon_title}:`, err);
+        results.push({ sermon: sermon.sermon_title, status: "error", error: err.message });
+      }
     }
-  }
 
-  return res.status(200).json({ checked: transcribingSermons?.length || 0, results });
+    return res.status(200).json({ checked: sermons?.length || 0, results });
+
+  } catch (err) {
+    console.error("[Church Polling] Handler error:", err);
+    return res.status(500).json({ error: err.message });
+  }
 }
