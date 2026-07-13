@@ -1,6 +1,6 @@
 // Runs every Sunday at 1pm ET via Vercel cron
 // For each church account: finds the sermon video posted near service time,
-// fetches captions, generates puzzle, emails pastor the puzzle link.
+// checks for captions, and submits to Supadata for transcription via webhook callback.
 
 import { createClient } from "@supabase/supabase-js";
 
@@ -58,35 +58,34 @@ function findSermonVideo(videos, serviceTime, sunday) {
   return videos.filter(v => v.published >= windowStart && v.published <= windowEnd);
 }
 
-// ── Transcribe sermon via Supadata (captions + AI fallback) ──────────────────
-async function fetchTranscript(videoId) {
-  const encodedUrl = encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`);
-  const res = await fetch(`https://api.supadata.ai/v1/transcript?url=${encodedUrl}`, {
-    headers: { "x-api-key": process.env.SUPADATA_API_KEY },
+// ── Transcribe sermon via Supadata with webhook callback ──────────────────────
+async function submitTranscriptionJob(videoId, churchId, sermonId) {
+  const webhookUrl = `${process.env.VERCEL_URL ? "https://" + process.env.VERCEL_URL : "http://localhost:3000"}/api/webhooks/supadata-complete`;
+
+  const res = await fetch(`https://api.supadata.ai/v1/transcript`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": process.env.SUPADATA_API_KEY,
+    },
+    body: JSON.stringify({
+      url: `https://www.youtube.com/watch?v=${videoId}`,
+      webhook_url: webhookUrl,
+      metadata: { churchId, sermonId, videoId }
+    })
   });
+
   const data = await res.json();
   if (!data || data.error) throw new Error(`Supadata error: ${JSON.stringify(data)}`);
 
-  if (typeof data.content === "string") return data.content;
-  if (Array.isArray(data.content)) return data.content.map(c => c.text || c).join(" ");
-  if (data.transcript) return data.transcript;
+  // If we got the transcript immediately (video has captions), return it
+  if (typeof data.content === "string") return { transcript: data.content, jobId: null };
+  if (Array.isArray(data.content)) return { transcript: data.content.map(c => c.text || c).join(" "), jobId: null };
+  if (data.transcript) return { transcript: data.transcript, jobId: null };
 
+  // Otherwise return jobId — webhook will handle async transcription
   if (data.jobId) {
-    const deadline = Date.now() + 10 * 60 * 1000;
-    while (Date.now() < deadline) {
-      await new Promise(r => setTimeout(r, 15000));
-      const pollRes = await fetch(`https://api.supadata.ai/v1/transcript/${data.jobId}`, {
-        headers: { "x-api-key": process.env.SUPADATA_API_KEY },
-      });
-      const pollData = await pollRes.json();
-      if (pollData.content || pollData.transcript) {
-        if (typeof pollData.content === "string") return pollData.content;
-        if (Array.isArray(pollData.content)) return pollData.content.map(c => c.text || c).join(" ");
-        if (pollData.transcript) return pollData.transcript;
-      }
-      if (pollData.status === "failed") throw new Error(`Supadata job failed`);
-    }
-    throw new Error("Supadata transcription timed out");
+    return { transcript: null, jobId: data.jobId };
   }
 
   throw new Error(`Supadata unexpected response: ${JSON.stringify(data)}`);
@@ -222,36 +221,55 @@ export default async function handler(req, res) {
         .single();
       if (existing) { results.push({ church: church.church_name, status: "already processed" }); continue; }
 
-      // Transcribe sermon via AssemblyAI
-      const transcript = await fetchTranscript(sermon.videoId);
-      if (!transcript) { results.push({ church: church.church_name, status: "transcription failed" }); continue; }
+      // Create sermon record with initial status
+      const { data: sermonRecord, error: insertError } = await supabase
+        .from("church_sermons")
+        .insert({
+          church_account_id: church.id,
+          video_id: sermon.videoId,
+          sermon_title: sermon.title,
+          status: "queued",
+        })
+        .select("id")
+        .single();
 
-      // Generate puzzle
-      const puzzleData = await generateSermonPuzzle(transcript, sermon.title, church.church_name, church.pastor_name);
+      if (insertError) { results.push({ church: church.church_name, status: "db error", error: insertError.message }); continue; }
 
-      // Save puzzle via existing save-puzzle API
-      const slug = `${sermon.title.toLowerCase().replace(/[^a-z0-9]+/g,"-").slice(0,40)}-sermon-${Date.now()}`;
-      const saveRes = await fetch(`${process.env.VERCEL_URL ? "https://"+process.env.VERCEL_URL : "http://localhost:3000"}/api/save-puzzle`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, title: puzzleData.title, words: puzzleData.words, grade: "adult", source: "church" }),
-      });
+      // Submit transcription job — returns immediately or with instant transcript
+      const transcriptionResult = await submitTranscriptionJob(sermon.videoId, church.id, sermonRecord.id);
 
-      const puzzleUrl = `https://storyclue.ai/play/${slug}`;
+      if (transcriptionResult.transcript) {
+        // Got transcript immediately (video has captions) — generate puzzle now
+        const puzzleData = await generateSermonPuzzle(transcriptionResult.transcript, sermon.title, church.church_name, church.pastor_name);
 
-      // Save sermon record
-      await supabase.from("church_sermons").insert({
-        church_account_id: church.id,
-        video_id: sermon.videoId,
-        sermon_title: sermon.title,
-        puzzle_slug: slug,
-        status: "sent",
-      });
+        const slug = `${sermon.title.toLowerCase().replace(/[^a-z0-9]+/g,"-").slice(0,40)}-sermon-${Date.now()}`;
+        const saveRes = await fetch(`${process.env.VERCEL_URL ? "https://"+process.env.VERCEL_URL : "http://localhost:3000"}/api/save-puzzle`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ slug, title: puzzleData.title, words: puzzleData.words, grade: "adult", source: "church" }),
+        });
 
-      // Email pastor
-      await emailPastor(church.sender_email, church.pastor_name, puzzleUrl, sermon.title);
+        const puzzleUrl = `https://storyclue.ai/play/${slug}`;
 
-      results.push({ church: church.church_name, status: "puzzle sent", puzzleUrl });
+        // Update sermon record
+        await supabase
+          .from("church_sermons")
+          .update({ puzzle_slug: slug, status: "sent", sent_at: new Date().toISOString() })
+          .eq("id", sermonRecord.id);
+
+        // Email pastor
+        await emailPastor(church.sender_email, church.pastor_name, puzzleUrl, sermon.title);
+
+        results.push({ church: church.church_name, status: "puzzle sent (instant)", puzzleUrl });
+      } else {
+        // Got jobId — webhook will handle it async
+        await supabase
+          .from("church_sermons")
+          .update({ job_id: transcriptionResult.jobId, status: "transcribing" })
+          .eq("id", sermonRecord.id);
+
+        results.push({ church: church.church_name, status: "transcription submitted (webhook pending)", jobId: transcriptionResult.jobId });
+      }
 
     } catch (err) {
       console.error(`[Church] Error for ${church.church_name}:`, err);
@@ -259,5 +277,6 @@ export default async function handler(req, res) {
     }
   }
 
+  // Return quickly — don't wait for webhooks
   return res.status(200).json({ processed: churches.length, results });
 }
