@@ -82,8 +82,17 @@ Return ONLY valid JSON:
     body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1500, messages: [{ role: "user", content: prompt }] }),
   });
   const data = await response.json();
+
+  if (!data.content || !data.content[0]) {
+    throw new Error(`Claude API error: ${JSON.stringify(data)}`);
+  }
+
   const text = data.content[0].text;
-  return JSON.parse(text.replace(/```json\n?|\n?```/g, "").trim());
+  try {
+    return JSON.parse(text.replace(/```json\n?|\n?```/g, "").trim());
+  } catch (e) {
+    throw new Error(`Failed to parse puzzle JSON. Claude responded: ${text.slice(0, 200)}`);
+  }
 }
 
 export default async function handler(req, res) {
