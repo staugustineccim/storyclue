@@ -159,7 +159,7 @@ async function emailPastor(toEmail, pastorName, puzzleUrl, sermonTitle) {
 // ── Supabase REST API helpers ──────────────────────────────────────────────
 async function getChurches() {
   const res = await fetch(
-    `${process.env.SUPABASE_URL}/rest/v1/church_accounts?youtube_channel=not.is.null`,
+    `${process.env.SUPABASE_URL}/rest/v1/church_accounts?youtube_channel=not.null`,
     {
       headers: {
         "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()}`,
