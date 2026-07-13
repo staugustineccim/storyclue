@@ -6,6 +6,9 @@
   "buildCommand": "npm install && chmod +x ./node_modules/.bin/vite && npm run build",
   "framework": "vite",
   "devCommand": "vite --port 5173",
+  "functions": {
+    "api/cron/sunday-sermon.js": { "maxDuration": 300 }
+  },
   "crons": [
     { "path": "/api/cron/sunday-sermon", "schedule": "0 18 * * 0" }
   ]

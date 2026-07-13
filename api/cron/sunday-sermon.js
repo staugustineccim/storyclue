@@ -61,29 +61,35 @@ function findSermonVideo(videos, serviceTime, sunday) {
   return videos.filter(v => v.published >= windowStart && v.published <= windowEnd);
 }
 
-// ── YouTube captions (free, no API key) ──────────────────────────────────────
-async function fetchCaptions(videoId) {
-  // Fetch the watch page to get caption track URL
-  const watchRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
-    headers: { "User-Agent": "Mozilla/5.0 (compatible; StoryClue/1.0)" }
+// ── Transcribe sermon via AssemblyAI ─────────────────────────────────────────
+async function fetchTranscript(videoId) {
+  const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
+  // Submit transcription job — AssemblyAI accepts YouTube URLs directly
+  const submitRes = await fetch("https://api.assemblyai.com/v2/transcript", {
+    method: "POST",
+    headers: {
+      "Authorization": process.env.ASSEMBLYAI_API_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ audio_url: videoUrl }),
   });
-  const html = await watchRes.text();
+  const { id, error: submitError } = await submitRes.json();
+  if (submitError) throw new Error(`AssemblyAI submit error: ${submitError}`);
 
-  // Extract caption URL from ytInitialPlayerResponse
-  const captionMatch = html.match(/"captionTracks":\[.*?"baseUrl":"([^"]+)"/);
-  if (!captionMatch) return null;
-
-  const captionUrl = captionMatch[1].replace(/\\u0026/g, "&");
-  const captionRes = await fetch(captionUrl);
-  const captionXml = await captionRes.text();
-
-  // Extract text from caption XML
-  const textMatches = captionXml.matchAll(/<text[^>]*>([^<]+)<\/text>/g);
-  const lines = [];
-  for (const m of textMatches) {
-    lines.push(m[1].replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#39;/g,"'").replace(/&quot;/g,'"'));
+  // Poll until complete (max 8 minutes — sermons are long)
+  const deadline = Date.now() + 8 * 60 * 1000;
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 10000)); // wait 10s between polls
+    const pollRes = await fetch(`https://api.assemblyai.com/v2/transcript/${id}`, {
+      headers: { "Authorization": process.env.ASSEMBLYAI_API_KEY },
+    });
+    const data = await pollRes.json();
+    if (data.status === "completed") return data.text;
+    if (data.status === "error") throw new Error(`AssemblyAI error: ${data.error}`);
+    // status is "queued" or "processing" — keep polling
   }
-  return lines.join(" ");
+  throw new Error("AssemblyAI transcription timed out after 8 minutes");
 }
 
 // ── Generate puzzle from sermon text ─────────────────────────────────────────
@@ -205,9 +211,9 @@ export default async function handler(req, res) {
         .single();
       if (existing) { results.push({ church: church.church_name, status: "already processed" }); continue; }
 
-      // Fetch captions
-      const transcript = await fetchCaptions(sermon.videoId);
-      if (!transcript) { results.push({ church: church.church_name, status: "no captions available" }); continue; }
+      // Transcribe sermon via AssemblyAI
+      const transcript = await fetchTranscript(sermon.videoId);
+      if (!transcript) { results.push({ church: church.church_name, status: "transcription failed" }); continue; }
 
       // Generate puzzle
       const puzzleData = await generateSermonPuzzle(transcript, sermon.title, church.church_name, church.pastor_name);
