@@ -2,15 +2,39 @@
 // Usage: POST /api/test-sermon with { "videoId": "a39qncc_RlU", "secret": "storyclue-sunday-2024" }
 
 async function transcribeVideo(videoId) {
-  // Supadata with aiFallback=true — uses captions if available, otherwise transcribes with Whisper
-  const res = await fetch(`https://api.supadata.ai/v1/transcript?url=https://www.youtube.com/watch?v=${videoId}`, {
+  const encodedUrl = encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`);
+  const res = await fetch(`https://api.supadata.ai/v1/transcript?url=${encodedUrl}`, {
     headers: { "x-api-key": process.env.SUPADATA_API_KEY },
   });
   const data = await res.json();
   if (!data || data.error) throw new Error(`Supadata error: ${JSON.stringify(data)}`);
+
+  // Immediate response with content
   if (typeof data.content === "string") return data.content;
   if (Array.isArray(data.content)) return data.content.map(c => c.text || c).join(" ");
   if (data.transcript) return data.transcript;
+
+  // Async job — poll for result
+  if (data.jobId) {
+    console.log(`[transcribe] Supadata jobId ${data.jobId} — polling...`);
+    const deadline = Date.now() + 10 * 60 * 1000;
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 15000));
+      const pollRes = await fetch(`https://api.supadata.ai/v1/transcript/${data.jobId}`, {
+        headers: { "x-api-key": process.env.SUPADATA_API_KEY },
+      });
+      const pollData = await pollRes.json();
+      if (pollData.status === "completed" || pollData.content || pollData.transcript) {
+        if (typeof pollData.content === "string") return pollData.content;
+        if (Array.isArray(pollData.content)) return pollData.content.map(c => c.text || c).join(" ");
+        if (pollData.transcript) return pollData.transcript;
+      }
+      if (pollData.status === "failed") throw new Error(`Supadata job failed: ${JSON.stringify(pollData)}`);
+      console.log(`[transcribe] status: ${pollData.status} — waiting...`);
+    }
+    throw new Error("Supadata transcription timed out after 10 minutes");
+  }
+
   throw new Error(`Supadata unexpected response: ${JSON.stringify(data)}`);
 }
 

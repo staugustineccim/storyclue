@@ -60,14 +60,35 @@ function findSermonVideo(videos, serviceTime, sunday) {
 
 // ── Transcribe sermon via Supadata (captions + AI fallback) ──────────────────
 async function fetchTranscript(videoId) {
-  const res = await fetch(`https://api.supadata.ai/v1/transcript?url=https://www.youtube.com/watch?v=${videoId}`, {
+  const encodedUrl = encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`);
+  const res = await fetch(`https://api.supadata.ai/v1/transcript?url=${encodedUrl}`, {
     headers: { "x-api-key": process.env.SUPADATA_API_KEY },
   });
   const data = await res.json();
   if (!data || data.error) throw new Error(`Supadata error: ${JSON.stringify(data)}`);
+
   if (typeof data.content === "string") return data.content;
   if (Array.isArray(data.content)) return data.content.map(c => c.text || c).join(" ");
   if (data.transcript) return data.transcript;
+
+  if (data.jobId) {
+    const deadline = Date.now() + 10 * 60 * 1000;
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 15000));
+      const pollRes = await fetch(`https://api.supadata.ai/v1/transcript/${data.jobId}`, {
+        headers: { "x-api-key": process.env.SUPADATA_API_KEY },
+      });
+      const pollData = await pollRes.json();
+      if (pollData.content || pollData.transcript) {
+        if (typeof pollData.content === "string") return pollData.content;
+        if (Array.isArray(pollData.content)) return pollData.content.map(c => c.text || c).join(" ");
+        if (pollData.transcript) return pollData.transcript;
+      }
+      if (pollData.status === "failed") throw new Error(`Supadata job failed`);
+    }
+    throw new Error("Supadata transcription timed out");
+  }
+
   throw new Error(`Supadata unexpected response: ${JSON.stringify(data)}`);
 }
 
