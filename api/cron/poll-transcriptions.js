@@ -36,27 +36,32 @@ Pastor: ${pastorName}
 Full sermon transcript:
 ${sermonText.slice(0, 6000)}
 
-Your job is to identify the pastor's MAIN POINTS and KEY ILLUSTRATIONS — the things they repeated, emphasized, or built their outline around. These become the crossword words.
+CRITICAL RULE: Every clue MUST quote or reference something the pastor explicitly said, a specific story they told, a specific scripture verse they cited, or a specific illustration they used. NO generic definitions. NO interpolation. NO filling in what you think the sermon meant.
 
-Look for:
-1. The numbered or named points the pastor walked through (e.g. "Point 1: Community", "Point 2: Experience")
-2. Key scripture words or names the pastor kept returning to
-3. Memorable illustrations or stories the pastor used (the object, person, or concept at the center of each story)
-4. Words or phrases the pastor asked the congregation to repeat out loud
-5. The central challenge or call to action at the end
+Your job is to pull out words that are:
+1. Directly quoted or emphasized by the pastor (words they repeated or highlighted)
+2. Central to a specific story or illustration the pastor told (the object, person, concept, or action at the heart of their story)
+3. Part of a specific scripture verse the pastor cited and explained
+4. Part of specific action items or challenges the pastor gave
+5. Key phrases the pastor used multiple times
+
+For EACH word:
+- Write the clue as: "[Pastor's name] said: [EXACT QUOTE or SPECIFIC REFERENCE to the story/verse/illustration]"
+- Example GOOD clue: "Jonathan illustrated that the people around you shape what you spiritually ___ for, like culture shapes food preferences" (Answer: HUNGER)
+- Example BAD clue: "The feeling of wanting something" (this is generic, banned)
 
 Rules:
-- Every word must connect directly to something the pastor actually said
-- Clues must reference the specific story or point from THIS sermon, not generic definitions
+- Every word must appear in the sermon text or be a direct reference to content in the sermon
+- Clues must include the pastor's name and reference something specific (a quote, story element, verse, or repeated phrase)
 - Words must be single words, all caps, 3-15 letters, no spaces
 - 15-20 words total
-- Clues written at a conversational adult level — like you're reminding a friend what the pastor said
+- If you cannot find specific source material for a word, DO NOT INCLUDE IT
 
 Return ONLY valid JSON in this exact format:
 {
   "title": "${sermonTitle} — Sermon Crossword",
   "words": [
-    {"word": "WORD", "clue": "Clue referencing the specific story or point from the sermon"}
+    {"word": "WORD", "clue": "Specific reference to what the pastor said or the story they told"}
   ]
 }`;
 
