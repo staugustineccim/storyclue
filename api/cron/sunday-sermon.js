@@ -260,6 +260,9 @@ async function sendStatusEmail(results, error) {
 
 // ── Main handler ──────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
+  console.log("[DEBUG] CRON_SECRET env var:", process.env.CRON_SECRET ? "SET" : "UNDEFINED");
+  console.log("[DEBUG] Authorization header:", req.headers.authorization);
+
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: "Unauthorized" });
   }
