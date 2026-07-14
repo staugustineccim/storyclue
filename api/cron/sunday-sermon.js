@@ -222,6 +222,37 @@ async function updateSermonRecord(sermonId, updates) {
   });
 }
 
+// ── Send status email to Bob ────────────────────────────────────────────────
+async function sendStatusEmail(results, error) {
+  if (!process.env.RESEND_API_KEY) return;
+
+  const statusHtml = error
+    ? `<p style="color:red"><strong>CRON FAILED:</strong> ${error}</p>`
+    : `<p style="color:green"><strong>CRON COMPLETED</strong></p>${results.map(r =>
+        `<p>${r.church}: ${r.status}${r.puzzleUrl ? ` — <a href="${r.puzzleUrl}">View Puzzle</a>` : ''}${r.error ? ` — ERROR: ${r.error}` : ''}</p>`
+      ).join('')}`;
+
+  await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+    },
+    body: JSON.stringify({
+      from: "StoryClue <puzzles@storyclue.ai>",
+      to: "bob@thepremierproperties.com",
+      subject: error ? "🚨 Church Sermon Cron Failed" : "✅ Church Sermon Cron Completed",
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
+          ${statusHtml}
+          <hr style="border:1px solid #ccc;margin:20px 0">
+          <p style="color:#666;font-size:12px">Timestamp: ${new Date().toISOString()}</p>
+        </div>
+      `,
+    }),
+  });
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -288,10 +319,12 @@ export default async function handler(req, res) {
       }
     }
 
+    await sendStatusEmail(results, null);
     return res.status(200).json({ processed: churches.length, results });
 
   } catch (err) {
     console.error("[Church Cron] Handler error:", err);
+    await sendStatusEmail([], err.message);
     return res.status(500).json({ error: err.message });
   }
 }
