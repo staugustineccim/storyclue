@@ -261,12 +261,15 @@ async function sendStatusEmail(results, error) {
 // ── Main handler ──────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   // TEMPORARY: bypass auth check to test if Supabase works
-  console.log("[DEBUG] Testing without CRON_SECRET check");
+  console.log("[DEBUG] Testing without CRON_SECRET check - deployed at 2026-07-14T23:00:00Z");
 
   const today = new Date();
   const results = [];
 
   try {
+    // PROOF OF NEW CODE: if you see this message, the July 14 deployment is live
+    console.log("[DIAGNOSTIC] NEW CODE IS RUNNING - July 14 version");
+
     const churches = await getChurches();
 
     for (const church of churches) {
