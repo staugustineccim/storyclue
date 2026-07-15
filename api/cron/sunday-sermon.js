@@ -1,8 +1,19 @@
+// TEST: Minimal cron to check if Vercel can even invoke this function
+export default async function handler(req, res) {
+  console.log("[TEST] Function invoked at " + new Date().toISOString());
+  return res.status(200).json({ test: "success", timestamp: new Date().toISOString() });
+}
+
+// ────────────────────────────────────────────────────────────────────────────────
+// COMMENTED OUT BELOW: Full production code (temporarily disabled for testing)
+// ────────────────────────────────────────────────────────────────────────────────
+
 // Runs every Sunday at 1pm ET via Vercel cron
 // Submit transcription jobs (don't wait for results)
 // Uses Supabase REST API (no SDK, no WebSocket issues)
 
 // ── YouTube RSS — no API key needed ──────────────────────────────────────────
+/*
 async function getChannelIdFromUrl(channelUrl) {
   if (channelUrl.includes("/@")) {
     const res = await fetch(channelUrl);
@@ -258,7 +269,8 @@ async function sendStatusEmail(results, error) {
   });
 }
 
-// ── Main handler ──────────────────────────────────────────────────────────────
+// ── Main handler (COMMENTED OUT FOR TESTING) ──────────────────────────────
+/*
 export default async function handler(req, res) {
   console.log("[Church Cron] Handler started");
 
@@ -333,3 +345,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 }
+*/
