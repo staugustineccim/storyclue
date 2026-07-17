@@ -302,15 +302,14 @@ export default async function handler(req, res) {
         const videos = await getRecentVideos(channelId);
         console.log(`[Church] Got ${videos.length} videos`);
 
-        const serviceTime = church.service_time || "10:00";
-        console.log(`[Church] Finding sermon video for service time: ${serviceTime}, date: ${today.toISOString()}`);
-        const matches = findSermonVideo(videos, serviceTime, today);
-        console.log(`[Church] Found ${matches.length} matching videos`);
-        if (matches.length === 0) { console.log(`[Church] No match - no video in time window`); results.push({ church: church.church_name, status: "no video found in window" }); continue; }
-        if (matches.length > 1)   { console.log(`[Church] Multiple matches found`); results.push({ church: church.church_name, status: "multiple videos found — pastor notified" }); continue; }
-        console.log(`[Church] Found matching sermon video`);
+        if (videos.length === 0) { results.push({ church: church.church_name, status: "no videos found" }); continue; }
 
-        const sermon = matches[0];
+        // TESTING: Find latest Sunday sermon
+        const sundaySermons = videos.filter(v => v.published.getUTCDay() === 0); // 0 = Sunday
+        if (sundaySermons.length === 0) { results.push({ church: church.church_name, status: "no Sunday sermons found" }); continue; }
+
+        const sermon = sundaySermons[0];
+        console.log(`[Church] Using latest Sunday sermon: "${sermon.title}" published ${sermon.published.toISOString()}`);
 
         console.log(`[Church] Checking if already processed...`);
         const existing = await getExistingSermon(church.id, sermon.videoId);
