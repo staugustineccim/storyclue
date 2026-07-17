@@ -291,9 +291,12 @@ export default async function handler(req, res) {
         const videos = await getRecentVideos(channelId);
         console.log(`[Church] Got ${videos.length} videos`);
 
-        const matches = findSermonVideo(videos, church.service_time || "10:00", today);
-        if (matches.length === 0) { results.push({ church: church.church_name, status: "no video found in window" }); continue; }
-        if (matches.length > 1)   { results.push({ church: church.church_name, status: "multiple videos found — pastor notified" }); continue; }
+        const serviceTime = church.service_time || "10:00";
+        console.log(`[Church] Finding sermon video for service time: ${serviceTime}, date: ${today.toISOString()}`);
+        const matches = findSermonVideo(videos, serviceTime, today);
+        console.log(`[Church] Found ${matches.length} matching videos`);
+        if (matches.length === 0) { console.log(`[Church] No match - no video in time window`); results.push({ church: church.church_name, status: "no video found in window" }); continue; }
+        if (matches.length > 1)   { console.log(`[Church] Multiple matches found`); results.push({ church: church.church_name, status: "multiple videos found — pastor notified" }); continue; }
         console.log(`[Church] Found matching sermon video`);
 
         const sermon = matches[0];
