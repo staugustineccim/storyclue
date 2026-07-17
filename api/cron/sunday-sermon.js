@@ -280,6 +280,7 @@ export default async function handler(req, res) {
     console.log(`[Church Cron] Found ${churches.length} churches`);
 
     for (const church of churches) {
+      console.log(`[Church] Processing: ${church.church_name}`);
       try {
         const channelId = await getChannelIdFromUrl(church.youtube_channel);
         if (!channelId) { results.push({ church: church.church_name, status: "no channel ID" }); continue; }
