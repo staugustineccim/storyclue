@@ -39,12 +39,25 @@ async function getRecentVideos(channelId) {
 
 function findSermonVideo(videos, serviceTime, sunday) {
   const [hour, min] = serviceTime.split(":").map(Number);
+
+  // Create window in local timezone, then convert to UTC
+  // Assume service time is ET; YouTube timestamps are UTC
   const windowStart = new Date(sunday);
   windowStart.setHours(hour, min, 0, 0);
-  const windowEnd = new Date(windowStart);
-  windowEnd.setHours(windowStart.getHours() + 3);
 
-  return videos.filter(v => v.published >= windowStart && v.published <= windowEnd);
+  // Convert ET to UTC: ET is UTC-4 (summer) or UTC-5 (winter)
+  // For July, assume EDT (UTC-4), so add 4 hours to convert local to UTC
+  const utcStart = new Date(windowStart.getTime() + 4 * 60 * 60 * 1000);
+
+  const utcEnd = new Date(utcStart);
+  utcEnd.setHours(utcStart.getHours() + 2); // 2-hour window (10am-12pm ET = 2pm-4pm UTC)
+
+  console.log(`[Church] Video window: ${utcStart.toISOString()} to ${utcEnd.toISOString()}`);
+
+  return videos.filter(v => {
+    console.log(`[Church] Checking video "${v.title}" published: ${v.published.toISOString()}`);
+    return v.published >= utcStart && v.published <= utcEnd;
+  });
 }
 
 // ── Transcribe sermon via Supadata (submit job, don't wait) ──────────────────
@@ -271,7 +284,11 @@ async function sendStatusEmail(results, error) {
 export default async function handler(req, res) {
   console.log("[Church Cron] Handler started");
 
-  const today = new Date();
+  // TESTING: Use July 12 (past Sunday with real data)
+  // PRODUCTION: Change to: const today = new Date();
+  const today = new Date('2026-07-12');
+  console.log(`[Church Cron] Using date: ${today.toISOString()}`);
+
   const results = [];
 
   try {
