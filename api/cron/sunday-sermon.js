@@ -171,6 +171,7 @@ async function getChurches() {
 
   const res = await fetch(url, {
     headers: {
+      "apikey": key,
       "Authorization": `Bearer ${key}`,
     },
   });
