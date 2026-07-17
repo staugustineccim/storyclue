@@ -282,26 +282,35 @@ export default async function handler(req, res) {
     for (const church of churches) {
       console.log(`[Church] Processing: ${church.church_name}`);
       try {
+        console.log(`[Church] Getting channel ID from: ${church.youtube_channel}`);
         const channelId = await getChannelIdFromUrl(church.youtube_channel);
         if (!channelId) { results.push({ church: church.church_name, status: "no channel ID" }); continue; }
+        console.log(`[Church] Got channel ID: ${channelId}`);
 
+        console.log(`[Church] Fetching recent videos...`);
         const videos = await getRecentVideos(channelId);
+        console.log(`[Church] Got ${videos.length} videos`);
 
         const matches = findSermonVideo(videos, church.service_time || "10:00", today);
         if (matches.length === 0) { results.push({ church: church.church_name, status: "no video found in window" }); continue; }
         if (matches.length > 1)   { results.push({ church: church.church_name, status: "multiple videos found — pastor notified" }); continue; }
+        console.log(`[Church] Found matching sermon video`);
 
         const sermon = matches[0];
 
+        console.log(`[Church] Checking if already processed...`);
         const existing = await getExistingSermon(church.id, sermon.videoId);
         if (existing) { results.push({ church: church.church_name, status: "already processed" }); continue; }
 
         // Create sermon record
+        console.log(`[Church] Creating sermon record...`);
         const sermonRecord = await createSermonRecord(church.id, sermon.videoId, sermon.title);
         if (!sermonRecord.id) { results.push({ church: church.church_name, status: "db error creating record" }); continue; }
+        console.log(`[Church] Sermon record created, submitting transcription...`);
 
         // Submit transcription job
         const transcriptionResult = await submitTranscriptionJob(sermon.videoId);
+        console.log(`[Church] Transcription submitted`);
 
         if (transcriptionResult.transcript) {
           // Got transcript immediately (video has captions) — generate puzzle now
