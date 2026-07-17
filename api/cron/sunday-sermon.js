@@ -38,18 +38,21 @@ async function getRecentVideos(channelId) {
 }
 
 function findSermonVideo(videos, serviceTime, sunday) {
-  // TESTING: Match any video from the entire day (ignore service time for now)
-  const dayStart = new Date(sunday);
-  dayStart.setUTCHours(0, 0, 0, 0);
+  const [hour, min] = serviceTime.split(":").map(Number);
 
-  const dayEnd = new Date(sunday);
-  dayEnd.setUTCHours(23, 59, 59, 999);
+  // Convert service time from ET to UTC: EDT is UTC-4
+  // 10:00 AM EDT = 2:00 PM UTC (14:00)
+  const windowStart = new Date(sunday);
+  windowStart.setUTCHours(hour + 4, min, 0, 0);
 
-  console.log(`[Church] Video window: ${dayStart.toISOString()} to ${dayEnd.toISOString()}`);
+  const windowEnd = new Date(windowStart);
+  windowEnd.setUTCHours(windowStart.getUTCHours() + 2); // 2-hour window (10am-12pm ET)
+
+  console.log(`[Church] Video window: ${windowStart.toISOString()} to ${windowEnd.toISOString()}`);
 
   return videos.filter(v => {
     console.log(`[Church] Checking video "${v.title}" published: ${v.published.toISOString()}`);
-    return v.published >= dayStart && v.published <= dayEnd;
+    return v.published >= windowStart && v.published <= windowEnd;
   });
 }
 
