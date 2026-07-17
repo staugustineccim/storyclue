@@ -38,25 +38,18 @@ async function getRecentVideos(channelId) {
 }
 
 function findSermonVideo(videos, serviceTime, sunday) {
-  const [hour, min] = serviceTime.split(":").map(Number);
+  // TESTING: Match any video from the entire day (ignore service time for now)
+  const dayStart = new Date(sunday);
+  dayStart.setUTCHours(0, 0, 0, 0);
 
-  // Create window in local timezone, then convert to UTC
-  // Assume service time is ET; YouTube timestamps are UTC
-  const windowStart = new Date(sunday);
-  windowStart.setHours(hour, min, 0, 0);
+  const dayEnd = new Date(sunday);
+  dayEnd.setUTCHours(23, 59, 59, 999);
 
-  // Convert ET to UTC: ET is UTC-4 (summer) or UTC-5 (winter)
-  // For July, assume EDT (UTC-4), so add 4 hours to convert local to UTC
-  const utcStart = new Date(windowStart.getTime() + 4 * 60 * 60 * 1000);
-
-  const utcEnd = new Date(utcStart);
-  utcEnd.setHours(utcStart.getHours() + 2); // 2-hour window (10am-12pm ET = 2pm-4pm UTC)
-
-  console.log(`[Church] Video window: ${utcStart.toISOString()} to ${utcEnd.toISOString()}`);
+  console.log(`[Church] Video window: ${dayStart.toISOString()} to ${dayEnd.toISOString()}`);
 
   return videos.filter(v => {
     console.log(`[Church] Checking video "${v.title}" published: ${v.published.toISOString()}`);
-    return v.published >= utcStart && v.published <= utcEnd;
+    return v.published >= dayStart && v.published <= dayEnd;
   });
 }
 
