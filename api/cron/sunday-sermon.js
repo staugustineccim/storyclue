@@ -38,21 +38,19 @@ async function getRecentVideos(channelId) {
 }
 
 function findSermonVideo(videos, serviceTime, sunday) {
-  const [hour, min] = serviceTime.split(":").map(Number);
+  // TESTING: Match any video from the entire day
+  // PRODUCTION: Switch back to time-window matching
+  const dayStart = new Date(sunday);
+  dayStart.setUTCHours(0, 0, 0, 0);
 
-  // Convert service time from ET to UTC: EDT is UTC-4
-  // 10:00 AM EDT = 2:00 PM UTC (14:00)
-  const windowStart = new Date(sunday);
-  windowStart.setUTCHours(hour + 4, min, 0, 0);
+  const dayEnd = new Date(sunday);
+  dayEnd.setUTCHours(23, 59, 59, 999);
 
-  const windowEnd = new Date(windowStart);
-  windowEnd.setUTCHours(windowStart.getUTCHours() + 2); // 2-hour window (10am-12pm ET)
-
-  console.log(`[Church] Video window: ${windowStart.toISOString()} to ${windowEnd.toISOString()}`);
+  console.log(`[Church] Video window: ${dayStart.toISOString()} to ${dayEnd.toISOString()}`);
 
   return videos.filter(v => {
     console.log(`[Church] Checking video "${v.title}" published: ${v.published.toISOString()}`);
-    return v.published >= windowStart && v.published <= windowEnd;
+    return v.published >= dayStart && v.published <= dayEnd;
   });
 }
 
@@ -280,9 +278,9 @@ async function sendStatusEmail(results, error) {
 export default async function handler(req, res) {
   console.log("[Church Cron] Handler started");
 
-  // TESTING: Use July 16 (latest video in feed)
+  // TESTING: Use July 12 (sermon to test)
   // PRODUCTION: Change to: const today = new Date();
-  const today = new Date('2026-07-16');
+  const today = new Date('2026-07-12');
   console.log(`[Church Cron] Using date: ${today.toISOString()}`);
 
   const results = [];
