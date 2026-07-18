@@ -343,7 +343,7 @@ export default async function handler(req, res) {
           await fetch(`${process.env.VERCEL_URL ? "https://"+process.env.VERCEL_URL : "http://localhost:3000"}/api/save-puzzle`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ slug, title: puzzleData.title, words: puzzleData.words, grade: "adult", source: "church" }),
+            body: JSON.stringify({ title: puzzleData.title, words: puzzleData.words, grade: "adult", rows: 15, cols: 15 }),
           });
 
           const puzzleUrl = `https://storyclue.ai/play/${slug}`;
