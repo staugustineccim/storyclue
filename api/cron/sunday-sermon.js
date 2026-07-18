@@ -15,26 +15,20 @@ async function getChannelIdFromUrl(channelUrl) {
 }
 
 async function getRecentVideos(channelId) {
-  const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
-  const res = await fetch(rssUrl);
-  const xml = await res.text();
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  if (!apiKey) throw new Error("YOUTUBE_API_KEY not set");
 
-  const entries = [];
-  const entryMatches = xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g);
-  for (const m of entryMatches) {
-    const entry = m[1];
-    const idMatch    = entry.match(/<yt:videoId>([^<]+)<\/yt:videoId>/);
-    const titleMatch = entry.match(/<title>([^<]+)<\/title>/);
-    const pubMatch   = entry.match(/<published>([^<]+)<\/published>/);
-    if (idMatch && titleMatch && pubMatch) {
-      entries.push({
-        videoId:   idMatch[1],
-        title:     titleMatch[1],
-        published: new Date(pubMatch[1]),
-      });
-    }
-  }
-  return entries;
+  const url = `https://www.googleapis.com/youtube/v3/search?channelId=${channelId}&order=date&part=snippet&key=${apiKey}&maxResults=50`;
+  const res = await fetch(url);
+  const data = await res.json();
+
+  if (!data.items) return [];
+
+  return data.items.map(item => ({
+    videoId: item.id.videoId,
+    title: item.snippet.title,
+    published: new Date(item.snippet.publishedAt),
+  })).filter(v => v.videoId); // Exclude non-video results
 }
 
 function findSermonVideo(videos, serviceTime, sunday) {
