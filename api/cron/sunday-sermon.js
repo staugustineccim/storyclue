@@ -298,11 +298,17 @@ export default async function handler(req, res) {
 
         if (videos.length === 0) { results.push({ church: church.church_name, status: "no videos found" }); continue; }
 
-        // TESTING: Find latest Sunday sermon
+        // Find latest Sunday sermon (skip live streams)
         const sundaySermons = videos.filter(v => v.published.getUTCDay() === 0); // 0 = Sunday
         if (sundaySermons.length === 0) { results.push({ church: church.church_name, status: "no Sunday sermons found" }); continue; }
 
-        const sermon = sundaySermons[0];
+        // Skip live streams (assume titles contain "live" or "streaming")
+        const completedSermons = sundaySermons.filter(v =>
+          !v.title.toLowerCase().includes("live") &&
+          !v.title.toLowerCase().includes("stream")
+        );
+
+        const sermon = completedSermons.length > 0 ? completedSermons[0] : sundaySermons[0];
         console.log(`[Church] Using latest Sunday sermon: "${sermon.title}" published ${sermon.published.toISOString()}`);
 
         console.log(`[Church] Checking if already processed...`);
