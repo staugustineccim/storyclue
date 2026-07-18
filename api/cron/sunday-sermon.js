@@ -298,34 +298,48 @@ export default async function handler(req, res) {
 
         if (videos.length === 0) { results.push({ church: church.church_name, status: "no videos found" }); continue; }
 
-        // Find latest Sunday sermon (skip live streams)
+        // Find latest Sunday sermon
         const sundaySermons = videos.filter(v => v.published.getUTCDay() === 0); // 0 = Sunday
         if (sundaySermons.length === 0) { results.push({ church: church.church_name, status: "no Sunday sermons found" }); continue; }
 
-        // Skip live streams (assume titles contain "live" or "streaming")
-        const completedSermons = sundaySermons.filter(v =>
-          !v.title.toLowerCase().includes("live") &&
-          !v.title.toLowerCase().includes("stream")
-        );
+        // Try each Sunday sermon until one succeeds (skip live streams)
+        let transcriptionResult = null;
+        let sermonRecord = null;
+        let sermon = null;
 
-        const sermon = completedSermons.length > 0 ? completedSermons[0] : sundaySermons[0];
-        console.log(`[Church] Using latest Sunday sermon: "${sermon.title}" published ${sermon.published.toISOString()}`);
+        for (const candidateSermon of sundaySermons) {
+          console.log(`[Church] Trying sermon: "${candidateSermon.title}" published ${candidateSermon.published.toISOString()}`);
 
-        console.log(`[Church] Checking if already processed...`);
-        const existing = await getExistingSermon(church.id, sermon.videoId);
-        if (existing) { results.push({ church: church.church_name, status: "already processed" }); continue; }
+          console.log(`[Church] Checking if already processed...`);
+          const existing = await getExistingSermon(church.id, candidateSermon.videoId);
+          if (existing) { console.log(`[Church] Already processed, skipping`); continue; }
 
-        // Create sermon record
-        console.log(`[Church] Creating sermon record...`);
-        const sermonRecord = await createSermonRecord(church.id, sermon.videoId, sermon.title);
-        if (!sermonRecord.id) { results.push({ church: church.church_name, status: "db error creating record" }); continue; }
-        console.log(`[Church] Sermon record created, submitting transcription...`);
+          // Create sermon record
+          console.log(`[Church] Creating sermon record...`);
+          const record = await createSermonRecord(church.id, candidateSermon.videoId, candidateSermon.title);
+          if (!record.id) { console.log(`[Church] DB error, skipping`); continue; }
+          console.log(`[Church] Sermon record created, submitting transcription...`);
 
-        // Submit transcription job
-        const transcriptionResult = await submitTranscriptionJob(sermon.videoId);
-        console.log(`[Church] Transcription submitted`);
+          // Try to transcribe
+          try {
+            const result = await submitTranscriptionJob(candidateSermon.videoId);
+            console.log(`[Church] Transcription submitted`);
+            transcriptionResult = result;
+            sermonRecord = record;
+            sermon = candidateSermon;
+            break; // Success, exit loop
+          } catch (err) {
+            if (err.message.includes("live streaming")) {
+              console.log(`[Church] Video is live streaming, trying next sermon...`);
+              continue; // Try next video
+            }
+            throw err; // Re-throw other errors
+          }
+        }
 
-        if (transcriptionResult.transcript) {
+        if (!sermon) { results.push({ church: church.church_name, status: "no usable sermons found" }); continue; }
+
+        if (transcriptionResult && transcriptionResult.transcript) {
           // Got transcript immediately (video has captions) — generate puzzle now
           const puzzleData = await generateSermonPuzzle(transcriptionResult.transcript, sermon.title, church.church_name, church.pastor_name);
 
