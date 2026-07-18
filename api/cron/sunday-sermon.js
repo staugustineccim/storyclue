@@ -143,17 +143,18 @@ async function emailPastor(toEmail, pastorName, puzzleUrl, sermonTitle) {
     return;
   }
 
-  await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
-    },
-    body: JSON.stringify({
-      from: "StoryClue <puzzles@storyclue.ai>",
-      to: toEmail,
-      subject: `Your Sunday Crossword is Ready — ${sermonTitle}`,
-      html: `
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: "StoryClue <puzzles@storyclue.ai>",
+        to: toEmail,
+        subject: `Your Sunday Crossword is Ready — ${sermonTitle}`,
+        html: `
         <div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;padding:32px 24px;background:#faf7f0">
           <h1 style="font-family:serif;color:#2D5A1A;font-size:24px;margin-bottom:8px">Your Sermon Crossword is Ready</h1>
           <p style="color:#5a4a28;font-size:16px;line-height:1.6">Pastor ${pastorName},</p>
@@ -170,8 +171,18 @@ async function emailPastor(toEmail, pastorName, puzzleUrl, sermonTitle) {
           <p style="color:#8a7a5a;font-size:12px;text-align:center">StoryClue · storyclue.ai</p>
         </div>
       `,
-    }),
-  });
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      console.error(`[Church] Email failed: ${res.status} ${JSON.stringify(data)}`);
+      throw new Error(`Resend error: ${data.message || res.statusText}`);
+    }
+    console.log(`[Church] Email sent to ${toEmail}`);
+  } catch (err) {
+    console.error(`[Church] Email error:`, err.message);
+    throw err;
+  }
 }
 
 // ── Supabase REST API helpers ──────────────────────────────────────────────
