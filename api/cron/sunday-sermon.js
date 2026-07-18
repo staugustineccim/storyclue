@@ -122,7 +122,14 @@ Return ONLY valid JSON in this exact format:
   const data = await response.json();
   const text = data.content[0].text;
   try {
-    return JSON.parse(text.replace(/```json\n?|\n?```/g, "").trim());
+    // Extract JSON from the response (may have text before/after)
+    const jsonStart = text.indexOf("{");
+    const jsonEnd = text.lastIndexOf("}");
+    if (jsonStart === -1 || jsonEnd === -1) {
+      throw new Error("No JSON object found in response");
+    }
+    const jsonStr = text.substring(jsonStart, jsonEnd + 1);
+    return JSON.parse(jsonStr);
   } catch (err) {
     console.error("[Claude] Failed to parse puzzle JSON. Response:", text.substring(0, 200));
     throw new Error(`Claude did not return valid JSON: ${err.message}`);
