@@ -298,17 +298,13 @@ export default async function handler(req, res) {
 
         if (videos.length === 0) { results.push({ church: church.church_name, status: "no videos found" }); continue; }
 
-        // Find latest Sunday sermon
-        const sundaySermons = videos.filter(v => v.published.getUTCDay() === 0); // 0 = Sunday
-        if (sundaySermons.length === 0) { results.push({ church: church.church_name, status: "no Sunday sermons found" }); continue; }
-
-        // Try each Sunday sermon until one succeeds (skip live streams)
+        // Try each video until one succeeds (skip live streams)
         let transcriptionResult = null;
         let sermonRecord = null;
         let sermon = null;
 
-        for (const candidateSermon of sundaySermons) {
-          console.log(`[Church] Trying sermon: "${candidateSermon.title}" published ${candidateSermon.published.toISOString()}`);
+        for (const candidateSermon of videos) {
+          console.log(`[Church] Trying: "${candidateSermon.title}" published ${candidateSermon.published.toISOString()}`);
 
           console.log(`[Church] Checking if already processed...`);
           const existing = await getExistingSermon(church.id, candidateSermon.videoId);
@@ -330,14 +326,14 @@ export default async function handler(req, res) {
             break; // Success, exit loop
           } catch (err) {
             if (err.message.includes("live streaming")) {
-              console.log(`[Church] Video is live streaming, trying next sermon...`);
+              console.log(`[Church] Video is live streaming, trying next video...`);
               continue; // Try next video
             }
             throw err; // Re-throw other errors
           }
         }
 
-        if (!sermon) { results.push({ church: church.church_name, status: "no usable sermons found" }); continue; }
+        if (!sermon) { results.push({ church: church.church_name, status: "no usable videos found" }); continue; }
 
         if (transcriptionResult && transcriptionResult.transcript) {
           // Got transcript immediately (video has captions) — generate puzzle now
