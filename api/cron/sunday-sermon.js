@@ -121,7 +121,12 @@ Return ONLY valid JSON in this exact format:
   });
   const data = await response.json();
   const text = data.content[0].text;
-  return JSON.parse(text.replace(/```json\n?|\n?```/g, "").trim());
+  try {
+    return JSON.parse(text.replace(/```json\n?|\n?```/g, "").trim());
+  } catch (err) {
+    console.error("[Claude] Failed to parse puzzle JSON. Response:", text.substring(0, 200));
+    throw new Error(`Claude did not return valid JSON: ${err.message}`);
+  }
 }
 
 // ── Send email via Resend ────────────────────────────────────────────────────
