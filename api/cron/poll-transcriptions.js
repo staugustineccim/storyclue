@@ -214,10 +214,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log("[Poll] Fetching transcribing sermons...");
     const sermons = await getTranscribingSermons();
-    console.log(`[Poll] Found ${sermons?.length || 0} sermons`);
     const results = [];
+    const debug = { sermonCount: sermons?.length || 0, processedSermons: [] };
 
     for (const sermon of sermons || []) {
       try {
@@ -276,12 +275,12 @@ export default async function handler(req, res) {
         results.push({ sermon: sermon.sermon_title, status: "puzzle sent", puzzleUrl });
 
       } catch (err) {
-        console.error(`[Church Polling] Error for ${sermon.sermon_title}:`, err);
         results.push({ sermon: sermon.sermon_title, status: "error", error: err.message });
+        debug.processedSermons.push({ title: sermon.sermon_title, error: err.message });
       }
     }
 
-    return res.status(200).json({ checked: sermons?.length || 0, results });
+    return res.status(200).json({ checked: sermons?.length || 0, results, debug });
 
   } catch (err) {
     console.error("[Church Polling] Handler error:", err);
