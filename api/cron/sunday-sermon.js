@@ -336,12 +336,18 @@ export default async function handler(req, res) {
 
         if (videos.length === 0) { results.push({ church: church.church_name, status: "no videos found" }); continue; }
 
+        // Filter to only today's videos
+        const todaysVideos = findSermonVideo(videos, null, today);
+        console.log(`[Church] Found ${todaysVideos.length} videos from today`);
+
+        if (todaysVideos.length === 0) { results.push({ church: church.church_name, status: "no videos from today" }); continue; }
+
         // Try each video until one succeeds (skip live streams)
         let transcriptionResult = null;
         let sermonRecord = null;
         let sermon = null;
 
-        for (const candidateSermon of videos) {
+        for (const candidateSermon of todaysVideos) {
           console.log(`[Church] Trying: "${candidateSermon.title}" published ${candidateSermon.published.toISOString()}`);
 
           console.log(`[Church] Checking if already processed...`);
