@@ -25,36 +25,33 @@ async function checkSupadataStatus(jobId) {
   return { done: false };
 }
 
-// ── Poll Whisper for transcription result (via OpenAI) ──────────────────────
-async function checkWhisperStatus(jobId) {
-  // Whisper uses a simple endpoint that returns the transcript directly
-  // jobId is the YouTube video ID in this case
-  const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${process.env.OPENAI_API_KEY}` },
-    body: JSON.stringify({
-      model: "whisper-1",
-      language: "en",
-      url: `https://www.youtube.com/watch?v=${jobId}`,
-    }),
+// ── Poll AssemblyAI for transcription result ────────────────────────────────
+async function checkAssemblyAIStatus(jobId) {
+  const res = await fetch(`https://api.assemblyai.com/v2/transcript/${jobId}`, {
+    headers: { "Authorization": process.env.ASSEMBLYAI_API_KEY },
   });
 
   const data = await res.json();
   if (!res.ok) {
-    return { done: true, error: data.error?.message || "Whisper API error" };
+    return { done: true, error: data.error || "AssemblyAI API error" };
   }
 
-  if (data.text) {
+  if (data.status === "completed") {
     return { transcript: data.text, done: true };
   }
 
+  if (data.status === "failed") {
+    return { done: true, error: data.error || "Transcription failed" };
+  }
+
+  // Still processing
   return { done: false };
 }
 
-// ── Check transcription status (handles both Supadata and Whisper) ──────────
+// ── Check transcription status (handles Supadata and AssemblyAI) ────────────
 async function checkTranscriptionStatus(jobId, service) {
-  if (service === "whisper") {
-    return await checkWhisperStatus(jobId);
+  if (service === "assemblyai") {
+    return await checkAssemblyAIStatus(jobId);
   } else {
     return await checkSupadataStatus(jobId);
   }

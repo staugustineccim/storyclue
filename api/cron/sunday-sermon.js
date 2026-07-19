@@ -70,41 +70,50 @@ async function submitSupadataJob(videoId) {
   throw new Error(`Supadata unexpected response: ${JSON.stringify(data)}`);
 }
 
-// ── Fallback: Transcribe via OpenAI Whisper API ──────────────────────────────
-async function submitWhisperJob(videoId) {
-  const url = `https://www.youtube.com/watch?v=${videoId}`;
+// ── Fallback: Transcribe via AssemblyAI (supports YouTube URLs) ─────────────
+async function submitAssemblyAIJob(videoId) {
+  const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-  const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+  // Submit job to AssemblyAI
+  const submitRes = await fetch("https://api.assemblyai.com/v2/transcript", {
     method: "POST",
-    headers: { "Authorization": `Bearer ${process.env.OPENAI_API_KEY}` },
+    headers: {
+      "Authorization": process.env.ASSEMBLYAI_API_KEY,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({
-      model: "whisper-1",
-      language: "en",
-      file: url, // Whisper API can accept URLs
+      audio_url: youtubeUrl,
+      language_code: "en",
     }),
   });
 
-  const data = await res.json();
-  if (!res.ok) throw new Error(`Whisper error: ${JSON.stringify(data)}`);
+  const data = await submitRes.json();
+  if (!submitRes.ok) throw new Error(`AssemblyAI error: ${JSON.stringify(data)}`);
 
-  if (data.text) {
-    return { transcript: data.text, jobId: null, service: "whisper" };
+  // If already complete, return transcript
+  if (data.status === "completed") {
+    return { transcript: data.text, jobId: null, service: "assemblyai" };
   }
 
-  throw new Error(`Whisper unexpected response: ${JSON.stringify(data)}`);
+  // Otherwise return job ID for polling
+  if (data.id) {
+    return { transcript: null, jobId: data.id, service: "assemblyai" };
+  }
+
+  throw new Error(`AssemblyAI unexpected response: ${JSON.stringify(data)}`);
 }
 
-// ── Try Supadata first, fall back to Whisper on failure ─────────────────────
+// ── Try Supadata first, fall back to AssemblyAI on failure ────────────────
 async function submitTranscriptionJob(videoId) {
   try {
     return await submitSupadataJob(videoId);
   } catch (supadataErr) {
-    console.log(`[Church] Supadata failed: ${supadataErr.message}, trying Whisper...`);
+    console.log(`[Church] Supadata failed: ${supadataErr.message}, trying AssemblyAI...`);
     try {
-      return await submitWhisperJob(videoId);
-    } catch (whisperErr) {
-      console.log(`[Church] Whisper also failed: ${whisperErr.message}`);
-      throw new Error(`Both Supadata and Whisper failed. Supadata: ${supadataErr.message}. Whisper: ${whisperErr.message}`);
+      return await submitAssemblyAIJob(videoId);
+    } catch (assemblyErr) {
+      console.log(`[Church] AssemblyAI also failed: ${assemblyErr.message}`);
+      throw new Error(`Both Supadata and AssemblyAI failed. Supadata: ${supadataErr.message}. AssemblyAI: ${assemblyErr.message}`);
     }
   }
 }
