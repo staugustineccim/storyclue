@@ -81,9 +81,13 @@ Pastor: ${pastorName}
 Full sermon transcript:
 ${sermonText.slice(0, 6000)}
 
-CRITICAL RULE: Every clue MUST quote or reference something the pastor explicitly said, a specific story they told, a specific scripture verse they cited, or a specific illustration they used. NO generic definitions. NO interpolation. NO filling in what you think the sermon meant.
+CRITICAL RULES:
+- IGNORE opening remarks, greetings, and casual chat (e.g., "I've been watching Colonial Church...", "look at your neighbor", audience participation calls)
+- FOCUS ONLY on the core sermon teaching: main message, scripture, stories, illustrations, key concepts
+- Every clue MUST reference something from the SERMON CONTENT, not the introduction
+- NO generic definitions. NO interpolation. NO filling in what you think the sermon meant.
 
-Your job is to pull out words that are:
+Your job is to pull out words from the SERMON TEACHING that are:
 1. Directly quoted or emphasized by the pastor (words they repeated or highlighted)
 2. Central to a specific story or illustration the pastor told (the object, person, concept, or action at the heart of their story)
 3. Part of a specific scripture verse the pastor cited and explained
