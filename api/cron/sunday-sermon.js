@@ -70,11 +70,40 @@ async function submitSupadataJob(videoId) {
   throw new Error(`Supadata unexpected response: ${JSON.stringify(data)}`);
 }
 
-// ── Fallback: Transcribe via AssemblyAI (supports YouTube URLs) ─────────────
+// ── Fallback 1: Get YouTube captions (free, no transcription needed) ────────
+async function getYouTubeCaptions(videoId) {
+  try {
+    // Try YouTube's timedtext API to get available caption tracks
+    const trackRes = await fetch(`https://www.youtube.com/api/timedtext?v=${videoId}&type=list`);
+    const trackXml = await trackRes.text();
+
+    // Extract first English caption track
+    const trackMatch = trackXml.match(/lang_code='([^']*en[^']*)'[^>]*name='([^']*)'[^>]*kind='([^']*)'/);
+    if (!trackMatch) throw new Error("No captions found");
+
+    const langCode = trackMatch[1];
+    const captionRes = await fetch(`https://www.youtube.com/api/timedtext?v=${videoId}&lang=${langCode}`);
+    const captionXml = await captionRes.text();
+
+    // Extract text from caption XML
+    const textMatches = captionXml.match(/<text[^>]*>([^<]+)<\/text>/g);
+    if (!textMatches) throw new Error("No caption text found");
+
+    const transcript = textMatches
+      .map(match => match.replace(/<[^>]+>/g, "").replace(/&[^;]+;/g, " ").trim())
+      .filter(text => text.length > 0)
+      .join(" ");
+
+    return { transcript, service: "youtube-captions" };
+  } catch (err) {
+    throw new Error(`YouTube captions error: ${err.message}`);
+  }
+}
+
+// ── Fallback 2: Transcribe via AssemblyAI ────────────────────────────────
 async function submitAssemblyAIJob(videoId) {
   const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-  // Submit job to AssemblyAI
   const submitRes = await fetch("https://api.assemblyai.com/v2/transcript", {
     method: "POST",
     headers: {
@@ -90,12 +119,10 @@ async function submitAssemblyAIJob(videoId) {
   const data = await submitRes.json();
   if (!submitRes.ok) throw new Error(`AssemblyAI error: ${JSON.stringify(data)}`);
 
-  // If already complete, return transcript
   if (data.status === "completed") {
     return { transcript: data.text, jobId: null, service: "assemblyai" };
   }
 
-  // Otherwise return job ID for polling
   if (data.id) {
     return { transcript: null, jobId: data.id, service: "assemblyai" };
   }
@@ -103,17 +130,22 @@ async function submitAssemblyAIJob(videoId) {
   throw new Error(`AssemblyAI unexpected response: ${JSON.stringify(data)}`);
 }
 
-// ── Try Supadata first, fall back to AssemblyAI on failure ────────────────
+// ── Transcription fallback chain: Supadata → YouTube captions → AssemblyAI ─
 async function submitTranscriptionJob(videoId) {
   try {
     return await submitSupadataJob(videoId);
   } catch (supadataErr) {
-    console.log(`[Church] Supadata failed: ${supadataErr.message}, trying AssemblyAI...`);
+    console.log(`[Church] Supadata failed: ${supadataErr.message}, trying YouTube captions...`);
     try {
-      return await submitAssemblyAIJob(videoId);
-    } catch (assemblyErr) {
-      console.log(`[Church] AssemblyAI also failed: ${assemblyErr.message}`);
-      throw new Error(`Both Supadata and AssemblyAI failed. Supadata: ${supadataErr.message}. AssemblyAI: ${assemblyErr.message}`);
+      return await getYouTubeCaptions(videoId);
+    } catch (captionErr) {
+      console.log(`[Church] YouTube captions failed: ${captionErr.message}, trying AssemblyAI...`);
+      try {
+        return await submitAssemblyAIJob(videoId);
+      } catch (assemblyErr) {
+        console.log(`[Church] All transcription methods failed`);
+        throw new Error(`Supadata: ${supadataErr.message}. YouTube captions: ${captionErr.message}. AssemblyAI: ${assemblyErr.message}`);
+      }
     }
   }
 }
