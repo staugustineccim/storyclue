@@ -100,37 +100,7 @@ async function getYouTubeCaptions(videoId) {
   }
 }
 
-// ── Fallback 2: Transcribe via AssemblyAI ────────────────────────────────
-async function submitAssemblyAIJob(videoId) {
-  const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
-
-  const submitRes = await fetch("https://api.assemblyai.com/v2/transcript", {
-    method: "POST",
-    headers: {
-      "Authorization": process.env.ASSEMBLYAI_API_KEY,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      audio_url: youtubeUrl,
-      language_code: "en",
-    }),
-  });
-
-  const data = await submitRes.json();
-  if (!submitRes.ok) throw new Error(`AssemblyAI error: ${JSON.stringify(data)}`);
-
-  if (data.status === "completed") {
-    return { transcript: data.text, jobId: null, service: "assemblyai" };
-  }
-
-  if (data.id) {
-    return { transcript: null, jobId: data.id, service: "assemblyai" };
-  }
-
-  throw new Error(`AssemblyAI unexpected response: ${JSON.stringify(data)}`);
-}
-
-// ── Transcription fallback chain: Supadata → YouTube captions → AssemblyAI ─
+// ── Transcription fallback chain: Supadata → YouTube captions ─────────────
 async function submitTranscriptionJob(videoId) {
   try {
     console.log(`[Church] Trying Supadata...`);
@@ -141,14 +111,8 @@ async function submitTranscriptionJob(videoId) {
       console.log(`[Church] Trying YouTube captions...`);
       return await getYouTubeCaptions(videoId);
     } catch (captionErr) {
-      console.log(`[Church] YouTube captions failed: ${captionErr.message}, trying AssemblyAI...`);
-      try {
-        console.log(`[Church] Trying AssemblyAI...`);
-        return await submitAssemblyAIJob(videoId);
-      } catch (assemblyErr) {
-        console.log(`[Church] All transcription methods failed`);
-        throw new Error(`Supadata: ${supadataErr.message}. YouTube captions: ${captionErr.message}. AssemblyAI: ${assemblyErr.message}`);
-      }
+      console.log(`[Church] YouTube captions failed: ${captionErr.message}`);
+      throw new Error(`No transcription available. Supadata: ${supadataErr.message}. YouTube captions: ${captionErr.message}`);
     }
   }
 }
