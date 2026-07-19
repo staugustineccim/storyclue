@@ -46,13 +46,15 @@ Your job is to pull out words that are:
 5. Key phrases the pastor used multiple times
 
 For EACH word:
-- Write the clue as: "[Pastor's name] said: [EXACT QUOTE or SPECIFIC REFERENCE to the story/verse/illustration]"
-- Example GOOD clue: "Jonathan illustrated that the people around you shape what you spiritually ___ for, like culture shapes food preferences" (Answer: HUNGER)
-- Example BAD clue: "The feeling of wanting something" (this is generic, banned)
+- Write the clue referencing the pastor's talking point, story, scripture, or key concept WITHOUT direct quotes
+- Example GOOD clue: "The people around you shape what you spiritually hunger for, like culture shapes food preferences" (Answer: HUNGER)
+- Example GOOD clue: "Scripture reference he opened with — chapter 5" (Answer: MATTHEW)
+- Example BAD clue: "Jonathan said: 'Open it up to the book of...'" (too quote-heavy)
+- Example BAD clue: "The feeling of wanting something" (too generic, not about the sermon)
 
 Rules:
 - Every word must appear in the sermon text or be a direct reference to content in the sermon
-- Clues must include the pastor's name and reference something specific (a quote, story element, verse, or repeated phrase)
+- Clues must reference something specific from the sermon (a concept, story element, verse, or repeated theme) — NO generic dictionary definitions
 - Words must be single words, all caps, 3-15 letters, no spaces
 - 15-20 words total
 - If you cannot find specific source material for a word, DO NOT INCLUDE IT
