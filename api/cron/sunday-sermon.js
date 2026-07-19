@@ -133,14 +133,17 @@ async function submitAssemblyAIJob(videoId) {
 // ── Transcription fallback chain: Supadata → YouTube captions → AssemblyAI ─
 async function submitTranscriptionJob(videoId) {
   try {
+    console.log(`[Church] Trying Supadata...`);
     return await submitSupadataJob(videoId);
   } catch (supadataErr) {
     console.log(`[Church] Supadata failed: ${supadataErr.message}, trying YouTube captions...`);
     try {
+      console.log(`[Church] Trying YouTube captions...`);
       return await getYouTubeCaptions(videoId);
     } catch (captionErr) {
       console.log(`[Church] YouTube captions failed: ${captionErr.message}, trying AssemblyAI...`);
       try {
+        console.log(`[Church] Trying AssemblyAI...`);
         return await submitAssemblyAIJob(videoId);
       } catch (assemblyErr) {
         console.log(`[Church] All transcription methods failed`);
