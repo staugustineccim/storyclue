@@ -442,11 +442,16 @@ export default async function handler(req, res) {
           await emailPastor(church.sender_email, church.pastor_name, puzzleUrl, sermon.title);
 
           results.push({ church: church.church_name, status: "puzzle sent (instant)", puzzleUrl });
-        } else {
+        } else if (transcriptionResult.jobId) {
           // Got jobId — background polling will handle it
           await updateSermonRecord(sermonRecord.id, { job_id: transcriptionResult.jobId, status: "transcribing", transcription_service: transcriptionResult.service });
 
           results.push({ church: church.church_name, status: "transcription queued (polling in background)", jobId: transcriptionResult.jobId, service: transcriptionResult.service });
+        } else {
+          // No transcript and no jobId — waiting for captions to become available
+          await updateSermonRecord(sermonRecord.id, { status: "waiting_for_captions", video_id: sermon.videoId });
+
+          results.push({ church: church.church_name, status: "waiting for YouTube captions (will retry hourly)" });
         }
 
       } catch (err) {
