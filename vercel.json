@@ -7,6 +7,8 @@
   "framework": "vite",
   "devCommand": "vite --port 5173",
   "functions": {
+    "api/get-puzzle.js": { "maxDuration": 10 },
+    "api/save-puzzle.js": { "maxDuration": 30 },
     "api/cron/sunday-sermon.js": { "maxDuration": 300 },
     "api/cron/poll-transcriptions.js": { "maxDuration": 60 },
     "api/test-sermon.js": { "maxDuration": 300 }
