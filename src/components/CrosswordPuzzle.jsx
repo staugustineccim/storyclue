@@ -731,7 +731,20 @@ function PuzzleBoard({
     const key = wordKey(activeWord);
     if (simplerClues[key]) { setHintMsg("Already simplified!"); setShowHintMenu(false); return; }
 
-    setHintLoading(true); setShowHintMenu(false);
+    setShowHintMenu(false);
+
+    // Use stored hint if available (for sermon puzzles)
+    if (activeWord.hint) {
+      setSimplerClues(prev => ({ ...prev, [key]: activeWord.hint }));
+      setHintsLeft(h => h - 1);
+      setHintMsg(`Hint revealed! (${hintsLeft - 1} hint${hintsLeft - 1 !== 1 ? "s" : ""} left)`);
+      trackEvent("hint_used", { hint_type: "stored_hint", grade_level: grade, book_title: title });
+      setTimeout(() => setHintMsg(""), 4000);
+      return;
+    }
+
+    // Fall back to API for older puzzles without stored hints
+    setHintLoading(true);
     setHintMsg("Getting a simpler clue...");
     try {
       const res  = await fetch("/api/simplify-clue", {

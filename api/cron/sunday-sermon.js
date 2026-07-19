@@ -90,16 +90,22 @@ Your job is to pull out words that are:
 4. Part of specific action items or challenges the pastor gave
 5. Key phrases the pastor used multiple times
 
-For EACH word:
-- Write the clue referencing the pastor's talking point, story, scripture, or key concept WITHOUT direct quotes
-- Example GOOD clue: "The people around you shape what you spiritually hunger for, like culture shapes food preferences" (Answer: HUNGER)
-- Example GOOD clue: "Scripture reference he opened with — chapter 5" (Answer: MATTHEW)
-- Example BAD clue: "Jonathan said: 'Open it up to the book of...'" (too quote-heavy)
-- Example BAD clue: "The feeling of wanting something" (too generic, not about the sermon)
+For EACH word, generate TWO versions:
+
+**CLUE** (thematic, bullet-point style):
+- Reference the main talking point, key theme, or concept WITHOUT direct quotes
+- Example: "The people around you shape what you spiritually hunger for, like culture shapes food preferences" (Answer: HUNGER)
+- Example: "Scripture reference he opened with — chapter 5" (Answer: MATTHEW)
+
+**HINT** (direct reference to what pastor said):
+- What the pastor actually said or emphasized about this word — can include brief direct quotes
+- Example: "He said it shapes what we spiritually hunger for, like culture shapes food preferences"
+- Example: "The book he told everyone to open to, chapter 5"
 
 Rules:
 - Every word must appear in the sermon text or be a direct reference to content in the sermon
-- Clues must reference something specific from the sermon (a concept, story element, verse, or repeated theme) — NO generic dictionary definitions
+- Clues must reference something specific from the sermon (a concept, story element, verse, or repeated theme)
+- Hints should be direct enough to remind people what the pastor said
 - Words must be single words, all caps, 3-15 letters, no spaces
 - 15-20 words total
 - If you cannot find specific source material for a word, DO NOT INCLUDE IT
@@ -108,7 +114,7 @@ Return ONLY valid JSON in this exact format:
 {
   "title": "${sermonTitle} — Sermon Crossword",
   "words": [
-    {"word": "WORD", "clue": "Specific reference to what the pastor said or the story they told"}
+    {"word": "WORD", "clue": "Thematic/bullet-point version", "hint": "Direct reference to what pastor said"}
   ]
 }`;
 
