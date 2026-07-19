@@ -56,8 +56,10 @@ For EACH word, generate TWO versions:
 
 **CLUE** (thematic, bullet-point style):
 - Reference the main talking point, key theme, or concept WITHOUT direct quotes
+- When referencing Jonathan's own thoughts/stories: "Jonathan said/did..."
+- When referencing a known scripture/teaching (Beatitudes, Proverbs, etc.): Use the teaching name directly, not "Jonathan said"
 - Example: "The people around you shape what you spiritually hunger for, like culture shapes food preferences" (Answer: HUNGER)
-- Example: "Scripture reference he opened with — chapter 5" (Answer: MATTHEW)
+- Example: "Jesus's teachings about spiritual blessedness from the mountain sermon" (Answer: BEATITUDES)
 
 **HINT** (direct reference to what pastor said):
 - What the pastor actually said or emphasized about this word — can include brief direct quotes
