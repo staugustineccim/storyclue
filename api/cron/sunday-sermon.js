@@ -83,12 +83,13 @@ ${sermonText.slice(0, 6000)}
 
 CRITICAL RULES:
 - IGNORE opening remarks, greetings, and casual chat (e.g., "I've been watching Colonial Church...", "look at your neighbor", audience participation calls)
-- FOCUS ONLY on the core sermon teaching: main message, scripture, stories, illustrations, key concepts
-- Every clue MUST reference something JONATHAN SPECIFICALLY SAID OR DID in THIS SERMON
-- NO generic Bible definitions. NO dictionary-style clues. NO generic church vocabulary
-- NO interpolation. NO filling in what you think the sermon meant
-- Example BAD: "A word said in church to express agreement" (generic)
-- Example GOOD: "Jonathan said when we say this in church, it's an expression of faith" (sermon-specific)
+- FOCUS ONLY on the core sermon teaching from the scripture passages being taught
+- Every clue MUST reference the SCRIPTURE PASSAGES and teachings in THIS SERMON
+- Reference the Bible passages, not generic definitions: "In Matthew 5, Jesus taught...", "The passage describes...", "This scripture illustrates..."
+- NO generic Bible dictionary definitions. NO generic church vocabulary. NO generic theology.
+- NO interpolation. NO filling in what you think the sermon meant.
+- Example BAD: "A word said in church to express agreement" (generic theology)
+- Example GOOD: "In Matthew 5, Jesus described those who hunger and thirst for righteousness as ___" (scripture-specific)
 
 Your job is to pull out words from the SERMON TEACHING that are:
 1. Directly quoted or emphasized by the pastor (words they repeated or highlighted)
@@ -99,12 +100,11 @@ Your job is to pull out words from the SERMON TEACHING that are:
 
 For EACH word, generate TWO versions:
 
-**CLUE** (thematic, bullet-point style):
-- Reference the main talking point, key theme, or concept WITHOUT direct quotes
-- When referencing Jonathan's own thoughts/stories: "Jonathan said/did..."
-- When referencing a known scripture/teaching (Beatitudes, Proverbs, etc.): Use the teaching name directly, not "Jonathan said"
-- Example: "The people around you shape what you spiritually hunger for, like culture shapes food preferences" (Answer: HUNGER)
-- Example: "Jesus's teachings about spiritual blessedness from the mountain sermon" (Answer: BEATITUDES)
+**CLUE** (scripture-based, bullet-point style):
+- Reference what the SCRIPTURE PASSAGE teaches, not generic theology
+- Ground every clue in the specific passage being taught: "In [book] [chapter], the passage says..."
+- Example: "In Matthew 5, Jesus taught that those who _____ and _____ for righteousness are blessed" (Answer: HUNGER, THIRST)
+- Example: "The Beatitudes describe those blessed when they mourn, when they are meek, when they..." (Answer: BLESSED)
 
 **HINT** (direct reference to what pastor said):
 - What the pastor actually said or emphasized about this word — can include brief direct quotes
