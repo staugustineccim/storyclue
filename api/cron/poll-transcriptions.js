@@ -168,16 +168,24 @@ async function emailPastor(toEmail, pastorName, puzzleUrl, sermonTitle) {
 
 // ── Supabase REST API helpers ──────────────────────────────────────────────
 async function getTranscribingSermons() {
-  const res = await fetch(
-    `${process.env.SUPABASE_URL}/rest/v1/church_sermons?status=eq.transcribing&select=*,church_accounts(*)`,
-    {
-      headers: {
-        "apikey": process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
-        "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-      },
-    }
-  );
-  return res.json();
+  try {
+    const res = await fetch(
+      `${process.env.SUPABASE_URL}/rest/v1/church_sermons?status=eq.transcribing&select=*,church_accounts(*)`,
+      {
+        headers: {
+          "apikey": process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
+          "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+      }
+    );
+    console.log(`[Poll] Supabase response: ${res.status}`);
+    const data = await res.json();
+    console.log(`[Poll] Got ${data?.length || 0} sermons from Supabase`);
+    return data;
+  } catch (err) {
+    console.error("[Poll] Error fetching sermons:", err.message);
+    throw err;
+  }
 }
 
 async function updateSermonRecord(sermonId, updates) {
@@ -198,12 +206,17 @@ async function updateSermonRecord(sermonId, updates) {
 
 // ── Main handler ──────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
+  console.log("[Poll] Handler started");
+
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+    console.log("[Poll] Authorization failed");
     return res.status(401).json({ error: "Unauthorized" });
   }
 
   try {
+    console.log("[Poll] Fetching transcribing sermons...");
     const sermons = await getTranscribingSermons();
+    console.log(`[Poll] Found ${sermons?.length || 0} sermons`);
     const results = [];
 
     for (const sermon of sermons || []) {
