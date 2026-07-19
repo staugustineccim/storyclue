@@ -416,6 +416,13 @@ export default async function handler(req, res) {
             sermon = candidateSermon;
             break; // Success, exit loop
           } catch (err) {
+            // If transcription completely failed, check if it's a "waiting for captions" situation
+            if (err.message.includes("No captions found")) {
+              console.log(`[Church] YouTube captions not available yet, setting to waiting state...`);
+              await updateSermonRecord(record.id, { status: "waiting_for_captions", video_id: candidateSermon.videoId });
+              results.push({ church: church.church_name, status: "waiting for YouTube captions (will retry hourly)" });
+              break; // Done with this church
+            }
             console.log(`[Church] Transcription failed for this video: ${err.message}, trying next...`);
             continue; // Try next video
           }
