@@ -312,9 +312,7 @@ async function sendStatusEmail(results, error) {
 export default async function handler(req, res) {
   console.log("[Church Cron] Handler started");
 
-  // TESTING: Use July 12 (sermon to test)
-  // PRODUCTION: Change to: const today = new Date();
-  const today = new Date('2026-07-12');
+  const today = new Date();
   console.log(`[Church Cron] Using date: ${today.toISOString()}`);
 
   const results = [];
