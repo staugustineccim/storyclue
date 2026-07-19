@@ -362,12 +362,13 @@ export default async function handler(req, res) {
           // Got transcript immediately (video has captions) — generate puzzle now
           const puzzleData = await generateSermonPuzzle(transcriptionResult.transcript, sermon.title, church.church_name, church.pastor_name);
 
-          const slug = `${sermon.title.toLowerCase().replace(/[^a-z0-9]+/g,"-").slice(0,40)}-sermon-${Date.now()}`;
-          await fetch(`${process.env.VERCEL_URL ? "https://"+process.env.VERCEL_URL : "http://localhost:3000"}/api/save-puzzle`, {
+          const savePuzzleRes = await fetch(`${process.env.VERCEL_URL ? "https://"+process.env.VERCEL_URL : "http://localhost:3000"}/api/save-puzzle`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ title: puzzleData.title, words: puzzleData.words, grade: "adult", rows: 15, cols: 15 }),
           });
+          const savePuzzleData = await savePuzzleRes.json();
+          const slug = savePuzzleData.slug;
 
           const puzzleUrl = `https://storyclue.ai/play/${slug}`;
 
