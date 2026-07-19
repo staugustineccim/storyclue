@@ -49,7 +49,7 @@ function findSermonVideo(videos, serviceTime, sunday) {
 }
 
 // ── Transcribe sermon via Supadata (submit job, don't wait) ──────────────────
-async function submitTranscriptionJob(videoId) {
+async function submitSupadataJob(videoId) {
   const encodedUrl = encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`);
   const res = await fetch(`https://api.supadata.ai/v1/transcript?url=${encodedUrl}`, {
     headers: { "x-api-key": process.env.SUPADATA_API_KEY },
@@ -58,16 +58,55 @@ async function submitTranscriptionJob(videoId) {
   if (!data || data.error) throw new Error(`Supadata error: ${JSON.stringify(data)}`);
 
   // If transcript is ready immediately (video has captions), return it
-  if (typeof data.content === "string") return { transcript: data.content, jobId: null };
-  if (Array.isArray(data.content)) return { transcript: data.content.map(c => c.text || c).join(" "), jobId: null };
-  if (data.transcript) return { transcript: data.transcript, jobId: null };
+  if (typeof data.content === "string") return { transcript: data.content, jobId: null, service: "supadata" };
+  if (Array.isArray(data.content)) return { transcript: data.content.map(c => c.text || c).join(" "), jobId: null, service: "supadata" };
+  if (data.transcript) return { transcript: data.transcript, jobId: null, service: "supadata" };
 
   // Otherwise return jobId — background polling will check for completion
   if (data.jobId) {
-    return { transcript: null, jobId: data.jobId };
+    return { transcript: null, jobId: data.jobId, service: "supadata" };
   }
 
   throw new Error(`Supadata unexpected response: ${JSON.stringify(data)}`);
+}
+
+// ── Fallback: Transcribe via OpenAI Whisper API ──────────────────────────────
+async function submitWhisperJob(videoId) {
+  const url = `https://www.youtube.com/watch?v=${videoId}`;
+
+  const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${process.env.OPENAI_API_KEY}` },
+    body: JSON.stringify({
+      model: "whisper-1",
+      language: "en",
+      file: url, // Whisper API can accept URLs
+    }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(`Whisper error: ${JSON.stringify(data)}`);
+
+  if (data.text) {
+    return { transcript: data.text, jobId: null, service: "whisper" };
+  }
+
+  throw new Error(`Whisper unexpected response: ${JSON.stringify(data)}`);
+}
+
+// ── Try Supadata first, fall back to Whisper on failure ─────────────────────
+async function submitTranscriptionJob(videoId) {
+  try {
+    return await submitSupadataJob(videoId);
+  } catch (supadataErr) {
+    console.log(`[Church] Supadata failed: ${supadataErr.message}, trying Whisper...`);
+    try {
+      return await submitWhisperJob(videoId);
+    } catch (whisperErr) {
+      console.log(`[Church] Whisper also failed: ${whisperErr.message}`);
+      throw new Error(`Both Supadata and Whisper failed. Supadata: ${supadataErr.message}. Whisper: ${whisperErr.message}`);
+    }
+  }
 }
 
 // ── Generate puzzle from sermon text ─────────────────────────────────────────
@@ -390,16 +429,16 @@ export default async function handler(req, res) {
 
           const puzzleUrl = `https://storyclue.ai/play/${slug}`;
 
-          await updateSermonRecord(sermonRecord.id, { puzzle_slug: slug, status: "sent", sent_at: new Date().toISOString() });
+          await updateSermonRecord(sermonRecord.id, { puzzle_slug: slug, status: "sent", sent_at: new Date().toISOString(), transcription_service: transcriptionResult.service });
 
           await emailPastor(church.sender_email, church.pastor_name, puzzleUrl, sermon.title);
 
           results.push({ church: church.church_name, status: "puzzle sent (instant)", puzzleUrl });
         } else {
           // Got jobId — background polling will handle it
-          await updateSermonRecord(sermonRecord.id, { job_id: transcriptionResult.jobId, status: "transcribing" });
+          await updateSermonRecord(sermonRecord.id, { job_id: transcriptionResult.jobId, status: "transcribing", transcription_service: transcriptionResult.service });
 
-          results.push({ church: church.church_name, status: "transcription queued (polling in background)", jobId: transcriptionResult.jobId });
+          results.push({ church: church.church_name, status: "transcription queued (polling in background)", jobId: transcriptionResult.jobId, service: transcriptionResult.service });
         }
 
       } catch (err) {

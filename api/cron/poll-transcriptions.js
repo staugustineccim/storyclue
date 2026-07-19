@@ -3,7 +3,7 @@
 // Uses Supabase REST API (no SDK, no WebSocket issues)
 
 // ── Poll Supadata for transcription result ──────────────────────────────────
-async function checkTranscriptionStatus(jobId) {
+async function checkSupadataStatus(jobId) {
   const res = await fetch(`https://api.supadata.ai/v1/transcript/${jobId}`, {
     headers: { "x-api-key": process.env.SUPADATA_API_KEY },
   });
@@ -23,6 +23,41 @@ async function checkTranscriptionStatus(jobId) {
   }
 
   return { done: false };
+}
+
+// ── Poll Whisper for transcription result (via OpenAI) ──────────────────────
+async function checkWhisperStatus(jobId) {
+  // Whisper uses a simple endpoint that returns the transcript directly
+  // jobId is the YouTube video ID in this case
+  const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${process.env.OPENAI_API_KEY}` },
+    body: JSON.stringify({
+      model: "whisper-1",
+      language: "en",
+      url: `https://www.youtube.com/watch?v=${jobId}`,
+    }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    return { done: true, error: data.error?.message || "Whisper API error" };
+  }
+
+  if (data.text) {
+    return { transcript: data.text, done: true };
+  }
+
+  return { done: false };
+}
+
+// ── Check transcription status (handles both Supadata and Whisper) ──────────
+async function checkTranscriptionStatus(jobId, service) {
+  if (service === "whisper") {
+    return await checkWhisperStatus(jobId);
+  } else {
+    return await checkSupadataStatus(jobId);
+  }
 }
 
 // ── Generate puzzle from sermon text ─────────────────────────────────────────
@@ -176,7 +211,8 @@ export default async function handler(req, res) {
 
     for (const sermon of sermons || []) {
       try {
-        const statusResult = await checkTranscriptionStatus(sermon.job_id);
+        const service = sermon.transcription_service || "supadata"; // Default to supadata for backwards compatibility
+        const statusResult = await checkTranscriptionStatus(sermon.job_id, service);
 
         if (statusResult.error) {
           await updateSermonRecord(sermon.id, { status: "error", error_message: statusResult.error });
@@ -185,7 +221,7 @@ export default async function handler(req, res) {
         }
 
         if (!statusResult.done) {
-          results.push({ sermon: sermon.sermon_title, status: "still transcribing" });
+          results.push({ sermon: sermon.sermon_title, status: "still transcribing", service });
           continue;
         }
 
