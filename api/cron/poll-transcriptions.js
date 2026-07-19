@@ -240,6 +240,12 @@ export default async function handler(req, res) {
 
         console.log(`[Poll] Transcription done, generating puzzle...`);
 
+        if (!sermon.church_accounts) {
+          console.error(`[Poll] ERROR: No church_accounts data for sermon ${sermon.id}`);
+          results.push({ sermon: sermon.sermon_title, status: "error", error: "Missing church account data" });
+          continue;
+        }
+
         // Transcription done — generate puzzle
         const puzzleData = await generateSermonPuzzle(
           statusResult.transcript,
