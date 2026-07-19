@@ -369,11 +369,8 @@ export default async function handler(req, res) {
             sermon = candidateSermon;
             break; // Success, exit loop
           } catch (err) {
-            if (err.message.includes("live streaming")) {
-              console.log(`[Church] Video is live streaming, trying next video...`);
-              continue; // Try next video
-            }
-            throw err; // Re-throw other errors
+            console.log(`[Church] Transcription failed for this video: ${err.message}, trying next...`);
+            continue; // Try next video
           }
         }
 
