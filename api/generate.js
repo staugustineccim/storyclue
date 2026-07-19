@@ -246,7 +246,28 @@ async function getYouTubeTranscript(videoId) {
     if (transcript?.length > 100) {
       return videoTitle ? `${videoTitle}\n\n${transcript}` : transcript;
     }
-  } catch { /* fall through to description fallback */ }
+  } catch { /* fall through to Whisper fallback */ }
+
+  // Fallback: use Supadata/Whisper to transcribe the video if captions unavailable
+  try {
+    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const encodedUrl = encodeURIComponent(videoUrl);
+    const res = await fetch(`https://api.supadata.ai/v1/transcript?url=${encodedUrl}`, {
+      headers: { "x-api-key": process.env.SUPADATA_API_KEY },
+      signal: AbortSignal.timeout(30000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      let transcript = null;
+      if (typeof data.content === "string") transcript = data.content;
+      else if (Array.isArray(data.content)) transcript = data.content.map(c => c.text || c).join(" ");
+      else if (data.transcript) transcript = data.transcript;
+
+      if (transcript?.length > 100) {
+        return videoTitle ? `${videoTitle}\n\n${transcript}` : transcript;
+      }
+    }
+  } catch { /* fall through to description */ }
 
   if (videoTitle || videoDescription) {
     return `Video: ${videoTitle}\n\n${videoDescription}`;
