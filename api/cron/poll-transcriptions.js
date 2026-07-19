@@ -220,19 +220,25 @@ export default async function handler(req, res) {
 
     for (const sermon of sermons || []) {
       try {
-        const service = sermon.transcription_service || "supadata"; // Default to supadata for backwards compatibility
+        const service = sermon.transcription_service || "supadata";
+        console.log(`[Poll] Checking sermon: ${sermon.sermon_title}, service: ${service}, jobId: ${sermon.job_id}`);
         const statusResult = await checkTranscriptionStatus(sermon.job_id, service);
+        console.log(`[Poll] Status result:`, JSON.stringify(statusResult));
 
         if (statusResult.error) {
+          console.log(`[Poll] Got error: ${statusResult.error}`);
           await updateSermonRecord(sermon.id, { status: "error", error_message: statusResult.error });
           results.push({ sermon: sermon.sermon_title, status: "error", error: statusResult.error });
           continue;
         }
 
         if (!statusResult.done) {
+          console.log(`[Poll] Still transcribing`);
           results.push({ sermon: sermon.sermon_title, status: "still transcribing", service });
           continue;
         }
+
+        console.log(`[Poll] Transcription done, generating puzzle...`);
 
         // Transcription done — generate puzzle
         const puzzleData = await generateSermonPuzzle(
