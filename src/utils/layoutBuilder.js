@@ -25,10 +25,11 @@ function getTier(grade) {
 export function buildGrid(words, rows, cols) {
   const g = Array.from({ length: rows }, () => Array(cols).fill(null));
   for (const w of words) {
-    for (let i = 0; i < w.answer.length; i++) {
+    const answer = w.answer || w.word;
+    for (let i = 0; i < answer.length; i++) {
       const r = w.orientation === "down"   ? w.starty + i : w.starty;
       const c = w.orientation === "across" ? w.startx + i : w.startx;
-      if (r >= 0 && r < rows && c >= 0 && c < cols) g[r][c] = w.answer[i];
+      if (r >= 0 && r < rows && c >= 0 && c < cols) g[r][c] = answer[i];
     }
   }
   return g;
