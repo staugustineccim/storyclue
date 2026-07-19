@@ -84,8 +84,11 @@ ${sermonText.slice(0, 6000)}
 CRITICAL RULES:
 - IGNORE opening remarks, greetings, and casual chat (e.g., "I've been watching Colonial Church...", "look at your neighbor", audience participation calls)
 - FOCUS ONLY on the core sermon teaching: main message, scripture, stories, illustrations, key concepts
-- Every clue MUST reference something from the SERMON CONTENT, not the introduction
-- NO generic definitions. NO interpolation. NO filling in what you think the sermon meant.
+- Every clue MUST reference something JONATHAN SPECIFICALLY SAID OR DID in THIS SERMON
+- NO generic Bible definitions. NO dictionary-style clues. NO generic church vocabulary
+- NO interpolation. NO filling in what you think the sermon meant
+- Example BAD: "A word said in church to express agreement" (generic)
+- Example GOOD: "Jonathan said when we say this in church, it's an expression of faith" (sermon-specific)
 
 Your job is to pull out words from the SERMON TEACHING that are:
 1. Directly quoted or emphasized by the pastor (words they repeated or highlighted)
