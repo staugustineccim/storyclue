@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useSearchParams, useNavigate, useParams } from "react-router-dom";
 import { decodePuzzle } from "../utils/urlEncoder";
-import { buildGrid, buildNumbering } from "../utils/layoutBuilder";
+import { buildGrid, buildNumbering, buildLayout } from "../utils/layoutBuilder";
 import FeedbackModal from "./FeedbackModal";
 import VocabModal from "./VocabModal";
 import ContextReviewModal from "./ContextReviewModal";
@@ -178,7 +178,14 @@ export default function CrosswordPuzzle() {
     if (slug) {
       fetch(`/api/get-puzzle?slug=${encodeURIComponent(slug)}`)
         .then(r => { if (!r.ok) throw Object.assign(new Error(), { status: r.status }); return r.json(); })
-        .then(data => { setPuzzleData(data); setLoadState("ready"); })
+        .then(data => {
+          if (data.words && data.words.length > 0 && !data.words[0].starty) {
+            const placed = buildLayout(data.words, data.grade || "adult");
+            if (placed) data = { ...data, ...placed };
+          }
+          setPuzzleData(data);
+          setLoadState("ready");
+        })
         .catch(() => setLoadState("error"));
     } else {
       const p = searchParams.get("p");
