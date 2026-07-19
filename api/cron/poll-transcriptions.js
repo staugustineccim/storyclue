@@ -181,17 +181,18 @@ export default async function handler(req, res) {
         );
 
         // Save puzzle
-        const slug = `${sermon.sermon_title.toLowerCase().replace(/[^a-z0-9]+/g,"-").slice(0,40)}-sermon-${Date.now()}`;
         const saveRes = await fetch(`${process.env.VERCEL_URL ? "https://"+process.env.VERCEL_URL : "http://localhost:3000"}/api/save-puzzle`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ slug, title: puzzleData.title, words: puzzleData.words, grade: "adult", source: "church" }),
+          body: JSON.stringify({ title: puzzleData.title, words: puzzleData.words, grade: "adult", rows: 15, cols: 15 }),
         });
 
         if (!saveRes.ok) {
           throw new Error(`Failed to save puzzle: ${saveRes.status}`);
         }
 
+        const saveData = await saveRes.json();
+        const slug = saveData.slug;
         const puzzleUrl = `https://storyclue.ai/play/${slug}`;
 
         // Update sermon record
