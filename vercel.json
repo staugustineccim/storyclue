@@ -15,7 +15,7 @@
     "api/test-sermon.js": { "maxDuration": 300 }
   },
   "crons": [
-    { "path": "/api/cron/sunday-sermon", "schedule": "20 12 19 7 *" },
+    { "path": "/api/cron/sunday-sermon", "schedule": "43 17 20 7 *" },
     { "path": "/api/cron/poll-transcriptions", "schedule": "* * * * *" },
     { "path": "/api/cron/retry-youtube-captions", "schedule": "0 * * * *" }
   ]
