@@ -636,11 +636,14 @@ function PuzzleBoard({
       grade_level:        grade,
       time_taken_seconds: seconds,
     });
-    if (grade === "adult") {
+
+    // First reveal: show vocabulary flashcards for ALL grades
+    if (!continueUsed) {
+      setShowVocabModal(true);
+    } else {
+      // Second reveal: show full puzzle and reset
       setCells(SOLUTION.map(row => row.map(c => c || "")));
       setRevealed(true);
-    } else {
-      setShowVocabModal(true);
     }
   }
 
@@ -1422,12 +1425,25 @@ function PuzzleBoard({
         <div className="confirm-overlay" onClick={() => setShowRevealConfirm(false)}>
           <div className="confirm-box" onClick={e => e.stopPropagation()}>
             <div style={{ fontSize:"2.2rem", marginBottom:"0.5rem" }}>🤔</div>
-            <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#2D5A1A", margin:"0 0 0.7rem", fontSize:"1.3rem" }}>Are you sure?</h2>
-            <p style={{ color:"#555", marginBottom:"1.5rem", lineHeight:1.5, fontSize:"0.95rem" }}>Showing the answer will end your puzzle session.</p>
-            <div style={{ display:"flex", gap:"0.8rem", justifyContent:"center" }}>
-              <button onClick={doReveal} style={{ background:"#c0392b", color:"#fff", border:"none", borderRadius:"8px", padding:"0.65rem 1.4rem", fontFamily:"Lora,Georgia,serif", fontWeight:600, fontSize:"0.95rem", cursor:"pointer" }}>Yes, show the answer</button>
-              <button onClick={() => setShowRevealConfirm(false)} style={{ background:"#2D5A1A", color:"#fff", border:"none", borderRadius:"8px", padding:"0.65rem 1.4rem", fontFamily:"Lora,Georgia,serif", fontWeight:600, fontSize:"0.95rem", cursor:"pointer" }}>No, keep trying</button>
-            </div>
+            {!continueUsed ? (
+              <>
+                <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#2D5A1A", margin:"0 0 0.7rem", fontSize:"1.3rem" }}>Learn the words first?</h2>
+                <p style={{ color:"#555", marginBottom:"1.5rem", lineHeight:1.5, fontSize:"0.95rem" }}>I'll show you the vocabulary one word at a time. You can then try solving the puzzle again.</p>
+                <div style={{ display:"flex", gap:"0.8rem", justifyContent:"center" }}>
+                  <button onClick={doReveal} style={{ background:"#2D5A1A", color:"#fff", border:"none", borderRadius:"8px", padding:"0.65rem 1.4rem", fontFamily:"Lora,Georgia,serif", fontWeight:600, fontSize:"0.95rem", cursor:"pointer" }}>Yes, show words</button>
+                  <button onClick={() => setShowRevealConfirm(false)} style={{ background:"#666", color:"#fff", border:"none", borderRadius:"8px", padding:"0.65rem 1.4rem", fontFamily:"Lora,Georgia,serif", fontWeight:600, fontSize:"0.95rem", cursor:"pointer" }}>No, keep trying</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#2D5A1A", margin:"0 0 0.7rem", fontSize:"1.3rem" }}>Show complete answer?</h2>
+                <p style={{ color:"#555", marginBottom:"1.5rem", lineHeight:1.5, fontSize:"0.95rem" }}>I'll reveal the entire puzzle and you can start fresh from the beginning if you want to solve it again.</p>
+                <div style={{ display:"flex", gap:"0.8rem", justifyContent:"center" }}>
+                  <button onClick={doReveal} style={{ background:"#c0392b", color:"#fff", border:"none", borderRadius:"8px", padding:"0.65rem 1.4rem", fontFamily:"Lora,Georgia,serif", fontWeight:600, fontSize:"0.95rem", cursor:"pointer" }}>Yes, show answer</button>
+                  <button onClick={() => setShowRevealConfirm(false)} style={{ background:"#2D5A1A", color:"#fff", border:"none", borderRadius:"8px", padding:"0.65rem 1.4rem", fontFamily:"Lora,Georgia,serif", fontWeight:600, fontSize:"0.95rem", cursor:"pointer" }}>No, keep trying</button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

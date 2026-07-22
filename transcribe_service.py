@@ -16,8 +16,8 @@ from datetime import datetime
 from dotenv import load_dotenv
 import requests
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from .env.local
+load_dotenv('.env.local')
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
@@ -56,18 +56,17 @@ def download_youtube_video(video_id):
     output_path = TEMP_DIR / f"{video_id}.%(ext)s"
 
     cmd = [
-        "yt-dlp",
+        "python", "-m", "yt_dlp",
         "-f", "bestaudio/best",
         "-x",  # Extract audio
-        "--audio-format", "mp3",
-        "--audio-quality", "192",
+        "--js-runtimes", "node:C:\\Program Files\\nodejs\\node.exe",
         "-o", str(output_path),
         f"https://www.youtube.com/watch?v={video_id}"
     ]
 
     try:
         log(f"Downloading video {video_id}...")
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
 
         if result.returncode != 0:
             log(f"ERROR: yt-dlp download failed: {result.stderr}")
