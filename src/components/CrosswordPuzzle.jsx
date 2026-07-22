@@ -5,6 +5,7 @@ import { buildGrid, buildNumbering, buildLayout } from "../utils/layoutBuilder";
 import FeedbackModal from "./FeedbackModal";
 import VocabModal from "./VocabModal";
 import ContextReviewModal from "./ContextReviewModal";
+import WordListModal from "./WordListModal";
 import { trackEvent } from "../utils/analytics";
 
 function formatTime(s) {
@@ -269,6 +270,7 @@ function PuzzleBoard({
   const [showVocabModal,    setShowVocabModal]     = useState(false);
   const [continueUsed,      setContinueUsed]      = useState(false);
   const [showWordsLearned,  setShowWordsLearned]  = useState(false);
+  const [showWordList,      setShowWordList]      = useState(false);
   const [clueBarExpanded,   setClueBarExpanded]   = useState(false);
 
   // ── K-2 Early Learner state ───────────────────────────────────────────────
@@ -1109,9 +1111,9 @@ function PuzzleBoard({
             {muted ? "🔇" : "🔊"}
           </button>
 
-          {/* Reader Mode: optional word list after reveal */}
-          {revealed && grade === "adult" && (
-            <button className="btn bo" onClick={() => setShowVocabModal(true)} style={{ padding:"4px 10px", fontSize:"12px", borderColor:"#3a6a1a", color:"#3a6a1a" }}>📚 Word List</button>
+          {/* Word List: Clues and Answers after reveal/win */}
+          {(won || revealed) && (
+            <button className="btn bo" onClick={() => setShowWordList(true)} style={{ padding:"4px 10px", fontSize:"12px", borderColor:"#3a6a1a", color:"#3a6a1a" }}>📚 Word List</button>
           )}
 
           {/* 6th+: Context Review button after win/reveal */}
@@ -1500,6 +1502,15 @@ function PuzzleBoard({
             </button>
           </div>
         </div>
+      )}
+
+      {/* ══ WORD LIST MODAL ══════════════════════════════════════════════════ */}
+      {showWordList && (
+        <WordListModal
+          words={words}
+          grade={grade}
+          onClose={() => setShowWordList(false)}
+        />
       )}
 
       {/* ══ CONTEXT REVIEW MODAL (Item 6) ════════════════════════════════ */}
