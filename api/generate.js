@@ -608,19 +608,32 @@ Instructions:
 - Word length must be between ${limits.minLen} and ${limits.maxLen} letters — STRICTLY ENFORCE THIS for the grade
 - Write every clue at ${gradeDesc}
 - Write ALL clues in modern plain everyday English — never use archaic, scriptural, or overly formal language
-- For each word, extract the key phrase or sentence from the text that the clue is based on — this is the sourceQuote
+- For each word, provide three-part context (sourceQuote):
+  1. bulletPoint: The main teaching/theme this word relates to
+  2. pastorExplanation: How the pastor explained or illustrated this point (story, analogy, or example from the sermon)
+  3. biblicalBasis: The scripture reference and verse that grounds this teaching (e.g., "John 3:16 - For God so loved the world...")
 - The title should be a short, specific title for this puzzle
 
 VALIDATION STEP — before returning, review every word-clue pair:
 - Each clue must specifically and accurately describe its exact answer word
-- Each sourceQuote must be a direct quote or close paraphrase from the text that supports the clue
-- If any clue does not match its word, or any sourceQuote doesn't support the clue, fix it before returning
+- Each bulletPoint must be the core teaching
+- Each pastorExplanation must be from the sermon content and support the bulletPoint
+- Each biblicalBasis must be a real scripture reference that biblically grounds the teaching
+- If any part doesn't align, fix it before returning
 
 Return this exact JSON structure with no other text:
 {
   "title": "Short specific title",
   "words": [
-    { "word": "EXAMPLE", "clue": "The clue text here", "sourceQuote": "The exact phrase from the text this clue is based on" }
+    {
+      "word": "EXAMPLE",
+      "clue": "The clue text here",
+      "sourceQuote": {
+        "bulletPoint": "The main teaching/theme",
+        "pastorExplanation": "How the pastor explained it",
+        "biblicalBasis": "Scripture Reference - verse text"
+      }
+    }
   ]
 }`;
   }

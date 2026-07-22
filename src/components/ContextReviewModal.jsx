@@ -92,17 +92,42 @@ export default function ContextReviewModal({ words, grade, onClose }) {
           {current?.answer}
         </div>
 
-        {/* Sermon quote */}
-        <div style={{
-          background:"#f4efe4", borderRadius:"12px",
-          padding:"18px 16px", marginBottom:"22px",
-          fontFamily:"Lora,serif",
-          fontSize: isEarlyLearner ? "1.15rem" : "1rem",
-          lineHeight:"1.75", color:"#2c1a08",
-          textAlign:"center",
-          fontStyle:"italic",
-        }}>
-          "{current?.sourceQuote}"
+        {/* Sermon context: bullet point, explanation, and scripture */}
+        <div style={{ marginBottom:"22px" }}>
+          {/* Bullet Point */}
+          <div style={{
+            background:"#f4efe4", borderRadius:"12px 12px 0 0",
+            padding:"16px", marginBottom:0,
+            fontFamily:"Lora,serif", fontSize:"0.95rem",
+            fontWeight:700, color:"#2D5A1A", textAlign:"center",
+            borderBottom:"2px solid #e0d7cc",
+          }}>
+            {current?.sourceQuote?.bulletPoint}
+          </div>
+
+          {/* Pastor's Explanation */}
+          <div style={{
+            background:"#faf8f3", borderRadius:"0",
+            padding:"14px 16px",
+            fontFamily:"Lora,serif", fontSize:"0.9rem",
+            lineHeight:"1.6", color:"#2c1a08",
+            fontStyle:"italic", textAlign:"center",
+            borderBottom:"2px solid #e0d7cc",
+          }}>
+            "{current?.sourceQuote?.pastorExplanation}"
+          </div>
+
+          {/* Biblical Basis */}
+          <div style={{
+            background:"#f9f6ef", borderRadius:"0 0 12px 12px",
+            padding:"14px 16px",
+            fontFamily:"Lora,serif", fontSize:"0.85rem",
+            lineHeight:"1.5", color:"#5a4a28",
+            textAlign:"center", fontStyle:"normal",
+          }}>
+            <div style={{ fontWeight:700, marginBottom:"4px", color:"#3a6a1a" }}>Scripture</div>
+            {current?.sourceQuote?.biblicalBasis}
+          </div>
         </div>
 
         {/* Navigation */}
