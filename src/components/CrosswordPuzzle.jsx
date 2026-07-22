@@ -226,6 +226,7 @@ export default function CrosswordPuzzle() {
 function PuzzleBoard({
   title, grade, language = "english", rows, cols, words, isTeacher = false,
   phonicsMode = false, pictureMode = false, songId = null,
+  pastorName = null, sermonDate = null, sermonDescription = null,
 }) {
   const navigate   = useNavigate();
   const SOLUTION   = buildGrid(words, rows, cols);
@@ -1049,6 +1050,16 @@ function PuzzleBoard({
               {phonicsMode && <span style={{ marginLeft:"8px", fontSize:"11px", background:"rgba(255,255,255,.2)", borderRadius:"10px", padding:"1px 7px" }}>🔤 Phonics</span>}
               {pictureMode && <span style={{ marginLeft:"6px", fontSize:"11px", background:"rgba(255,255,255,.2)", borderRadius:"10px", padding:"1px 7px" }}>🖼️ Pictures</span>}
             </div>
+            {pastorName && sermonDate && (
+              <div style={{ fontSize:"11px", color:"#c9b59a", marginTop:"2px", marginBottom:"3px" }}>
+                {pastorName} · {sermonDate}
+              </div>
+            )}
+            {sermonDescription && (
+              <div style={{ fontSize:"11px", color:"#d9cfc1", fontStyle:"italic", marginBottom:"3px", maxWidth:"400px", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                "{sermonDescription}"
+              </div>
+            )}
             <div className="hdr-sub" style={{ fontSize:"10px", color: isEarlyLearner ? "#a5d6a7" : "#a8d890", fontStyle:"italic", letterSpacing:"1px" }}>
               {gradeLabel ? `${gradeLabel} · ` : ""}{words.length} Words{isSpanish ? " · 🇪🇸 Spanish" : ""}{" · "}
               <span style={{ color:"#81c784" }}>🛡️ Safe for K-12</span>
