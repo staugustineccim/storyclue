@@ -1,20 +1,22 @@
 import { useState } from "react";
 
 /**
- * ContextReviewModal — Vocabulary in Context (Item 6)
+ * ContextReviewModal — Sermon Context Review
  *
  * Props:
- *   sentences  — [{ word, sentence }]  sentence has word written IN ALL CAPS
+ *   words      — [{ answer, sourceQuote }]  words with their sermon source quotes
  *   grade      — grade string
  *   onClose    — function
  */
-export default function ContextReviewModal({ sentences, grade, onClose }) {
+export default function ContextReviewModal({ words, grade, onClose }) {
   const [index, setIndex] = useState(0);
   const isEarlyLearner = ["k","1","2"].includes(String(grade));
   const isLower = ["k","1","2","3","4","5"].includes(String(grade));
 
-  const current = sentences[index];
-  const total   = sentences.length;
+  // Filter to only words that have a source quote
+  const wordsWithContext = words.filter(w => w.sourceQuote);
+  const current = wordsWithContext[index];
+  const total   = wordsWithContext.length;
 
   // Highlight the word in the sentence (it's already written ALL CAPS in the sentence)
   function renderSentence(sentence, word) {
@@ -70,7 +72,7 @@ export default function ContextReviewModal({ sentences, grade, onClose }) {
 
         {/* Progress dots */}
         <div style={{ display:"flex", justifyContent:"center", gap:"5px", marginBottom:"20px", flexWrap:"wrap" }}>
-          {sentences.map((_, i) => (
+          {wordsWithContext.map((_, i) => (
             <div key={i} style={{
               width:"8px", height:"8px", borderRadius:"50%",
               background: i < index ? "#4caf50" : i === index ? "#2D5A1A" : "#e0d8c8",
@@ -87,10 +89,10 @@ export default function ContextReviewModal({ sentences, grade, onClose }) {
           color:"#2D5A1A", letterSpacing:"4px",
           marginBottom:"16px",
         }}>
-          {current?.word}
+          {current?.answer}
         </div>
 
-        {/* Context sentence */}
+        {/* Sermon quote */}
         <div style={{
           background:"#f4efe4", borderRadius:"12px",
           padding:"18px 16px", marginBottom:"22px",
@@ -98,8 +100,9 @@ export default function ContextReviewModal({ sentences, grade, onClose }) {
           fontSize: isEarlyLearner ? "1.15rem" : "1rem",
           lineHeight:"1.75", color:"#2c1a08",
           textAlign:"center",
+          fontStyle:"italic",
         }}>
-          {current && renderSentence(current.sentence, current.word)}
+          "{current?.sourceQuote}"
         </div>
 
         {/* Navigation */}

@@ -287,11 +287,8 @@ function PuzzleBoard({
   // ── Picture mode: Wikipedia images ───────────────────────────────────────
   const [wordImages, setWordImages] = useState({}); // { "WORD": "https://..." }
 
-  // ── Context review (Item 6) ───────────────────────────────────────────────
+  // ── Context review (sermon quotes) ────────────────────────────────────────
   const [showContextReview, setShowContextReview] = useState(false);
-  const [contextSentences,  setContextSentences]  = useState(null);
-  const [contextLoading,    setContextLoading]    = useState(false);
-  const [contextAutoShown,  setContextAutoShown]  = useState(false);
 
   // ── Refs ──────────────────────────────────────────────────────────────────
   const refs              = useRef({});
@@ -528,24 +525,6 @@ function PuzzleBoard({
       window.speechSynthesis.speak(utt);
     }
     next();
-  }
-
-  async function loadContext() {
-    if (contextSentences) { setShowContextReview(true); return; }
-    setContextLoading(true);
-    try {
-      const r = await fetch("/api/vocab-context", {
-        method: "POST",
-        headers: { "content-type":"application/json" },
-        body: JSON.stringify({ words, title, grade }),
-      });
-      const data = await r.json();
-      if (data.sentences?.length) {
-        setContextSentences(data.sentences);
-        setShowContextReview(true);
-      }
-    } catch { /* silently fail — context review is optional */ }
-    setContextLoading(false);
   }
 
   // ── Interactions ──────────────────────────────────────────────────────────
@@ -1118,9 +1097,9 @@ function PuzzleBoard({
 
           {/* 6th+: Context Review button after win/reveal */}
           {(won || revealed) && !isLowerGrade && (
-            <button className="btn bo" onClick={loadContext} disabled={contextLoading}
-              style={{ padding:"4px 10px", fontSize:"12px", borderColor:"#3a6a1a", color:"#3a6a1a", opacity:contextLoading?0.6:1 }}>
-              {contextLoading ? "Loading…" : "📖 Context Review"}
+            <button className="btn bo" onClick={() => setShowContextReview(true)}
+              style={{ padding:"4px 10px", fontSize:"12px", borderColor:"#3a6a1a", color:"#3a6a1a" }}>
+              📖 Context Review
             </button>
           )}
 
@@ -1513,10 +1492,10 @@ function PuzzleBoard({
         />
       )}
 
-      {/* ══ CONTEXT REVIEW MODAL (Item 6) ════════════════════════════════ */}
-      {showContextReview && contextSentences && (
+      {/* ══ CONTEXT REVIEW MODAL — Sermon Quotes ════════════════════════════ */}
+      {showContextReview && (
         <ContextReviewModal
-          sentences={contextSentences}
+          words={words}
           grade={grade}
           onClose={() => setShowContextReview(false)}
         />
