@@ -2,7 +2,7 @@
 // Processes Colonial Church St. Augustine sermon with three-part context structure
 
 export const config = {
-  schedule: "0 17 * * *", // 1:00pm ET (17:00 UTC, accounting for daylight saving)
+  schedule: "0 5 * * *", // 1:00am ET (05:00 UTC during daylight saving)
 };
 
 async function getYouTubeCaptions(videoId) {
