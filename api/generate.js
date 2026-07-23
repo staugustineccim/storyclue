@@ -603,23 +603,34 @@ ${resolvedText.slice(0, 6000)}
 Grade level for clues: ${gradeDesc}${faithNote}${seriesNote}${languageNote}${phonicsNote}${pictureNote}${songsNote}
 
 Instructions:
+
+STEP 1 — IDENTIFY SERMON'S KEY TEACHING POINTS (3-5 main themes):
+Read the sermon and extract its core themes. For sermons/lectures, these are usually:
+- The main idea or thesis
+- Major supporting arguments or illustrations
+- Key spiritual practices or actions encouraged
+- Call to decision or transformation
+- Personal testimony or example
+
+STEP 2 — EXTRACT VOCABULARY AND CONNECT TO KEY POINTS:
 - Extract ${wci} from the text above
 - Each word must be ALL CAPS, letters only (A-Z), no spaces, no hyphens, no punctuation
 - Word length must be between ${limits.minLen} and ${limits.maxLen} letters — STRICTLY ENFORCE THIS for the grade
 - Write every clue at ${gradeDesc}
 - Write ALL clues in modern plain everyday English — never use archaic, scriptural, or overly formal language
-- For each word, provide three-part context (sourceQuote):
-  1. bulletPoint: The main teaching/theme this word relates to
-  2. pastorExplanation: How the pastor explained or illustrated this point (story, analogy, or example from the sermon)
-  3. biblicalBasis: The scripture reference and verse that grounds this teaching (e.g., "John 3:16 - For God so loved the world...")
+- For each word, tie it to ONE of the key teaching points identified in STEP 1
+- Provide three-part context (sourceQuote):
+  1. bulletPoint: The specific KEY TEACHING POINT this word relates to (must be one of the 3-5 identified themes)
+  2. pastorExplanation: The pastor's exact explanation, illustration, story, or example that supports this teaching point
+  3. biblicalBasis: The scripture reference cited or implied in that teaching section (e.g., "John 15:4 - Abide in me")
 - The title should be a short, specific title for this puzzle
 
 VALIDATION STEP — before returning, review every word-clue pair:
 - Each clue must specifically and accurately describe its exact answer word
-- Each bulletPoint must be the core teaching
-- Each pastorExplanation must be from the sermon content and support the bulletPoint
-- Each biblicalBasis must be a real scripture reference that biblically grounds the teaching
-- If any part doesn't align, fix it before returning
+- Each bulletPoint must be ONE of the 3-5 key teaching points (don't invent new themes)
+- Each pastorExplanation must be directly from the sermon content in that teaching section
+- Each biblicalBasis must be a scripture reference actually cited or referenced in the sermon
+- Ensure you're capturing the actual themes the pastor taught, not making up interpretations
 
 Return this exact JSON structure with no other text:
 {
