@@ -367,14 +367,14 @@ export default function VocabModal({
               padding:"28px 22px 22px", textAlign:"center",
               cursor:"pointer", userSelect:"none", WebkitUserSelect:"none",
               marginBottom:"16px",
-              minHeight: early ? "200px" : "180px",
+              minHeight: early ? "260px" : "240px",
               display:"flex", flexDirection:"column", justifyContent:"center", gap:"14px",
               boxShadow: early ? "0 6px 0 rgba(0,0,0,.2)" : "inset 0 -3px 0 rgba(0,0,0,.2)",
             }}>
               {/* Word */}
               <div style={{
                 fontFamily:"'Playfair Display',serif", fontWeight:900,
-                fontSize: early ? "clamp(1.5rem,7vw,2.2rem)" : "clamp(1.2rem,5vw,1.8rem)",
+                fontSize: early ? "clamp(2rem,8vw,3rem)" : "clamp(1.5rem,6vw,2.4rem)",
                 color:"#f0ead8", letterSpacing:"5px", lineHeight:1.1,
                 wordBreak:"break-word",
               }}>
