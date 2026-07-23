@@ -198,8 +198,11 @@ async function getYouTubeTranscript(videoId) {
 
     const tracks = pr?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
     if (!tracks?.length) {
-      return videoTitle
+      const fallbackText = videoTitle
         ? `Video Title: ${videoTitle}\n\n${videoDescription}`
+        : null;
+      return fallbackText
+        ? { transcript: fallbackText, jobId: null, service: "youtube-metadata" }
         : null;
     }
 
@@ -222,7 +225,8 @@ async function getYouTubeTranscript(videoId) {
         ?.replace(/\s+/g, " ")
         ?.trim();
       if (transcript?.length > 100) {
-        return videoTitle ? `${videoTitle}\n\n${transcript}` : transcript;
+        const fullText = videoTitle ? `${videoTitle}\n\n${transcript}` : transcript;
+        return { transcript: fullText, jobId: null, service: "youtube-captions" };
       }
     }
 
@@ -244,7 +248,8 @@ async function getYouTubeTranscript(videoId) {
       ?.trim();
 
     if (transcript?.length > 100) {
-      return videoTitle ? `${videoTitle}\n\n${transcript}` : transcript;
+      const fullText = videoTitle ? `${videoTitle}\n\n${transcript}` : transcript;
+      return { transcript: fullText, jobId: null, service: "youtube-captions" };
     }
   } catch { /* fall through to Whisper fallback */ }
 
