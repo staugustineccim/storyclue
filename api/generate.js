@@ -694,27 +694,31 @@ Return this exact JSON structure with no other text:
     });
 
     if (!response.ok) {
-      console.error("Anthropic API error:", await response.text());
-      return res.status(500).json({ error: "Could not generate puzzle. Please try again." });
+      const apiErr = await response.text();
+      console.error(`[${langFlag}] Anthropic API error (${response.status}):`, apiErr);
+      return res.status(500).json({ error: `Could not generate puzzle (API error). Language: ${langFlag}. Please try again.` });
     }
 
     const data = await response.json();
     const text = data.content?.[0]?.text?.trim();
 
     if (!text) {
-      return res.status(500).json({ error: "Could not generate puzzle. Please try again." });
+      console.error(`[${langFlag}] No text in Claude response`);
+      return res.status(500).json({ error: "Could not generate puzzle (no response). Please try again." });
     }
 
     let parsed;
     try {
       parsed = JSON.parse(text);
-    } catch {
+    } catch (parseErr) {
+      console.error(`[${langFlag}] JSON parse error:`, parseErr.message, "Text:", text.slice(0, 200));
       const match = text.match(/\{[\s\S]*\}/);
       if (match) parsed = JSON.parse(match[0]);
-      else return res.status(500).json({ error: "Could not generate puzzle. Please try again." });
+      else return res.status(500).json({ error: "Could not generate puzzle (invalid format). Please try again." });
     }
 
     if (!parsed.words || !Array.isArray(parsed.words) || parsed.words.length < 3) {
+      console.error(`[${langFlag}] Not enough words. Got ${parsed.words?.length || 0} words`);
       return res.status(500).json({
         error: "No vocabulary found. Try being more specific — for example: \"Book of Jonah Chapter 1\" or \"Charlotte's Web Chapter 3\".",
       });
