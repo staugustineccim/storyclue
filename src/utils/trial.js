@@ -10,7 +10,7 @@
 //   Day 38+   : ended — upgrade prompt shown, current session always completes
 
 export const TRIAL_DAYS  = 30;
-export const GRACE_DAYS  = 7;
+export const GRACE_DAYS  = 45; // Extended grace period for beta testing (was 7)
 export const WARN_AT_DAY = 25; // start showing banner at this day
 
 const STORAGE_KEY  = "sc_trial_start";
