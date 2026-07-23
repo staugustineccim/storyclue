@@ -374,7 +374,7 @@ export default function VocabModal({
               {/* Word */}
               <div style={{
                 fontFamily:"'Playfair Display',serif", fontWeight:900,
-                fontSize: early ? "clamp(2rem,8vw,3rem)" : "clamp(1.5rem,6vw,2.4rem)",
+                fontSize: early ? "clamp(1.5rem,7vw,2.2rem)" : "clamp(1.2rem,5vw,1.8rem)",
                 color:"#f0ead8", letterSpacing:"5px", lineHeight:1.1,
                 wordBreak:"break-word",
               }}>
