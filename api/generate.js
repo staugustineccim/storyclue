@@ -269,13 +269,23 @@ async function getYouTubeTranscript(videoId) {
       else if (data.transcript) transcript = data.transcript;
 
       if (transcript?.length > 100) {
-        return videoTitle ? `${videoTitle}\n\n${transcript}` : transcript;
+        const fullText = videoTitle ? `${videoTitle}\n\n${transcript}` : transcript;
+        // Check if Supadata returned a jobId (async transcription)
+        if (data.jobId && !transcript) {
+          return { transcript: null, jobId: data.jobId, service: "supadata" };
+        }
+        return { transcript: fullText, jobId: null, service: "supadata" };
+      }
+      // Supadata returned jobId but no immediate transcript
+      if (data.jobId) {
+        return { transcript: null, jobId: data.jobId, service: "supadata" };
       }
     }
   } catch { /* fall through to description */ }
 
   if (videoTitle || videoDescription) {
-    return `Video: ${videoTitle}\n\n${videoDescription}`;
+    const fullText = `Video: ${videoTitle}\n\n${videoDescription}`;
+    return { transcript: fullText, jobId: null, service: "youtube-metadata" };
   }
   return null;
 }
