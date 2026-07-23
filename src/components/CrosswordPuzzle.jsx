@@ -1095,8 +1095,8 @@ function PuzzleBoard({
             <button className="btn bo" onClick={() => setShowWordList(true)} style={{ padding:"4px 10px", fontSize:"12px", borderColor:"#3a6a1a", color:"#3a6a1a" }}>📚 Word List</button>
           )}
 
-          {/* Context Review button after win/reveal (all grades) */}
-          {(won || revealed) && (
+          {/* Context Review button — only if sermon/lecture has sourceQuote data */}
+          {(won || revealed) && words.some(w => w.sourceQuote?.bulletPoint) && (
             <button className="btn bo" onClick={() => setShowContextReview(true)}
               style={{ padding:"4px 10px", fontSize:"12px", borderColor:"#3a6a1a", color:"#3a6a1a" }}>
               📖 Context Review
