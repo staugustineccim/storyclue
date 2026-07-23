@@ -13,6 +13,7 @@ import SongsLibrary from "./SongsLibrary";
 import AuthButton from "./AuthButton";
 import TrialBanner from "./TrialBanner";
 import UpgradeModal from "./UpgradeModal";
+import TranscriptionModal from "./TranscriptionModal";
 
 // ── Audience cookie helpers ────────────────────────────────────────────────
 // Audience values: "early-learner" | "elementary" | "middle-high" | "adult"
@@ -102,6 +103,9 @@ export default function PuzzleGenerator() {
 
   // ── Trial ──────────────────────────────────────────────────────────────────
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
+  // ── Transcription ───────────────────────────────────────────────────────────
+  const [isTranscribing, setIsTranscribing] = useState(false);
 
   // Init trial on first visit to /create
   useEffect(() => {
@@ -398,6 +402,31 @@ export default function PuzzleGenerator() {
 
       const data = await res.json();
 
+      // Handle transcription in progress (202 Accepted)
+      if (res.status === 202 && data.jobId) {
+        setIsTranscribing(true);
+        setLoading(false);
+        // Poll for transcription completion every 2 seconds
+        const pollInterval = setInterval(async () => {
+          try {
+            const checkRes = await fetch(`/api/transcription-status?jobId=${data.jobId}`);
+            const checkData = await checkRes.json();
+            if (checkData.status === "complete" && checkData.transcript) {
+              clearInterval(pollInterval);
+              setIsTranscribing(false);
+              // Re-submit with the transcript
+              body.chapterText = checkData.transcript;
+              setLoading(true);
+              handleGenerate(e); // Recursively call to retry
+              return;
+            }
+          } catch (err) {
+            console.error("Transcription status check failed:", err);
+          }
+        }, 2000);
+        return;
+      }
+
       if (!res.ok || data.error) {
         setError(data.error || "Could not generate puzzle. Please try again.");
         setLoading(false);
@@ -550,6 +579,9 @@ export default function PuzzleGenerator() {
           forced={isTrialOver()}
         />
       )}
+
+      {/* Transcription modal */}
+      {isTranscribing && <TranscriptionModal />}
 
       <div style={{ maxWidth:"700px", margin:"0 auto", padding:"32px 20px" }}>
         <h1 style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"28px", color:"#2d4a18", marginBottom:"8px" }}>
