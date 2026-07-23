@@ -107,6 +107,10 @@ export default function PuzzleGenerator() {
   // ── Transcription ───────────────────────────────────────────────────────────
   const [isTranscribing, setIsTranscribing] = useState(false);
 
+  // ── More Languages Modal ────────────────────────────────────────────────
+  const [showMoreLanguages, setShowMoreLanguages] = useState(false);
+  const [tempLanguageSelection, setTempLanguageSelection] = useState(null);
+
   // Init trial on first visit to /create
   useEffect(() => {
     initTrial();
@@ -583,6 +587,204 @@ export default function PuzzleGenerator() {
       {/* Transcription modal */}
       {isTranscribing && <TranscriptionModal />}
 
+      {/* More Languages Modal */}
+      {showMoreLanguages && (
+        <div style={{
+          position: "fixed", inset: 0,
+          background: "rgba(0,0,0,.5)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 9999, padding: "12px",
+        }}>
+          <div style={{
+            background: "#fdfaf4", borderRadius: "16px",
+            padding: "32px", textAlign: "left",
+            maxWidth: "380px", boxShadow: "0 28px 90px rgba(0,0,0,.45)",
+          }}>
+            <h2 style={{
+              fontFamily: "'Playfair Display',serif", fontWeight: 900,
+              color: "#2D5A1A", fontSize: "1.2rem",
+              margin: "0 0 18px", letterSpacing: "0.5px",
+            }}>
+              {tempLanguageSelection ? "Bilingual Mode" : "Select Language"}
+            </h2>
+
+            {!tempLanguageSelection ? (
+              <>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "20px" }}>
+                  {[
+                    { value: "english", label: "🇺🇸 English" },
+                    { value: "spanish", label: "🇪🇸 Spanish (Español)" },
+                    { value: "french", label: "🇫🇷 French (Français)" },
+                    { value: "german", label: "🇩🇪 German (Deutsch)" },
+                    { value: "portuguese", label: "🇵🇹 Portuguese (Português)" },
+                    { value: "italian", label: "🇮🇹 Italian (Italiano)" },
+                    { value: "mandarin", label: "🇨🇳 Mandarin Chinese (中文)" },
+                    { value: "japanese", label: "🇯🇵 Japanese (日本語)" },
+                    { value: "korean", label: "🇰🇷 Korean (한국어)" },
+                  ].map(lang => (
+                    <button
+                      key={lang.value}
+                      type="button"
+                      onClick={() => {
+                        setLanguage(lang.value);
+                        setTempLanguageSelection(lang);
+                      }}
+                      style={{
+                        padding: "10px 14px",
+                        textAlign: "left",
+                        border: "1.5px solid #c8b888",
+                        borderRadius: "6px",
+                        background: language === lang.value ? "#e8f4d8" : "#fffef5",
+                        color: "#2c1a08",
+                        cursor: "pointer",
+                        fontFamily: "Lora,serif",
+                        fontSize: "14px",
+                        transition: "all 0.2s",
+                      }}
+                      onMouseEnter={(e) => e.target.style.background = "#f0ebe0"}
+                      onMouseLeave={(e) => e.target.style.background = language === lang.value ? "#e8f4d8" : "#fffef5"}
+                    >
+                      {lang.label}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowMoreLanguages(false)}
+                  style={{
+                    width: "100%",
+                    padding: "10px",
+                    border: "none",
+                    borderRadius: "6px",
+                    background: "#c8b888",
+                    color: "#fff",
+                    cursor: "pointer",
+                    fontFamily: "Lora,serif",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                  }}
+                >
+                  Close
+                </button>
+              </>
+            ) : (
+              <>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "20px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setBilingual("")}
+                    style={{
+                      padding: "10px 14px",
+                      border: bilingualMode === "" ? "1.5px solid #3a6a1a" : "1.5px solid #c8b888",
+                      borderRadius: "6px",
+                      background: bilingualMode === "" ? "#3a6a1a" : "#fffef5",
+                      color: bilingualMode === "" ? "#f0ead8" : "#4a3a18",
+                      fontFamily: "Lora,serif",
+                      fontSize: "13px",
+                      cursor: "pointer",
+                      textAlign: "center",
+                      transition: "all 0.15s",
+                    }}
+                    onMouseEnter={(e) => { if(bilingualMode !== "") e.target.style.background = "#e8e0cc"; }}
+                    onMouseLeave={(e) => { if(bilingualMode !== "") e.target.style.background = "#fffef5"; }}
+                  >
+                    {tempLanguageSelection.label.split(" ")[1]} only
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBilingual(`${tempLanguageSelection.value}-clue-en-word`)}
+                    style={{
+                      padding: "10px 14px",
+                      border: bilingualMode === `${tempLanguageSelection.value}-clue-en-word` ? "1.5px solid #3a6a1a" : "1.5px solid #c8b888",
+                      borderRadius: "6px",
+                      background: bilingualMode === `${tempLanguageSelection.value}-clue-en-word` ? "#3a6a1a" : "#fffef5",
+                      color: bilingualMode === `${tempLanguageSelection.value}-clue-en-word` ? "#f0ead8" : "#4a3a18",
+                      fontFamily: "Lora,serif",
+                      fontSize: "13px",
+                      cursor: "pointer",
+                      textAlign: "center",
+                      transition: "all 0.15s",
+                      lineHeight: "1.4",
+                    }}
+                    onMouseEnter={(e) => { if(bilingualMode !== `${tempLanguageSelection.value}-clue-en-word`) e.target.style.background = "#e8e0cc"; }}
+                    onMouseLeave={(e) => { if(bilingualMode !== `${tempLanguageSelection.value}-clue-en-word`) e.target.style.background = "#fffef5"; }}
+                  >
+                    {tempLanguageSelection.label.split(" ")[1]} clues<br/>English answers
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBilingual(`en-clue-${tempLanguageSelection.value}-word`)}
+                    style={{
+                      padding: "10px 14px",
+                      border: bilingualMode === `en-clue-${tempLanguageSelection.value}-word` ? "1.5px solid #3a6a1a" : "1.5px solid #c8b888",
+                      borderRadius: "6px",
+                      background: bilingualMode === `en-clue-${tempLanguageSelection.value}-word` ? "#3a6a1a" : "#fffef5",
+                      color: bilingualMode === `en-clue-${tempLanguageSelection.value}-word` ? "#f0ead8" : "#4a3a18",
+                      fontFamily: "Lora,serif",
+                      fontSize: "13px",
+                      cursor: "pointer",
+                      textAlign: "center",
+                      transition: "all 0.15s",
+                      lineHeight: "1.4",
+                    }}
+                    onMouseEnter={(e) => { if(bilingualMode !== `en-clue-${tempLanguageSelection.value}-word`) e.target.style.background = "#e8e0cc"; }}
+                    onMouseLeave={(e) => { if(bilingualMode !== `en-clue-${tempLanguageSelection.value}-word`) e.target.style.background = "#fffef5"; }}
+                  >
+                    English clues<br/>{tempLanguageSelection.label.split(" ")[1]} answers
+                  </button>
+                </div>
+
+                <div style={{ marginTop:"8px", padding:"8px 10px", background:"#fff8e8", border:"1px solid #e0c860", borderRadius:"4px", marginBottom:"16px" }}>
+                  <div style={{ fontFamily:"Lora,serif", fontSize:"11px", color:"#7a5500", lineHeight:1.6 }}>
+                    ⚠️ AI-generated {tempLanguageSelection.label} content. We recommend review by a fluent speaker for classroom use.
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setTempLanguageSelection(null)}
+                    style={{
+                      flex: 1,
+                      padding: "10px",
+                      border: "1.5px solid #c8b888",
+                      borderRadius: "6px",
+                      background: "#fffef5",
+                      color: "#2c1a08",
+                      cursor: "pointer",
+                      fontFamily: "Lora,serif",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowMoreLanguages(false)}
+                    style={{
+                      flex: 1,
+                      padding: "10px",
+                      border: "none",
+                      borderRadius: "6px",
+                      background: "#c8b888",
+                      color: "#fff",
+                      cursor: "pointer",
+                      fontFamily: "Lora,serif",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Done
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <div style={{ maxWidth:"700px", margin:"0 auto", padding:"32px 20px" }}>
         <h1 style={{ fontFamily:"'Playfair Display',serif", fontWeight:900, fontSize:"28px", color:"#2d4a18", marginBottom:"8px" }}>
           Create Your Crossword
@@ -1037,6 +1239,9 @@ export default function PuzzleGenerator() {
               </button>
               <button type="button" className={`lang-btn${isSpanish?" on":""}`} onClick={() => setLanguage("spanish")}>
                 🇪🇸 Spanish
+              </button>
+              <button type="button" className="lang-btn" onClick={() => setShowMoreLanguages(true)} style={{ fontSize:"12px", padding:"8px 12px" }}>
+                + More Languages
               </button>
             </div>
 
