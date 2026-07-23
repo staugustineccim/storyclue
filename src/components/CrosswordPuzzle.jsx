@@ -1095,8 +1095,8 @@ function PuzzleBoard({
             <button className="btn bo" onClick={() => setShowWordList(true)} style={{ padding:"4px 10px", fontSize:"12px", borderColor:"#3a6a1a", color:"#3a6a1a" }}>📚 Word List</button>
           )}
 
-          {/* 6th+: Context Review button after win/reveal */}
-          {(won || revealed) && !isLowerGrade && (
+          {/* Context Review button after win/reveal (all grades) */}
+          {(won || revealed) && (
             <button className="btn bo" onClick={() => setShowContextReview(true)}
               style={{ padding:"4px 10px", fontSize:"12px", borderColor:"#3a6a1a", color:"#3a6a1a" }}>
               📖 Context Review
