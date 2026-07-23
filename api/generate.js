@@ -478,14 +478,25 @@ The child should fill in the answer word because they already know it from singi
     // ── YouTube URL ──────────────────────────────────────────────────────
     const videoId = extractVideoId(url);
     if (videoId) {
-      const transcript = await getYouTubeTranscript(videoId);
-      if (!transcript || transcript.trim().length < 50) {
+      const result = await getYouTubeTranscript(videoId);
+
+      // If transcription is async (no captions, using Supadata), return job status
+      if (result && result.jobId && !result.transcript) {
+        return res.status(202).json({
+          status: "processing",
+          message: "Transcribing YouTube video — please wait a moment and refresh",
+          jobId: result.jobId,
+          service: result.service,
+        });
+      }
+
+      if (!result || !result.transcript || result.transcript.trim().length < 50) {
         return res.status(400).json({
           error:
             "Could not extract content from this YouTube video. The video may be private, age-restricted, or have no captions available. Try copying the video description and using Paste Text instead.",
         });
       }
-      resolvedText = transcript;
+      resolvedText = result.transcript;
 
     // ── Vimeo URL ────────────────────────────────────────────────────────
     } else if (/vimeo\.com\/\d+/.test(url)) {
