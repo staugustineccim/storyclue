@@ -6,7 +6,6 @@ import CrosswordPuzzle from "./components/CrosswordPuzzle";
 import AdminDashboard from "./components/AdminDashboard";
 import ChurchMode from "./components/ChurchMode";
 import ChurchSignup from "./components/ChurchSignup";
-import CitizenshipPrep from "./components/CitizenshipPrep";
 import NotFound from "./components/NotFound";
 
 export default function App() {
@@ -15,7 +14,6 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/create" element={<PuzzleGenerator />} />
-        <Route path="/citizenship-prep" element={<CitizenshipPrep />} />
         <Route path="/play" element={<CrosswordPuzzle />} />
         <Route path="/play/:slug" element={<CrosswordPuzzle />} />
         <Route path="/admin" element={<AdminDashboard />} />
