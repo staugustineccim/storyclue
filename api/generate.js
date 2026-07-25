@@ -1,6 +1,7 @@
 import { kv } from "@vercel/kv";
 import { validateCSRFToken } from "./csrf.js";
 import { checkRateLimit, tooManyRequests } from "./rate-limit.js";
+import { validateInputs } from "./input-validation.js";
 
 // ── Grade descriptions for clue language ──────────────────────────────────────
 const GRADE_DESCRIPTIONS = {
@@ -332,6 +333,12 @@ export default async function handler(req, res) {
   const rateInfo = await checkRateLimit(req, false); // false = free tier
   if (!rateInfo.allowed) {
     return tooManyRequests(res, rateInfo);
+  }
+
+  // ── Input Validation ───────────────────────────────────────────────────────────
+  const inputValidation = validateInputs(req);
+  if (!inputValidation.valid) {
+    return res.status(400).json({ error: inputValidation.error });
   }
 
   const {
