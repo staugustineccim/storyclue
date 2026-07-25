@@ -209,6 +209,30 @@ export default function VocabModal({
     speakText(`${w.answer}. ${cleanClue}`, grade, muted);
   }
 
+  function goBack() {
+    clearTimeout(autoRef.current);
+    const prev = (cardIndex - 1 + words.length) % words.length;
+    setCardIndex(prev);
+    if (lower && !readerMode) {
+      setViewedSet(prev => {
+        const updated = new Set(prev);
+        updated.add(prev);
+        return updated;
+      });
+    }
+  }
+
+  // Keyboard support: arrow keys
+  useEffect(() => {
+    if (phase !== "cards") return;
+    const handleKey = (e) => {
+      if (e.key === "ArrowRight") { clearTimeout(autoRef.current); advance(); }
+      if (e.key === "ArrowLeft") goBack();
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [phase, cardIndex]); // eslint-disable-line
+
   // Renders a clue string, replacing ___ with the answer word shown underlined.
   // This way kids see the word clearly in context instead of blank underscores.
   function renderClueWithAnswer(clue, answer) {
@@ -358,48 +382,71 @@ export default function VocabModal({
               </button>
             </div>
 
-            {/* Flashcard */}
-            <div onClick={advance} style={{
-              background: early
-                ? "linear-gradient(135deg,#2D5A1A,#4a8a2a)"
-                : "#2D5A1A",
-              borderRadius: early ? "20px" : "12px",
-              padding:"28px 22px 22px", textAlign:"center",
-              cursor:"pointer", userSelect:"none", WebkitUserSelect:"none",
-              marginBottom:"16px",
-              minHeight: early ? "260px" : "240px",
-              display:"flex", flexDirection:"column", justifyContent:"center", gap:"14px",
-              boxShadow: early ? "0 6px 0 rgba(0,0,0,.2)" : "inset 0 -3px 0 rgba(0,0,0,.2)",
-            }}>
-              {/* Word */}
-              <div style={{
-                fontFamily:"'Playfair Display',serif", fontWeight:900,
-                fontSize: early ? "clamp(2rem,8vw,3rem)" : "clamp(1.5rem,6vw,2.4rem)",
-                color:"#f0ead8", letterSpacing:"2px", lineHeight:1.1,
-                wordBreak:"break-word",
-              }}>
-                {word.answer}
-              </div>
+            {/* Auto-cycling disclaimer */}
+            <div style={{ fontFamily:"Lora,serif", fontSize:"11px", color:"#8a7a50", textAlign:"center", marginBottom:"8px", fontStyle:"italic" }}>
+              Cards advance automatically • Use ← → arrows to control
+            </div>
 
-              {/* Emoji (picture mode) */}
-              {word.emoji && word.emoji !== "🔤" && (
-                <div style={{ fontSize: early ? "3.5rem" : "2.5rem", lineHeight:1 }}>
-                  {word.emoji}
+            {/* Flashcard with arrow controls */}
+            <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"16px" }}>
+              <button onClick={goBack} style={{
+                background:"#e8e0cc", border:"1.5px solid #c8b888", borderRadius:"6px",
+                padding:"8px 10px", cursor:"pointer", fontSize:"18px", lineHeight:1,
+                transition:"all .15s"
+              }} title="Previous word (←)">
+                ← Back
+              </button>
+
+              <div onClick={advance} style={{
+                background: early
+                  ? "linear-gradient(135deg,#2D5A1A,#4a8a2a)"
+                  : "#2D5A1A",
+                borderRadius: early ? "20px" : "12px",
+                padding:"28px 22px 22px", textAlign:"center",
+                cursor:"pointer", userSelect:"none", WebkitUserSelect:"none",
+                flex:1,
+                minHeight: early ? "260px" : "240px",
+                display:"flex", flexDirection:"column", justifyContent:"center", gap:"14px",
+                boxShadow: early ? "0 6px 0 rgba(0,0,0,.2)" : "inset 0 -3px 0 rgba(0,0,0,.2)",
+              }}>
+                {/* Word */}
+                <div style={{
+                  fontFamily:"'Playfair Display',serif", fontWeight:900,
+                  fontSize: early ? "clamp(2rem,8vw,3rem)" : "clamp(1.5rem,6vw,2.4rem)",
+                  color:"#f0ead8", letterSpacing:"2px", lineHeight:1.1,
+                  wordBreak:"break-word",
+                }}>
+                  {word.answer}
                 </div>
-              )}
 
-              {/* Clue — ___ blanks are replaced with the answer underlined/highlighted */}
-              <div style={{
-                fontFamily:"Lora,serif",
-                fontSize: early ? "16px" : "14px",
-                color:"#C8E6C0", lineHeight:1.65,
-              }}>
-                {renderClueWithAnswer(word.clue, word.answer)}
+                {/* Emoji (picture mode) */}
+                {word.emoji && word.emoji !== "🔤" && (
+                  <div style={{ fontSize: early ? "3.5rem" : "2.5rem", lineHeight:1 }}>
+                    {word.emoji}
+                  </div>
+                )}
+
+                {/* Clue — ___ blanks are replaced with the answer underlined/highlighted */}
+                <div style={{
+                  fontFamily:"Lora,serif",
+                  fontSize: early ? "16px" : "14px",
+                  color:"#C8E6C0", lineHeight:1.65,
+                }}>
+                  {renderClueWithAnswer(word.clue, word.answer)}
+                </div>
+
+                <div style={{ fontFamily:"Lora,serif", fontSize:"11px", color:"rgba(200,230,192,.55)", fontStyle:"italic" }}>
+                  {early ? "Tap for next word →" : "Tap to advance →"}
+                </div>
               </div>
 
-              <div style={{ fontFamily:"Lora,serif", fontSize:"11px", color:"rgba(200,230,192,.55)", fontStyle:"italic" }}>
-                {early ? "Tap for next word →" : "Tap to advance →"}
-              </div>
+              <button onClick={advance} style={{
+                background:"#e8e0cc", border:"1.5px solid #c8b888", borderRadius:"6px",
+                padding:"8px 10px", cursor:"pointer", fontSize:"18px", lineHeight:1,
+                transition:"all .15s"
+              }} title="Next word (→)">
+                Next →
+              </button>
             </div>
 
             {/* Progress indicator */}
@@ -459,7 +506,7 @@ export default function VocabModal({
                   cursor: unlocked ? "pointer" : "not-allowed",
                   transition:"all .2s",
                 }}>
-                  {readerMode ? "Close" : early ? "Continue! 🎉" : "Continue\n(1 remaining)"}
+                  {readerMode ? "Close" : early ? "Continue to Puzzle! 🎉" : "Continue to Puzzle"}
                 </button>
               )}
               <button onClick={unlocked ? handleRestart : undefined} style={{
@@ -473,7 +520,7 @@ export default function VocabModal({
                 cursor: unlocked ? "pointer" : "not-allowed",
                 transition:"all .2s",
               }}>
-                {early ? "Try Again! 🔄" : "Restart"}
+                {early ? "Restart Puzzle! 🔄" : "Restart Puzzle"}
               </button>
             </div>
           </>
