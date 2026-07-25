@@ -381,6 +381,48 @@ export default async function handler(req, res) {
     seriesNote += ` This spoiler protection is critical — never reference anything from unread books or unread chapters.`;
   }
 
+  // ── Language / Spanish / Bilingual ────────────────────────────────────────
+  let languageNote = "";
+  let langFlag = "english";
+
+  // Language-to-name mapping for instructions
+  const LANGUAGE_NAMES = {
+    spanish: "Spanish",
+    french: "French",
+    german: "German",
+    portuguese: "Portuguese",
+    italian: "Italian",
+    mandarin: "Mandarin Chinese",
+    japanese: "Japanese",
+    korean: "Korean",
+  };
+
+  // Handle bilingual modes for all languages
+  let clueLanguageForPrompt = "english"; // Default: write clues in English
+  const bilingualLanguageMatch = bilingualMode?.match(/^([a-z-]+)-clue-([a-z-]+)-word$/);
+  if (bilingualLanguageMatch) {
+    const [, clueLanguage, answerLanguage] = bilingualLanguageMatch;
+    const clueLangName = LANGUAGE_NAMES[clueLanguage] || clueLanguage;
+    const answerLangName = LANGUAGE_NAMES[answerLanguage] || answerLanguage;
+    clueLanguageForPrompt = clueLanguage;
+    langFlag = bilingualMode;
+    languageNote = `\nBilingual Mode (${clueLangName} clues / ${answerLangName} answers):
+- Write all CLUES in ${clueLangName} (NOT English)
+- The ANSWER WORDS must be their ${answerLangName} equivalents in ALL CAPS (A-Z only, no special characters or accents)
+- Each clue in ${clueLangName} must accurately describe the ${answerLangName} answer word (not the English equivalent)
+- Example: If the Spanish answer is GATO (cat), the Spanish clue should describe a cat, not use English vocabulary
+- For ${clueLangName} clues: use natural, grade-appropriate language; maintain correct grammar and spelling for the grade level
+- Do NOT translate English clues into ${clueLangName} — write clues directly in ${clueLangName} that describe the meaning`;
+  } else if (language === "spanish" && !bilingualMode) {
+    clueLanguageForPrompt = "spanish";
+    langFlag = "spanish";
+    languageNote = `\nLanguage: Spanish only. IMPORTANT — First translate the entire input text from English to Spanish. Then extract vocabulary and generate ALL WORDS and CLUES entirely in Spanish from the translated text. Answer words must be Spanish words in ALL CAPS using only the letters A-Z (no accents, tildes, or special characters — use plain ASCII: N for Ñ, etc.). Clues must be in Spanish at the appropriate grade level. After generating, run a secondary validation pass: confirm each Spanish word is correctly spelled, grammatically appropriate for the grade level, and each clue accurately describes its answer word in Spanish. Fix any errors before returning.`;
+  } else if (language !== "english" && !bilingualMode) {
+    langFlag = language;
+    const langName = LANGUAGE_NAMES[language] || language;
+    languageNote = `\nLanguage: ${langName} only. IMPORTANT — First translate the entire input text to ${langName}. Then extract vocabulary and generate ALL WORDS and CLUES entirely in ${langName} from the translated text. Answer words must be ${langName} words in ALL CAPS using only letters A-Z (no accents, special characters, or diacritics). Clues must be in ${langName} at the appropriate grade level. After generating, run a secondary validation pass: confirm each word is correctly spelled, grammatically appropriate for the grade level, and each clue accurately describes its answer word in ${langName}. Fix any errors before returning.`;
+  }
+
   // ── Phonics Mode — STORY-CONNECTED clues ──────────────────────────────────
   // Phonics mode is only for English K-2 (phonics is English-language specific)
   const isEnglishOnly = clueLanguageForPrompt === "english";
@@ -487,48 +529,6 @@ WORD SELECTION RULES for songs:
 ${effectivePhonicsMode ? `5. PHONICS + LYRIC: Each clue must ALSO include a phonics hint after the lyric fill-in. Format: "[lyric] ___ — [phonics hint]". Example: "Twinkle twinkle little ___ — rhymes with car and starts with /st/"` : ""}
 
 The child should fill in the answer word because they already know it from singing the song.`;
-  }
-
-  // ── Language / Spanish / Bilingual ────────────────────────────────────────
-  let languageNote = "";
-  let langFlag = "english";
-
-  // Language-to-name mapping for instructions
-  const LANGUAGE_NAMES = {
-    spanish: "Spanish",
-    french: "French",
-    german: "German",
-    portuguese: "Portuguese",
-    italian: "Italian",
-    mandarin: "Mandarin Chinese",
-    japanese: "Japanese",
-    korean: "Korean",
-  };
-
-  // Handle bilingual modes for all languages
-  let clueLanguageForPrompt = "english"; // Default: write clues in English
-  const bilingualLanguageMatch = bilingualMode?.match(/^([a-z-]+)-clue-([a-z-]+)-word$/);
-  if (bilingualLanguageMatch) {
-    const [, clueLanguage, answerLanguage] = bilingualLanguageMatch;
-    const clueLangName = LANGUAGE_NAMES[clueLanguage] || clueLanguage;
-    const answerLangName = LANGUAGE_NAMES[answerLanguage] || answerLanguage;
-    clueLanguageForPrompt = clueLanguage;
-    langFlag = bilingualMode;
-    languageNote = `\nBilingual Mode (${clueLangName} clues / ${answerLangName} answers):
-- Write all CLUES in ${clueLangName} (NOT English)
-- The ANSWER WORDS must be their ${answerLangName} equivalents in ALL CAPS (A-Z only, no special characters or accents)
-- Each clue in ${clueLangName} must accurately describe the ${answerLangName} answer word (not the English equivalent)
-- Example: If the Spanish answer is GATO (cat), the Spanish clue should describe a cat, not use English vocabulary
-- For ${clueLangName} clues: use natural, grade-appropriate language; maintain correct grammar and spelling for the grade level
-- Do NOT translate English clues into ${clueLangName} — write clues directly in ${clueLangName} that describe the meaning`;
-  } else if (language === "spanish" && !bilingualMode) {
-    clueLanguageForPrompt = "spanish";
-    langFlag = "spanish";
-    languageNote = `\nLanguage: Spanish only. IMPORTANT — First translate the entire input text from English to Spanish. Then extract vocabulary and generate ALL WORDS and CLUES entirely in Spanish from the translated text. Answer words must be Spanish words in ALL CAPS using only the letters A-Z (no accents, tildes, or special characters — use plain ASCII: N for Ñ, etc.). Clues must be in Spanish at the appropriate grade level. After generating, run a secondary validation pass: confirm each Spanish word is correctly spelled, grammatically appropriate for the grade level, and each clue accurately describes its answer word in Spanish. Fix any errors before returning.`;
-  } else if (language !== "english" && !bilingualMode) {
-    langFlag = language;
-    const langName = LANGUAGE_NAMES[language] || language;
-    languageNote = `\nLanguage: ${langName} only. IMPORTANT — First translate the entire input text to ${langName}. Then extract vocabulary and generate ALL WORDS and CLUES entirely in ${langName} from the translated text. Answer words must be ${langName} words in ALL CAPS using only letters A-Z (no accents, special characters, or diacritics). Clues must be in ${langName} at the appropriate grade level. After generating, run a secondary validation pass: confirm each word is correctly spelled, grammatically appropriate for the grade level, and each clue accurately describes its answer word in ${langName}. Fix any errors before returning.`;
   }
 
   // ── Resolve input text ─────────────────────────────────────────────────────
