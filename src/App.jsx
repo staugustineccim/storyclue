@@ -6,6 +6,7 @@ import CrosswordPuzzle from "./components/CrosswordPuzzle";
 import AdminDashboard from "./components/AdminDashboard";
 import ChurchMode from "./components/ChurchMode";
 import ChurchSignup from "./components/ChurchSignup";
+import Privacy from "./components/Privacy";
 import NotFound from "./components/NotFound";
 
 export default function App() {
@@ -19,6 +20,7 @@ export default function App() {
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/church" element={<ChurchMode />} />
         <Route path="/church/setup" element={<ChurchSignup />} />
+        <Route path="/privacy" element={<Privacy />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AuthProvider>
