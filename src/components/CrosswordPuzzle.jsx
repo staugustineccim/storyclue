@@ -734,7 +734,7 @@ function PuzzleBoard({
     try {
       const res  = await fetch("/api/simplify-clue", {
         method:"POST", headers:{ "content-type":"application/json" },
-        body: JSON.stringify({ word:activeWord.answer, clue:activeWord.clue, grade }),
+        body: JSON.stringify({ word:activeWord.answer, clue:activeWord.clue, grade, language }),
       });
       const data = await res.json();
       if (data.clue) {
