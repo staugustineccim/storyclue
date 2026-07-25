@@ -13,19 +13,28 @@ const GRADE_DESC = {
   "adult": "adult reader level — rich and engaging sentences",
 };
 
+const LANGUAGE_NAMES = {
+  spanish: "Spanish", french: "French", german: "German", portuguese: "Portuguese",
+  italian: "Italian", mandarin: "Mandarin", japanese: "Japanese", korean: "Korean",
+  english: "English",
+};
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { words, title, grade } = req.body || {};
+  const { words, title, grade, language = "english" } = req.body || {};
   if (!words?.length) return res.status(400).json({ error: "No words provided" });
 
   const gradeDesc = GRADE_DESC[grade] || GRADE_DESC["3"];
+  const langName = LANGUAGE_NAMES[language] || language;
   const wordList  = words
     .map(w => (w.answer || w.word || "").toUpperCase())
     .filter(Boolean)
     .join(", ");
 
-  const prompt = `For the crossword puzzle titled "${title || "Vocabulary Crossword"}", write one short sentence for each vocabulary word that shows the word used naturally in context. Write the vocabulary word IN ALL CAPS inside the sentence so it stands out clearly.
+  const isEnglish = language === "english";
+  const prompt = isEnglish
+    ? `For the crossword puzzle titled "${title || "Vocabulary Crossword"}", write one short sentence for each vocabulary word that shows the word used naturally in context. Write the vocabulary word IN ALL CAPS inside the sentence so it stands out clearly.
 
 Grade level: ${gradeDesc}
 
@@ -41,6 +50,25 @@ Return ONLY this exact JSON with no other text:
 {
   "sentences": [
     { "word": "EXAMPLE", "sentence": "The teacher put a clear EXAMPLE on the board so everyone could understand." }
+  ]
+}`
+    : `For the crossword puzzle titled "${title || "Vocabulary Crossword"}", write one short sentence in ${langName} for each vocabulary word. Show how the word is used naturally in context. Write the vocabulary word IN ALL CAPS inside each sentence.
+
+Grade level: ${gradeDesc} (in ${langName})
+
+Words (in ${langName}): ${wordList}
+
+Rules:
+- Each sentence must be written entirely in ${langName}
+- Write each vocabulary word IN ALL CAPS exactly as listed in the sentence
+- Keep each sentence short and meaningful for the grade level in ${langName}
+- Show the word in action or context — use natural ${langName} grammar and phrasing
+- Use vocabulary and expressions natural to ${langName} speakers at this grade level
+
+Return ONLY this exact JSON with no other text:
+{
+  "sentences": [
+    { "word": "EXAMPLE", "sentence": "The sentence in ${langName} with the EXAMPLE word in all caps." }
   ]
 }`;
 
