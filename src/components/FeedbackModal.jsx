@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { trackEvent } from "../utils/analytics";
+import { fetchWithCSRF } from "../utils/csrf";
 
 export default function FeedbackModal({ puzzleTitle, grade, wasRevealed, onClose }) {
   const [step, setStep] = useState("rating"); // "rating" | "thanks"
@@ -12,9 +13,8 @@ export default function FeedbackModal({ puzzleTitle, grade, wasRevealed, onClose
     if (stars === 0) return;
     setSubmitting(true);
     try {
-      await fetch("/api/feedback", {
+      await fetchWithCSRF("/api/feedback", {
         method: "POST",
-        headers: { "content-type": "application/json" },
         body: JSON.stringify({
           puzzleTitle,
           grade,

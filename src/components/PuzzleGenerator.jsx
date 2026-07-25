@@ -5,6 +5,7 @@ import { buildLayout } from "../utils/layoutBuilder";
 import { buildDemoData, getDemoUrl, SERIES_DATA } from "../utils/demoData";
 import { savePrefs, loadPrefs } from "../utils/prefs";
 import { trackEvent } from "../utils/analytics";
+import { fetchWithCSRF, withCSRFToken } from "../utils/csrf";
 import { useAuth } from "../context/AuthContext";
 import { authEnabled } from "../utils/supabase";
 import { initTrial, getDaysRemaining, getTrialStatus, isExpiring, isInGrace, isTrialOver } from "../utils/trial";
@@ -337,9 +338,8 @@ export default function PuzzleGenerator() {
     if (inputMode === "lookup" && !versionCheckDone) {
       setLoading(true);
       try {
-        const vRes = await fetch("/api/check-versions", {
+        const vRes = await fetchWithCSRF("/api/check-versions", {
           method: "POST",
-          headers: { "content-type": "application/json" },
           body: JSON.stringify({ bookRef: bookRef.trim(), grade }),
         });
         const vData = await vRes.json();
@@ -398,9 +398,8 @@ export default function PuzzleGenerator() {
         pictureMode: isK2 && pictureMode,
       };
 
-      const res = await fetch("/api/generate", {
+      const res = await fetchWithCSRF("/api/generate", {
         method: "POST",
-        headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       });
 
@@ -461,9 +460,8 @@ export default function PuzzleGenerator() {
       };
 
       // Items 1 + 6: save puzzle to Postgres, get back a permanent readable slug
-      const saveRes = await fetch("/api/save-puzzle", {
+      const saveRes = await fetchWithCSRF("/api/save-puzzle", {
         method: "POST",
-        headers: { "content-type": "application/json" },
         body: JSON.stringify({
           title:       puzzleData.title,
           grade,

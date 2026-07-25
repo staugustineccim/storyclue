@@ -1,9 +1,14 @@
 import { kv } from "@vercel/kv";
+import { validateCSRFToken } from "./csrf.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
+
+  // ── CSRF Protection ────────────────────────────────────────────────────────────
+  const csrfError = await validateCSRFToken(req, res);
+  if (csrfError) return csrfError;
 
   const { puzzleTitle, grade, stars, comment, wasRevealed, wouldPay, date } = req.body || {};
 

@@ -1,4 +1,5 @@
 import { sql } from "@vercel/postgres";
+import { validateCSRFToken } from "./csrf.js";
 
 // Converts a puzzle title into a URL-safe slug segment
 function titleToSlug(title) {
@@ -36,6 +37,10 @@ export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
+
+  // ── CSRF Protection ────────────────────────────────────────────────────────────
+  const csrfError = await validateCSRFToken(req, res);
+  if (csrfError) return csrfError;
 
   const { title, grade, faith, language, rows, cols, words, phonicsMode, pictureMode } = req.body || {};
 

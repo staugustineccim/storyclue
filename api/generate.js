@@ -1,4 +1,5 @@
 import { kv } from "@vercel/kv";
+import { validateCSRFToken } from "./csrf.js";
 
 // ── Grade descriptions for clue language ──────────────────────────────────────
 const GRADE_DESCRIPTIONS = {
@@ -321,6 +322,10 @@ export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
+
+  // ── CSRF Protection ────────────────────────────────────────────────────────────
+  const csrfError = await validateCSRFToken(req, res);
+  if (csrfError) return csrfError;
 
   const {
     inputMode, bookRef, chapterText, urlRef,
