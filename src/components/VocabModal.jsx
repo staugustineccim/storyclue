@@ -384,27 +384,32 @@ export default function VocabModal({
 
             {/* Auto-cycling disclaimer */}
             <div style={{ fontFamily:"Lora,serif", fontSize:"11px", color:"#8a7a50", textAlign:"center", marginBottom:"8px", fontStyle:"italic" }}>
-              Cards advance automatically • Use ← → arrows to control
+              Cards advance automatically • Click arrows or use ← → keys to control
             </div>
 
-            {/* Flashcard with arrow controls */}
-            <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"16px" }}>
-              <button onClick={goBack} style={{
-                background:"#e8e0cc", border:"1.5px solid #c8b888", borderRadius:"6px",
-                padding:"8px 10px", cursor:"pointer", fontSize:"18px", lineHeight:1,
-                transition:"all .15s"
-              }} title="Previous word (←)">
-                ← Back
+            {/* Flashcard with embedded arrows */}
+            <div style={{ position:"relative", marginBottom:"16px" }} onClick={advance}>
+              {/* Left arrow */}
+              <button onClick={(e) => { e.stopPropagation(); goBack(); }} style={{
+                position:"absolute", left:"12px", top:"50%", transform:"translateY(-50%)",
+                background:"rgba(0,0,0,0.3)", hover:"rgba(0,0,0,0.5)",
+                border:"none", borderRadius:"50%",
+                padding:"10px 14px", cursor:"pointer", fontSize:"24px", lineHeight:1,
+                color:"#f0ead8", transition:"background .2s",
+                zIndex:10,
+              }} title="Previous word (←)" onMouseEnter={(e) => e.target.style.background="rgba(0,0,0,0.5)"}
+                 onMouseLeave={(e) => e.target.style.background="rgba(0,0,0,0.3)"}>
+                ‹
               </button>
 
-              <div onClick={advance} style={{
+              {/* Flashcard */}
+              <div style={{
                 background: early
                   ? "linear-gradient(135deg,#2D5A1A,#4a8a2a)"
                   : "#2D5A1A",
                 borderRadius: early ? "20px" : "12px",
-                padding:"28px 22px 22px", textAlign:"center",
+                padding:"28px 50px 22px", textAlign:"center",
                 cursor:"pointer", userSelect:"none", WebkitUserSelect:"none",
-                flex:1,
                 minHeight: early ? "260px" : "240px",
                 display:"flex", flexDirection:"column", justifyContent:"center", gap:"14px",
                 boxShadow: early ? "0 6px 0 rgba(0,0,0,.2)" : "inset 0 -3px 0 rgba(0,0,0,.2)",
@@ -414,7 +419,7 @@ export default function VocabModal({
                   fontFamily:"'Playfair Display',serif", fontWeight:900,
                   fontSize: early ? "clamp(2rem,8vw,3rem)" : "clamp(1.5rem,6vw,2.4rem)",
                   color:"#f0ead8", letterSpacing:"2px", lineHeight:1.1,
-                  wordBreak:"break-word",
+                  wordBreak:"break-word", overflowWrap:"break-word",
                 }}>
                   {word.answer}
                 </div>
@@ -440,12 +445,17 @@ export default function VocabModal({
                 </div>
               </div>
 
-              <button onClick={advance} style={{
-                background:"#e8e0cc", border:"1.5px solid #c8b888", borderRadius:"6px",
-                padding:"8px 10px", cursor:"pointer", fontSize:"18px", lineHeight:1,
-                transition:"all .15s"
-              }} title="Next word (→)">
-                Next →
+              {/* Right arrow */}
+              <button onClick={(e) => { e.stopPropagation(); advance(); }} style={{
+                position:"absolute", right:"12px", top:"50%", transform:"translateY(-50%)",
+                background:"rgba(0,0,0,0.3)",
+                border:"none", borderRadius:"50%",
+                padding:"10px 14px", cursor:"pointer", fontSize:"24px", lineHeight:1,
+                color:"#f0ead8", transition:"background .2s",
+                zIndex:10,
+              }} title="Next word (→)" onMouseEnter={(e) => e.target.style.background="rgba(0,0,0,0.5)"}
+                 onMouseLeave={(e) => e.target.style.background="rgba(0,0,0,0.3)"}>
+                ›
               </button>
             </div>
 
