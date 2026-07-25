@@ -592,13 +592,13 @@ export default function PuzzleGenerator() {
           background: "rgba(0,0,0,.5)",
           display: "flex", alignItems: "center", justifyContent: "center",
           zIndex: 9999, padding: "12px",
-        }}>
+        }} role="presentation" onClick={(e) => {if (e.target === e.currentTarget) setShowMoreLanguages(false);}}>
           <div style={{
             background: "#fdfaf4", borderRadius: "16px",
             padding: "32px", textAlign: "left",
             maxWidth: "380px", boxShadow: "0 28px 90px rgba(0,0,0,.45)",
-          }}>
-            <h2 style={{
+          }} role="dialog" aria-labelledby="language-modal-title" aria-modal="true">
+            <h2 id="language-modal-title" style={{
               fontFamily: "'Playfair Display',serif", fontWeight: 900,
               color: "#2D5A1A", fontSize: "1.2rem",
               margin: "0 0 18px", letterSpacing: "0.5px",
@@ -627,6 +627,8 @@ export default function PuzzleGenerator() {
                         setLanguage(lang.value);
                         setTempLanguageSelection(lang);
                       }}
+                      aria-label={`Select ${lang.label}`}
+                      aria-pressed={language === lang.value}
                       style={{
                         padding: "10px 14px",
                         textAlign: "left",
@@ -1170,7 +1172,9 @@ export default function PuzzleGenerator() {
                       {group.grades.map(g => (
                         <button type="button" key={g.key}
                           className={`grade-btn${grade===g.key?" on":""}`}
-                          onClick={() => setGrade(g.key)}>
+                          onClick={() => setGrade(g.key)}
+                          aria-label={`Select ${g.label} grade level`}
+                          aria-pressed={grade===g.key}>
                           {g.label}
                         </button>
                       ))}
@@ -1232,13 +1236,13 @@ export default function PuzzleGenerator() {
           <div style={{ marginBottom:"24px" }}>
             <label style={labelStyle}>Language</label>
             <div style={{ display:"flex", gap:"8px", marginBottom: (isSpanish || (language !== "english" && language !== "spanish")) ? "12px" : 0 }}>
-              <button type="button" className={`lang-btn${language === "english" ? " on" : ""}`} onClick={() => { setLanguage("english"); setBilingual(""); }}>
+              <button type="button" className={`lang-btn${language === "english" ? " on" : ""}`} onClick={() => { setLanguage("english"); setBilingual(""); }} aria-label="Select English" aria-pressed={language === "english"}>
                 🇺🇸 English
               </button>
-              <button type="button" className={`lang-btn${language === "spanish" ? " on" : ""}`} onClick={() => { setLanguage("spanish"); setBilingual(""); }}>
+              <button type="button" className={`lang-btn${language === "spanish" ? " on" : ""}`} onClick={() => { setLanguage("spanish"); setBilingual(""); }} aria-label="Select Spanish" aria-pressed={language === "spanish"}>
                 🇪🇸 Spanish
               </button>
-              <button type="button" className="lang-btn" onClick={() => setShowMoreLanguages(true)} style={{ fontSize:"12px", padding:"8px 12px" }}>
+              <button type="button" className="lang-btn" onClick={() => setShowMoreLanguages(true)} style={{ fontSize:"12px", padding:"8px 12px" }} aria-label="Open language menu to select from 9 languages" aria-expanded={showMoreLanguages}>
                 + More Languages
               </button>
             </div>
@@ -1257,13 +1261,13 @@ export default function PuzzleGenerator() {
                   Bilingual Mode (optional)
                 </div>
                 <div style={{ display:"flex", gap:"6px" }}>
-                  <button type="button" className={`bilingual-btn${bilingualMode===""?" on":""}`} onClick={() => setBilingual("")}>
+                  <button type="button" className={`bilingual-btn${bilingualMode===""?" on":""}`} onClick={() => setBilingual("")} aria-label="Spanish only mode" aria-pressed={bilingualMode===""}>
                     Spanish only
                   </button>
-                  <button type="button" className={`bilingual-btn${bilingualMode==="en-clue-es-word"?" on":""}`} onClick={() => setBilingual("en-clue-es-word")}>
+                  <button type="button" className={`bilingual-btn${bilingualMode==="en-clue-es-word"?" on":""}`} onClick={() => setBilingual("en-clue-es-word")} aria-label="English clues with Spanish answers" aria-pressed={bilingualMode==="en-clue-es-word"}>
                     English clues<br/>Spanish answers
                   </button>
-                  <button type="button" className={`bilingual-btn${bilingualMode==="es-clue-en-word"?" on":""}`} onClick={() => setBilingual("es-clue-en-word")}>
+                  <button type="button" className={`bilingual-btn${bilingualMode==="es-clue-en-word"?" on":""}`} onClick={() => setBilingual("es-clue-en-word")} aria-label="Spanish clues with English answers" aria-pressed={bilingualMode==="es-clue-en-word"}>
                     Spanish clues<br/>English answers
                   </button>
                 </div>
