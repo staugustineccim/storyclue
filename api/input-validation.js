@@ -59,14 +59,8 @@ export function validateBookRef(ref) {
     };
   }
 
-  // Allow letters, numbers, spaces, hyphens, commas, colons, periods
-  if (!/^[a-zA-Z0-9\s\-,:.]+$/.test(str)) {
-    return {
-      valid: false,
-      error: "Book reference contains invalid characters",
-    };
-  }
-
+  // Book reference is just used as context for Claude — no dangerous operations
+  // Accept any reasonable text without character whitelisting
   return { valid: true, ref: str };
 }
 
