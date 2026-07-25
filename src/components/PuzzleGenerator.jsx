@@ -1233,17 +1233,25 @@ export default function PuzzleGenerator() {
           {/* ── Language ────────────────────────────────────────────────── */}
           <div style={{ marginBottom:"24px" }}>
             <label style={labelStyle}>Language</label>
-            <div style={{ display:"flex", gap:"8px", marginBottom: isSpanish ? "12px" : 0 }}>
-              <button type="button" className={`lang-btn${!isSpanish?" on":""}`} onClick={() => { setLanguage("english"); setBilingual(""); }}>
+            <div style={{ display:"flex", gap:"8px", marginBottom: (isSpanish || (language !== "english" && language !== "spanish")) ? "12px" : 0 }}>
+              <button type="button" className={`lang-btn${language === "english" ? " on" : ""}`} onClick={() => { setLanguage("english"); setBilingual(""); }}>
                 🇺🇸 English
               </button>
-              <button type="button" className={`lang-btn${isSpanish?" on":""}`} onClick={() => setLanguage("spanish")}>
+              <button type="button" className={`lang-btn${language === "spanish" ? " on" : ""}`} onClick={() => { setLanguage("spanish"); setBilingual(""); }}>
                 🇪🇸 Spanish
               </button>
               <button type="button" className="lang-btn" onClick={() => setShowMoreLanguages(true)} style={{ fontSize:"12px", padding:"8px 12px" }}>
                 + More Languages
               </button>
             </div>
+
+            {language !== "english" && language !== "spanish" && (
+              <div style={{ marginTop:"10px", padding:"8px 10px", background:"#e8f4d8", border:"1px solid #4a8a2a", borderRadius:"4px", marginBottom:"12px" }}>
+                <div style={{ fontFamily:"Lora,serif", fontSize:"12px", color:"#2d4a18", fontWeight:600 }}>
+                  {language.charAt(0).toUpperCase() + language.slice(1)}{bilingualMode ? ` (${bilingualMode.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")})` : ""} selected
+                </div>
+              </div>
+            )}
 
             {isSpanish && (
               <div style={{ marginTop:"10px" }}>
