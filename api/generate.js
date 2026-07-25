@@ -380,8 +380,12 @@ export default async function handler(req, res) {
   }
 
   // ── Phonics Mode — STORY-CONNECTED clues ──────────────────────────────────
+  // Phonics mode is only for English K-2 (phonics is English-language specific)
+  const isEnglishOnly = clueLanguageForPrompt === "english";
+  const effectivePhonicsMode = phonicsMode && isEnglishOnly && ["k","1","2"].includes(String(grade));
+
   let phonicsNote = "";
-  if (phonicsMode && ["k","1","2"].includes(String(grade))) {
+  if (effectivePhonicsMode) {
     const storyRef = bookRef?.trim() || "this story";
     const pg = {
       k: `
@@ -478,7 +482,7 @@ WORD SELECTION RULES for songs:
 2. Maximum ${limits.maxLen} letters per word — choose short familiar words: STAR, BOAT, RAIN, LAMB, CLOCK, WHEEL, FARM, DUCK
 3. Choose words a child will feel proud to know from singing the song — reward their existing knowledge
 4. NEVER write a clue that doesn't come from the actual lyrics of this specific song
-${phonicsMode ? `5. PHONICS + LYRIC: Each clue must ALSO include a phonics hint after the lyric fill-in. Format: "[lyric] ___ — [phonics hint]". Example: "Twinkle twinkle little ___ — rhymes with car and starts with /st/"` : ""}
+${effectivePhonicsMode ? `5. PHONICS + LYRIC: Each clue must ALSO include a phonics hint after the lyric fill-in. Format: "[lyric] ___ — [phonics hint]". Example: "Twinkle twinkle little ___ — rhymes with car and starts with /st/"` : ""}
 
 The child should fill in the answer word because they already know it from singing the song.`;
   }
