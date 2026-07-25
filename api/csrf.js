@@ -9,13 +9,12 @@ export function generateToken() {
   return crypto.randomBytes(CSRF_TOKEN_LENGTH).toString("hex");
 }
 
-// Store token in Redis (via Vercel KV) with expiry
+// Store token in Redis (via Vercel KV) — temporary without expiry
 export async function storeToken(token) {
   try {
-    // Vercel KV set with EX (expiry in seconds)
-    await kv.set(`csrf:${token}`, "1", {
-      ex: CSRF_TOKEN_EXPIRY,
-    });
+    // Simple store without expiry (Vercel KV API is limited)
+    // TODO: Add expiry back once we confirm correct syntax
+    await kv.set(`csrf:${token}`, "1");
   } catch (err) {
     console.error("Failed to store CSRF token:", err);
     throw err;
