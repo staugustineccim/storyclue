@@ -59,8 +59,8 @@ export function validateBookRef(ref) {
     };
   }
 
-  // Allow letters, numbers, spaces, hyphens, commas, colons
-  if (!/^[a-zA-Z0-9\s\-,:]+$/.test(str)) {
+  // Allow letters, numbers, spaces, hyphens, commas, colons, periods
+  if (!/^[a-zA-Z0-9\s\-,:.]+$/.test(str)) {
     return {
       valid: false,
       error: "Book reference contains invalid characters",
