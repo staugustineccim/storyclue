@@ -500,14 +500,23 @@ The child should fill in the answer word because they already know it from singi
   };
 
   // Handle bilingual modes for all languages
+  let clueLanguageForPrompt = "english"; // Default: write clues in English
   const bilingualLanguageMatch = bilingualMode?.match(/^([a-z-]+)-clue-([a-z-]+)-word$/);
   if (bilingualLanguageMatch) {
     const [, clueLanguage, answerLanguage] = bilingualLanguageMatch;
     const clueLangName = LANGUAGE_NAMES[clueLanguage] || clueLanguage;
     const answerLangName = LANGUAGE_NAMES[answerLanguage] || answerLanguage;
+    clueLanguageForPrompt = clueLanguage;
     langFlag = bilingualMode;
-    languageNote = `\nBilingual Mode (${clueLangName} clues / ${answerLangName} answers): Write all CLUES in ${clueLangName}, but the ANSWER WORDS must be their ${answerLangName} equivalents in ALL CAPS (A-Z only, no special characters or accents). Each clue in ${clueLangName} describes the answer word in ${answerLangName}.`;
+    languageNote = `\nBilingual Mode (${clueLangName} clues / ${answerLangName} answers):
+- Write all CLUES in ${clueLangName} (NOT English)
+- The ANSWER WORDS must be their ${answerLangName} equivalents in ALL CAPS (A-Z only, no special characters or accents)
+- Each clue in ${clueLangName} must accurately describe the ${answerLangName} answer word (not the English equivalent)
+- Example: If the Spanish answer is GATO (cat), the Spanish clue should describe a cat, not use English vocabulary
+- For ${clueLangName} clues: use natural, grade-appropriate language; maintain correct grammar and spelling for the grade level
+- Do NOT translate English clues into ${clueLangName} — write clues directly in ${clueLangName} that describe the meaning`;
   } else if (language === "spanish" && !bilingualMode) {
+    clueLanguageForPrompt = "spanish";
     langFlag = "spanish";
     languageNote = `\nLanguage: Spanish only. IMPORTANT — First translate the entire input text from English to Spanish. Then extract vocabulary and generate ALL WORDS and CLUES entirely in Spanish from the translated text. Answer words must be Spanish words in ALL CAPS using only the letters A-Z (no accents, tildes, or special characters — use plain ASCII: N for Ñ, etc.). Clues must be in Spanish at the appropriate grade level. After generating, run a secondary validation pass: confirm each Spanish word is correctly spelled, grammatically appropriate for the grade level, and each clue accurately describes its answer word in Spanish. Fix any errors before returning.`;
   } else if (language !== "english" && !bilingualMode) {
@@ -635,7 +644,7 @@ Instructions:
 - Each word must be ALL CAPS, letters only (A-Z), no spaces, no hyphens, no punctuation
 - Word length must be between ${limits.minLen} and ${limits.maxLen} letters — STRICTLY ENFORCE THIS for the grade
 - Write every clue at ${gradeDesc}
-- Write ALL clues in modern plain everyday English — never use archaic, scriptural, or overly formal language
+- ${clueLanguageForPrompt === "english" ? "Write ALL clues in modern plain everyday English — never use archaic, scriptural, or overly formal language" : `Write ALL clues in modern plain everyday ${LANGUAGE_NAMES[clueLanguageForPrompt] || clueLanguageForPrompt} — use natural grammar and vocabulary for the grade level, never use archaic or overly formal language`}
 - The title should specifically name the source (e.g. "Book of Jonah — Vocabulary Crossword")
 - Do NOT reproduce extended passages of text — only vocabulary words and short clues
 
@@ -643,6 +652,7 @@ VALIDATION STEP — before returning, review every word-clue pair:
 - Each clue must specifically and accurately describe its exact answer word
 - A clue for SHEPHERD must describe a shepherd, not a king or a fish
 - A clue for ARK must describe an ark, not a whale
+- ${clueLanguageForPrompt !== "english" ? `For ${LANGUAGE_NAMES[clueLanguageForPrompt] || clueLanguageForPrompt} clues: verify correct spelling, grammar, and that the clue makes sense in ${LANGUAGE_NAMES[clueLanguageForPrompt] || clueLanguageForPrompt}` : ""}
 - If any clue does not match its word, fix it before returning
 
 Return this exact JSON structure with no other text:
@@ -681,7 +691,7 @@ STEP 2 — EXTRACT VOCABULARY AND CONNECT TO KEY POINTS:
 - Each word must be ALL CAPS, letters only (A-Z), no spaces, no hyphens, no punctuation
 - Word length must be between ${limits.minLen} and ${limits.maxLen} letters — STRICTLY ENFORCE THIS for the grade
 - Write every clue at ${gradeDesc}
-- Write ALL clues in modern plain everyday English — never use archaic, scriptural, or overly formal language
+- ${clueLanguageForPrompt === "english" ? "Write ALL clues in modern plain everyday English — never use archaic, scriptural, or overly formal language" : `Write ALL clues in modern plain everyday ${LANGUAGE_NAMES[clueLanguageForPrompt] || clueLanguageForPrompt} — use natural grammar and vocabulary for the grade level`}
 - For each word, tie it to ONE of the key teaching points identified in STEP 1
 - Provide three-part context (sourceQuote):
   1. bulletPoint: The specific KEY TEACHING POINT this word relates to (must be one of the 3-5 identified themes)
@@ -694,6 +704,7 @@ VALIDATION STEP — before returning, review every word-clue pair:
 - Each bulletPoint must be ONE of the 3-5 key teaching points (don't invent new themes)
 - Each pastorExplanation must be directly from the sermon content in that teaching section
 - Each biblicalBasis must be a scripture reference actually cited or referenced in the sermon
+- ${clueLanguageForPrompt !== "english" ? `For ${LANGUAGE_NAMES[clueLanguageForPrompt] || clueLanguageForPrompt} clues: verify correct spelling, grammar, and that each clue accurately describes the ${LANGUAGE_NAMES[clueLanguageForPrompt] || clueLanguageForPrompt} word in ${LANGUAGE_NAMES[clueLanguageForPrompt] || clueLanguageForPrompt}` : ""}
 - Ensure you're capturing the actual themes the pastor taught, not making up interpretations
 
 Return this exact JSON structure with no other text:
