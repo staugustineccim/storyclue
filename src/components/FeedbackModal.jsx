@@ -56,7 +56,7 @@ export default function FeedbackModal({ puzzleTitle, grade, wasRevealed, onClose
                   key={n}
                   style={{
                     ...starBtn,
-                    color: n <= (hovered || stars) ? "#8A7A30" : "#ccc",
+                    color: n <= (hovered || stars) ? "#FFD700" : "#ddd",
                     transform: n <= (hovered || stars) ? "scale(1.2)" : "scale(1)",
                   }}
                   onMouseEnter={() => setHovered(n)}
@@ -150,7 +150,7 @@ const starBtn = {
 };
 
 const starLabel = {
-  color: "#8A7A30", fontSize: "0.85rem", fontWeight: 600,
+  color: "#FFD700", fontSize: "0.85rem", fontWeight: 600,
   margin: "0 0 1rem", height: "1.2em",
 };
 
