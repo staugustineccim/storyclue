@@ -12,8 +12,8 @@ export function generateToken() {
 // Store token in Redis (via Vercel KV) with expiry
 export async function storeToken(token) {
   try {
-    // Use set with EX option for expiry (Redis standard)
-    await kv.set(`csrf:${token}`, "1", { ex: CSRF_TOKEN_EXPIRY });
+    // Use setEx method (standard Redis client camelCase naming)
+    await kv.setEx(`csrf:${token}`, CSRF_TOKEN_EXPIRY, "1");
   } catch (err) {
     console.error("Failed to store CSRF token:", err);
     throw err; // Throw error so caller knows token storage failed
