@@ -1,5 +1,6 @@
 import { kv } from "@vercel/kv";
 import { validateCSRFToken } from "./csrf.js";
+import { checkRateLimit, tooManyRequests } from "./rate-limit.js";
 
 // ── Grade descriptions for clue language ──────────────────────────────────────
 const GRADE_DESCRIPTIONS = {
@@ -326,6 +327,12 @@ export default async function handler(req, res) {
   // ── CSRF Protection ────────────────────────────────────────────────────────────
   const csrfError = await validateCSRFToken(req, res);
   if (csrfError) return csrfError;
+
+  // ── Rate Limiting ──────────────────────────────────────────────────────────────
+  const rateInfo = await checkRateLimit(req, false); // false = free tier
+  if (!rateInfo.allowed) {
+    return tooManyRequests(res, rateInfo);
+  }
 
   const {
     inputMode, bookRef, chapterText, urlRef,
