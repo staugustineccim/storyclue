@@ -2,6 +2,7 @@
 
 import { sql } from "@vercel/postgres";
 import { calculateSM2, evaluateAnswer, selectClueLevel } from "./sm2.js";
+import { replaceDynamicContent } from "./fetch-dynamic-content.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -32,7 +33,11 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: "Question not found" });
     }
 
-    const officialAnswer = questionResult.rows[0].official_answer;
+    let officialAnswer = questionResult.rows[0].official_answer;
+
+    // Replace dynamic content placeholders (elected officials, etc.)
+    // User's ZIP code could be passed in body for more accurate results
+    officialAnswer = await replaceDynamicContent(officialAnswer, req.body?.userZipCode);
 
     // Evaluate answer correctness
     const quality = evaluateAnswer(userAnswer, officialAnswer);

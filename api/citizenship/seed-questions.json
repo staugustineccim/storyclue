@@ -1,0 +1,299 @@
+{
+  "civics_questions": [
+    {
+      "question_text": "What is the supreme law of the land?",
+      "official_answer": "The Constitution",
+      "category": "Constitution",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "What does the Constitution do?",
+      "official_answer": "It sets up the government. It defines the government's powers. It protects the basic rights of Americans.",
+      "category": "Constitution",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "The first three words of the Constitution are very important. What are these words?",
+      "official_answer": "We the People",
+      "category": "Constitution",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "What is an amendment?",
+      "official_answer": "A change (to the Constitution). An addition (to the Constitution).",
+      "category": "Amendments",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "What do we call the first ten amendments to the Constitution?",
+      "official_answer": "The Bill of Rights",
+      "category": "Amendments",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "What is one right or freedom from the First Amendment?",
+      "official_answer": "Speech, Religion, Assembly, Press, or Petition the government",
+      "category": "Amendments",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "How many amendments does the Constitution have?",
+      "official_answer": "27",
+      "category": "Amendments",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "What did the Declaration of Independence do?",
+      "official_answer": "Announced our independence (from Great Britain). Declared our independence (from Great Britain). Said that the United States is free (from Great Britain).",
+      "category": "History",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "What year was the Declaration of Independence adopted?",
+      "official_answer": "1776",
+      "category": "History",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "There are four amendments to the Constitution about who can vote. Describe one of them.",
+      "official_answer": "Citizens 18 or older can vote. You don't have to pay to vote. Any citizen can vote (not just men). A male citizen of any race can vote.",
+      "category": "Amendments",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "What is the name of the President of the United States now?",
+      "official_answer": "[CURRENT_PRESIDENT]",
+      "category": "Government",
+      "test_versions": ["100", "128"],
+      "dynamic_content": true,
+      "dynamic_type": "CURRENT_PRESIDENT"
+    },
+    {
+      "question_text": "What is the name of the Vice President of the United States now?",
+      "official_answer": "[CURRENT_VICEPRESIDENT]",
+      "category": "Government",
+      "test_versions": ["100", "128"],
+      "dynamic_content": true,
+      "dynamic_type": "CURRENT_VICEPRESIDENT"
+    },
+    {
+      "question_text": "If the President can no longer serve, who becomes President?",
+      "official_answer": "The Vice President",
+      "category": "Government",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "If both the President and the Vice President can no longer serve, who becomes President?",
+      "official_answer": "The Speaker of the House",
+      "category": "Government",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "Who is the Speaker of the House of Representatives now?",
+      "official_answer": "[HOUSE_SPEAKER]",
+      "category": "Government",
+      "test_versions": ["100", "128"],
+      "dynamic_content": true,
+      "dynamic_type": "HOUSE_SPEAKER"
+    },
+    {
+      "question_text": "Who makes federal laws?",
+      "official_answer": "Congress. Senate and House of Representatives. The legislative branch.",
+      "category": "Government",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "What are the two parts of the U.S. Congress?",
+      "official_answer": "The Senate and the House of Representatives",
+      "category": "Government",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "How many U.S. Senators are there?",
+      "official_answer": "100",
+      "category": "Government",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "How many years do we elect each U.S. Senator?",
+      "official_answer": "Six",
+      "category": "Government",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "Who is one of your state's U.S. Senators now?",
+      "official_answer": "[STATE_SENATORS]",
+      "category": "Government",
+      "test_versions": ["100", "128"],
+      "dynamic_content": true,
+      "dynamic_type": "STATE_SENATORS"
+    },
+    {
+      "question_text": "How many voting members does the House of Representatives have?",
+      "official_answer": "435",
+      "category": "Government",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "We elect a U.S. Representative for how many years?",
+      "official_answer": "Two",
+      "category": "Government",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "Who is your U.S. Representative?",
+      "official_answer": "[HOUSE_REPRESENTATIVE]",
+      "category": "Government",
+      "test_versions": ["100", "128"],
+      "dynamic_content": true,
+      "dynamic_type": "HOUSE_REPRESENTATIVE"
+    },
+    {
+      "question_text": "What are the two major political parties in the United States?",
+      "official_answer": "Democratic and Republican",
+      "category": "Government",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "What is the political party of the President now?",
+      "official_answer": "[PRESIDENT_PARTY]",
+      "category": "Government",
+      "test_versions": ["128"],
+      "dynamic_content": true,
+      "dynamic_type": "PRESIDENT_PARTY"
+    },
+    {
+      "question_text": "What is the executive branch of our government?",
+      "official_answer": "The President, Cabinet, and agencies under the Cabinet members. The President enforces the laws of our country.",
+      "category": "Government",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "What is the legislative branch of our government?",
+      "official_answer": "Congress. Senate and House of Representatives. Congress makes federal laws.",
+      "category": "Government",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "What is the judicial branch of our government?",
+      "official_answer": "The Supreme Court. Courts. The judicial branch interprets laws.",
+      "category": "Government",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "What are the three branches of government?",
+      "official_answer": "Legislative, Executive, and Judicial",
+      "category": "Government",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "How many justices are on the Supreme Court?",
+      "official_answer": "Nine",
+      "category": "Government",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "Who is the Chief Justice of the United States?",
+      "official_answer": "[CHIEF_JUSTICE]",
+      "category": "Government",
+      "test_versions": ["128"],
+      "dynamic_content": true,
+      "dynamic_type": "CHIEF_JUSTICE"
+    },
+    {
+      "question_text": "Can the President serve more than two terms?",
+      "official_answer": "No",
+      "category": "Government",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "How long is a term for the President?",
+      "official_answer": "Four years",
+      "category": "Government",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "What does the President's Cabinet do?",
+      "official_answer": "Advises the President",
+      "category": "Government",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "What is the most important right granted to U.S. citizens?",
+      "official_answer": "The right to vote. Freedom of speech. Freedom of religion. The right to petition the government.",
+      "category": "Rights",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "What is naturalization?",
+      "official_answer": "The process to become a U.S. citizen",
+      "category": "Citizenship",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "What is the most important right we want for all our people?",
+      "official_answer": "Freedom. Liberty. Freedom of speech. The ability to pursue happiness.",
+      "category": "Rights",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "How many full terms is a President elected for?",
+      "official_answer": "Two",
+      "category": "Government",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "Name one right guaranteed by the Bill of Rights.",
+      "official_answer": "Freedom of speech, religion, assembly, petition, or press. The right to bear arms. Protection against unreasonable search and seizure. The right to a speedy trial. The right to remain silent. The right to an attorney.",
+      "category": "Amendments",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "What is the first amendment?",
+      "official_answer": "Freedom of speech, religion, assembly, petition, and press",
+      "category": "Amendments",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    },
+    {
+      "question_text": "What is the Second Amendment?",
+      "official_answer": "The right to bear arms. The right to own a gun.",
+      "category": "Amendments",
+      "test_versions": ["100", "128"],
+      "dynamic_content": false
+    }
+  ],
+  "notes": "This is a representative sample of USCIS civics questions. The complete 100-question (pre-Oct 2025) and 128-question (Oct 2025+) sets should be sourced from official USCIS materials. Questions marked with [PLACEHOLDER] require dynamic content replacement at runtime."
+}
