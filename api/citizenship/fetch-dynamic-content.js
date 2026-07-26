@@ -16,7 +16,7 @@ async function fetchCurrentPresident() {
     const data = await res.json();
     // Parse from site content or fallback to known data
     // For now, fallback to database cached value
-    return "Joseph R. Biden Jr."; // Update this as needed
+    return "Donald J. Trump"; // Update this as needed
   } catch (err) {
     console.error("Failed to fetch president:", err.message);
     return "President"; // Fallback
