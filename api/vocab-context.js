@@ -81,7 +81,7 @@ Return ONLY this exact JSON with no other text:
         "content-type":        "application/json",
       },
       body: JSON.stringify({
-        model:      "claude-sonnet-5",
+        model:      "claude-opus-4-1-20250805",
         max_tokens: 2048,
         messages:   [{ role: "user", content: prompt }],
       }),
