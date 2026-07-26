@@ -1,4 +1,4 @@
-// Runs every Sunday at 1pm ET via Vercel cron
+// Runs every Monday at noon ET via Vercel cron (schedule: "0 16 * * 1")
 // Submit transcription jobs (don't wait for results)
 // Uses Supabase REST API (no SDK, no WebSocket issues)
 
