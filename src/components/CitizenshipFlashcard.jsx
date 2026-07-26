@@ -100,6 +100,7 @@ export default function CitizenshipFlashcard() {
       setTimeout(() => {
         setUserAnswer("");
         setFeedback(null);
+        setIsFlipped(false);
         if (currentIndex < questions.length - 1) {
           setCurrentIndex(currentIndex + 1);
         } else {
