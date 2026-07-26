@@ -21,7 +21,6 @@ export default function FeedbackModal({ puzzleTitle, grade, wasRevealed, onClose
           stars,
           comment: comment.trim(),
           wasRevealed,
-          wouldPay: null,
           date: new Date().toISOString(),
         }),
       });
