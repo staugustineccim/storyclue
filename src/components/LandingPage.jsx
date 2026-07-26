@@ -360,7 +360,7 @@ export default function LandingPage() {
         <div style={{ fontFamily:"Lora,serif", fontSize:"13px", color:"rgba(240,234,216,.6)", marginBottom:"12px", fontStyle:"italic" }}>
           AI Generated Crossword Puzzle Maker · StoryClue.ai
         </div>
-        <div style={{ display:"flex", gap:"20px", justifyContent:"center", flexWrap:"wrap" }}>
+        <div style={{ display:"flex", gap:"20px", justifyContent:"center", flexWrap:"wrap", marginBottom:"12px" }}>
           {[
             ["Create a Puzzle", "/create"],
             ["Charlotte's Web Demo", demoUrl],
@@ -372,7 +372,25 @@ export default function LandingPage() {
             </button>
           ))}
         </div>
-        <div style={{ fontFamily:"Lora,serif", fontSize:"11px", color:"rgba(240,234,216,.3)", marginTop:"16px" }}>
+        <div style={{ display:"flex", gap:"16px", justifyContent:"center", flexWrap:"wrap", borderTop:"1px solid rgba(200,232,168,.2)", paddingTop:"10px", marginBottom:"12px" }}>
+          {[
+            ["Privacy Policy", "/privacy"],
+            ["Puzzle History", "/history"],
+            ["Contact", "mailto:support@storyclue.ai"],
+          ].map(([label, href]) => {
+            const isEmail = href.startsWith("mailto");
+            return isEmail ? (
+              <a key={label} href={href} style={{ color:"rgba(200,232,168,.6)", fontFamily:"Lora,serif", fontSize:"11px", textDecoration:"underline" }}>
+                {label}
+              </a>
+            ) : (
+              <button key={label} onClick={() => navigate(href)} style={{ background:"none", border:"none", color:"rgba(200,232,168,.6)", fontFamily:"Lora,serif", fontSize:"11px", cursor:"pointer", textDecoration:"underline" }}>
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ fontFamily:"Lora,serif", fontSize:"11px", color:"rgba(240,234,216,.3)" }}>
           Built in Duck Key, Florida · May 2026 · StoryClue.ai
         </div>
       </footer>
