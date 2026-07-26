@@ -96,6 +96,66 @@ export default async function seedDatabase() {
       )
     `;
 
+    await sql`
+      CREATE TABLE IF NOT EXISTS user_citizenship_progress (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        question_id INTEGER NOT NULL REFERENCES civics_questions(id),
+        mastery_state INTEGER DEFAULT 1,
+        ease_factor FLOAT DEFAULT 2.5,
+        interval INTEGER DEFAULT 0,
+        next_review_date DATE,
+        times_seen INTEGER DEFAULT 0,
+        times_correct INTEGER DEFAULT 0,
+        proficiency_level INTEGER DEFAULT 1,
+        last_attempt_date TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(user_id, question_id)
+      )
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS user_citizenship_attempts (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        question_id INTEGER NOT NULL REFERENCES civics_questions(id),
+        clue_variant_id INTEGER REFERENCES clue_variants(id),
+        answer_given TEXT,
+        answer_correct BOOLEAN,
+        time_taken_seconds INTEGER,
+        hint_used BOOLEAN DEFAULT false,
+        mode VARCHAR(50),
+        attempted_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS user_citizenship_sessions (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL UNIQUE,
+        test_version VARCHAR(20),
+        filing_date VARCHAR(20),
+        current_phase INTEGER,
+        flashcard_completed BOOLEAN DEFAULT false,
+        mastery_percentage FLOAT DEFAULT 0,
+        last_active TIMESTAMP DEFAULT NOW(),
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS dynamic_content_sources (
+        id SERIAL PRIMARY KEY,
+        placeholder_type VARCHAR(100),
+        api_endpoint TEXT,
+        last_updated TIMESTAMP,
+        data_json TEXT,
+        UNIQUE(placeholder_type)
+      )
+    `;
+
     console.log("[Seed] Tables ready");
 
     // Insert questions and generate clues
