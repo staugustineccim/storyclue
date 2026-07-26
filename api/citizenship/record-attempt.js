@@ -71,10 +71,15 @@ export default async function handler(req, res) {
       progress.repetitions || 0
     );
 
-    // Determine new mastery state
+    // Determine new mastery state based on times_correct and proficiency
     let newMasteryState = progress.mastery_state || 1;
+    let timesCorrectAfter = progress.times_correct + (isCorrect ? 1 : 0);
+
     if (newMasteryState === 1) newMasteryState = 2; // Not Introduced → Introduced
     if (isCorrect && newMasteryState === 2) newMasteryState = 3; // Introduced → Recognized
+    if (isCorrect && timesCorrectAfter >= 3 && newMasteryState < 4) newMasteryState = 4; // Familiar
+    if (isCorrect && timesCorrectAfter >= 5 && newMasteryState < 5) newMasteryState = 5; // Proficient
+    if (isCorrect && timesCorrectAfter >= 8 && newMasteryState < 6) newMasteryState = 6; // Mastered
 
     // Determine new proficiency level
     let newProficiencyLevel = progress.proficiency_level || 1;
