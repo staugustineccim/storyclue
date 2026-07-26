@@ -163,15 +163,23 @@ export async function replaceDynamicContent(answer, userZipCode = null) {
   }
 
   if (result.includes("[STATE_SENATORS]")) {
-    if (!userZipCode) return result; // Can't replace without ZIP
-    const senators = await fetchStateSenators(userZipCode);
-    result = result.replace("[STATE_SENATORS]", senators);
+    if (!userZipCode) {
+      // Fallback: provide generic answer without ZIP
+      result = result.replace("[STATE_SENATORS]", "Your State Senators");
+    } else {
+      const senators = await fetchStateSenators(userZipCode);
+      result = result.replace("[STATE_SENATORS]", senators);
+    }
   }
 
   if (result.includes("[HOUSE_REPRESENTATIVE]")) {
-    if (!userZipCode) return result; // Can't replace without ZIP
-    const rep = await fetchHouseRepresentative(userZipCode);
-    result = result.replace("[HOUSE_REPRESENTATIVE]", rep);
+    if (!userZipCode) {
+      // Fallback: provide generic answer without ZIP
+      result = result.replace("[HOUSE_REPRESENTATIVE]", "Your U.S. Representative");
+    } else {
+      const rep = await fetchHouseRepresentative(userZipCode);
+      result = result.replace("[HOUSE_REPRESENTATIVE]", rep);
+    }
   }
 
   if (result.includes("[CHIEF_JUSTICE]")) {
