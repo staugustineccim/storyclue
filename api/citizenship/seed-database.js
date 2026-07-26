@@ -81,6 +81,7 @@ export default async function seedDatabase() {
         has_dynamic_content BOOLEAN DEFAULT false,
         dynamic_content_type VARCHAR(50),
         created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
         UNIQUE(question_text, test_version)
       )
     `;
