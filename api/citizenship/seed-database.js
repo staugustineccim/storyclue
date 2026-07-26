@@ -161,6 +161,17 @@ export default async function seedDatabase() {
 
     console.log("[Seed] Tables ready");
 
+    // Ensure updated_at column exists on civics_questions
+    try {
+      await sql`
+        ALTER TABLE civics_questions
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()
+      `;
+      console.log("[Seed] Ensured updated_at column exists");
+    } catch (err) {
+      console.log("[Seed] updated_at column already exists or error adding it:", err.message);
+    }
+
     // Insert questions and generate clues
     let insertedCount = 0;
     let skippedCount = 0;
