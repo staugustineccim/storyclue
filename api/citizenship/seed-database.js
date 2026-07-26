@@ -2,8 +2,7 @@
 // Run once to populate the database with all 100/128 USCIS civics questions
 
 import { sql } from "@vercel/postgres";
-import fs from "fs";
-import path from "path";
+import seedQuestionsData from "./seed-questions.json" assert { type: "json" };
 
 // Generate clue variants at different difficulty levels
 function generateClueVariants(question, answer, category) {
@@ -63,10 +62,7 @@ export default async function seedDatabase() {
   console.log("[Seed] Starting citizenship database seed...");
 
   try {
-    // Load questions from JSON
-    const seedFilePath = path.join(process.cwd(), "api/citizenship/seed-questions.json");
-    const seedData = JSON.parse(fs.readFileSync(seedFilePath, "utf-8"));
-
+    const seedData = seedQuestionsData;
     console.log(`[Seed] Loaded ${seedData.civics_questions.length} questions from seed file`);
 
     // Create tables if they don't exist
