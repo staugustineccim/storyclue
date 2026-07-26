@@ -29,6 +29,11 @@ function randomSuffix() {
   return Array.from({ length: 2 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
 
+// 32-character random token for teacher URL access (hexadecimal)
+function generateTeacherToken() {
+  return Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+}
+
 function buildSlug(title) {
   return `${titleToSlug(title) || "puzzle"}-${dateStamp()}-${randomSuffix()}`;
 }
@@ -59,23 +64,25 @@ export default async function handler(req, res) {
     // Auto-create table on first use (safe to run every time — IF NOT EXISTS)
     await sql`
       CREATE TABLE IF NOT EXISTS puzzles (
-        slug        TEXT PRIMARY KEY,
-        title       TEXT NOT NULL,
-        grade       TEXT,
-        faith       TEXT,
-        language    TEXT,
-        puzzle_json TEXT NOT NULL,
-        created_at  TIMESTAMPTZ DEFAULT NOW()
+        slug          TEXT PRIMARY KEY,
+        title         TEXT NOT NULL,
+        grade         TEXT,
+        faith         TEXT,
+        language      TEXT,
+        puzzle_json   TEXT NOT NULL,
+        teacher_token TEXT,
+        created_at    TIMESTAMPTZ DEFAULT NOW()
       )
     `;
 
     // Try up to 3 times in the astronomically unlikely event of a slug collision
     let slug = null;
+    const teacherToken = generateTeacherToken();
     for (let attempt = 0; attempt < 3; attempt++) {
       const candidate = buildSlug(title);
       const result = await sql`
-        INSERT INTO puzzles (slug, title, grade, faith, language, puzzle_json)
-        VALUES (${candidate}, ${title}, ${grade || ""}, ${faith || ""}, ${language || "english"}, ${puzzleJson})
+        INSERT INTO puzzles (slug, title, grade, faith, language, puzzle_json, teacher_token)
+        VALUES (${candidate}, ${title}, ${grade || ""}, ${faith || ""}, ${language || "english"}, ${puzzleJson}, ${teacherToken})
         ON CONFLICT (slug) DO NOTHING
         RETURNING slug
       `;
@@ -89,12 +96,12 @@ export default async function handler(req, res) {
       // Absolute last resort — append timestamp to guarantee uniqueness
       slug = buildSlug(title) + Date.now().toString(36).slice(-4);
       await sql`
-        INSERT INTO puzzles (slug, title, grade, faith, language, puzzle_json)
-        VALUES (${slug}, ${title}, ${grade || ""}, ${faith || ""}, ${language || "english"}, ${puzzleJson})
+        INSERT INTO puzzles (slug, title, grade, faith, language, puzzle_json, teacher_token)
+        VALUES (${slug}, ${title}, ${grade || ""}, ${faith || ""}, ${language || "english"}, ${puzzleJson}, ${teacherToken})
       `;
     }
 
-    return res.status(200).json({ slug });
+    return res.status(200).json({ slug, teacherToken });
   } catch (err) {
     console.error("save-puzzle error:", err);
     return res.status(500).json({

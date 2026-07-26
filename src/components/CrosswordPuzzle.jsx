@@ -171,9 +171,10 @@ export default function CrosswordPuzzle() {
 
   const [loadState,  setLoadState]  = useState("loading");
   const [puzzleData, setPuzzleData] = useState(null);
+  const [isTeacher,  setIsTeacher]  = useState(false);
 
-  const isTeacher = searchParams.get("t") === "1";
-  const songId    = searchParams.get("song") || null; // set when puzzle came from Songs library
+  const teacherToken = searchParams.get("teacher") || null;
+  const songId       = searchParams.get("song") || null;
 
   useEffect(() => {
     if (slug) {
@@ -186,6 +187,14 @@ export default function CrosswordPuzzle() {
           }
           setPuzzleData(data);
           setLoadState("ready");
+
+          // Validate teacher token if provided
+          if (teacherToken) {
+            fetch(`/api/validate-teacher-token?slug=${encodeURIComponent(slug)}&token=${encodeURIComponent(teacherToken)}`)
+              .then(r => r.json())
+              .then(res => setIsTeacher(res.valid === true))
+              .catch(() => setIsTeacher(false));
+          }
         })
         .catch(() => setLoadState("error"));
     } else {
@@ -194,7 +203,7 @@ export default function CrosswordPuzzle() {
       if (data) { setPuzzleData(data); setLoadState("ready"); }
       else setLoadState("error");
     }
-  }, [slug]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [slug, teacherToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loadState === "loading") {
     return (

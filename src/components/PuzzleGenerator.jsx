@@ -487,7 +487,7 @@ export default function PuzzleGenerator() {
       setGeneratedPuzzle({
         title:      puzzleData.title,
         studentUrl: `${origin}/play/${saveData.slug}${songParam}`,
-        teacherUrl: `${origin}/play/${saveData.slug}?t=1`,
+        teacherUrl: `${origin}/play/${saveData.slug}?teacher=${saveData.teacherToken}`,
         playPath:   `/play/${saveData.slug}${songParam}`,
         slug:       saveData.slug,
       });
