@@ -2,7 +2,13 @@
 // Run once to populate the database with all 100/128 USCIS civics questions
 
 import { sql } from "@vercel/postgres";
-import seedQuestionsData from "./seed-questions.json" assert { type: "json" };
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const seedQuestionsData = JSON.parse(readFileSync(join(__dirname, "seed-questions.json"), "utf-8"));
 
 // Generate clue variants at different difficulty levels
 function generateClueVariants(question, answer, category) {
