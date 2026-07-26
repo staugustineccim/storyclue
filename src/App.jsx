@@ -3,6 +3,7 @@ import { AuthProvider } from "./context/AuthContext";
 import LandingPage from "./components/LandingPage";
 import PuzzleGenerator from "./components/PuzzleGenerator";
 import CrosswordPuzzle from "./components/CrosswordPuzzle";
+import PuzzleHistory from "./components/PuzzleHistory";
 import AdminDashboard from "./components/AdminDashboard";
 import ChurchMode from "./components/ChurchMode";
 import ChurchSignup from "./components/ChurchSignup";
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="/create" element={<PuzzleGenerator />} />
         <Route path="/play" element={<CrosswordPuzzle />} />
         <Route path="/play/:slug" element={<CrosswordPuzzle />} />
+        <Route path="/history" element={<PuzzleHistory />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/church" element={<ChurchMode />} />
         <Route path="/church/setup" element={<ChurchSignup />} />

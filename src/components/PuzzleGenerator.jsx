@@ -484,6 +484,18 @@ export default function PuzzleGenerator() {
       const origin = window.location.origin;
       // Songs puzzles append ?song=id so CrosswordPuzzle can show the reward card
       const songParam = (inputMode === "songs" && selectedSong) ? `?song=${selectedSong.id}` : "";
+
+      // Save to local puzzle history
+      const historyEntry = {
+        slug: saveData.slug,
+        title: puzzleData.title,
+        grade: grade,
+        createdAt: new Date().toISOString(),
+      };
+      const history = JSON.parse(localStorage.getItem("sc_puzzle_history") || "[]");
+      history.unshift(historyEntry);
+      localStorage.setItem("sc_puzzle_history", JSON.stringify(history.slice(0, 100))); // Keep last 100
+
       setGeneratedPuzzle({
         title:      puzzleData.title,
         studentUrl: `${origin}/play/${saveData.slug}${songParam}`,

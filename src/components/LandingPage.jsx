@@ -47,6 +47,10 @@ export default function LandingPage() {
         <a href="#features">Features</a>
         <a href="#who-its-for">Who It's For</a>
         <a href="#faq">FAQ</a>
+        <button className="cta-btn" style={{ background:"transparent", color:P, padding:"8px 16px", fontSize:"13px", fontFamily:"'Playfair Display',serif", fontWeight:900, borderRadius:"4px", border:"1px solid rgba(255,255,255,0.3)", cursor:"pointer" }}
+          onClick={() => navigate("/history")}>
+          📚 History
+        </button>
         <button className="cta-btn" style={{ background:P, color:G, padding:"8px 20px", fontSize:"13px", fontFamily:"'Playfair Display',serif", fontWeight:900, borderRadius:"4px", border:"none", cursor:"pointer" }}
           onClick={() => navigate("/create")}>
           Create Puzzle →
