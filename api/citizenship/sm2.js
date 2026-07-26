@@ -140,9 +140,4 @@ function calculateQuestionWeight(questionProgress) {
   return Math.min(100, weight);
 }
 
-module.exports = {
-  calculateSM2,
-  evaluateAnswer,
-  selectClueLevel,
-  calculateQuestionWeight,
-};
+export { calculateSM2, evaluateAnswer, selectClueLevel, calculateQuestionWeight };
