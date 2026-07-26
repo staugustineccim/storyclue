@@ -161,7 +161,7 @@ export default async function seedDatabase() {
 
     console.log("[Seed] Tables ready");
 
-    // Ensure updated_at column exists on civics_questions
+    // Ensure required columns exist
     try {
       await sql`
         ALTER TABLE civics_questions
@@ -170,6 +170,16 @@ export default async function seedDatabase() {
       console.log("[Seed] Ensured updated_at column exists");
     } catch (err) {
       console.log("[Seed] updated_at column already exists or error adding it:", err.message);
+    }
+
+    try {
+      await sql`
+        ALTER TABLE user_citizenship_progress
+        ADD COLUMN IF NOT EXISTS repetitions INTEGER DEFAULT 0
+      `;
+      console.log("[Seed] Ensured repetitions column exists");
+    } catch (err) {
+      console.log("[Seed] repetitions column already exists or error adding it:", err.message);
     }
 
     // Insert questions and generate clues
