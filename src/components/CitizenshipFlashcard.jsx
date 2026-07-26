@@ -197,7 +197,7 @@ export default function CitizenshipFlashcard() {
 
         {/* Flashcard */}
         <div
-          style={{ ...flashcard, transform: isFlipped ? "rotateY(180deg)" : "none" }}
+          style={flashcard}
           onClick={() => !feedback && setIsFlipped(!isFlipped)}
         >
           <div style={flashcardContent}>
