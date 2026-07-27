@@ -75,6 +75,17 @@ export default async function handler(req, res) {
       )
     `;
 
+    // Ensure teacher_token column exists (for existing tables)
+    try {
+      await sql`
+        ALTER TABLE puzzles
+        ADD COLUMN IF NOT EXISTS teacher_token TEXT
+      `;
+    } catch (err) {
+      // Column might already exist, silently continue
+      console.log("[save-puzzle] teacher_token column check:", err.message);
+    }
+
     // Try up to 3 times in the astronomically unlikely event of a slug collision
     let slug = null;
     const teacherToken = generateTeacherToken();
