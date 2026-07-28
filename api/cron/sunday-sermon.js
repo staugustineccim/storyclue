@@ -360,7 +360,10 @@ export default async function handler(req, res) {
   console.log("[Church Cron] Handler started");
 
   const today = new Date();
-  console.log(`[Church Cron] Using date: ${today.toISOString()}`);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  console.log(`[Church Cron] Using date: ${yesterday.toISOString()}`);
 
   const results = [];
 
@@ -383,18 +386,18 @@ export default async function handler(req, res) {
 
         if (videos.length === 0) { results.push({ church: church.church_name, status: "no videos found" }); continue; }
 
-        // Filter to only today's videos
-        const todaysVideos = findSermonVideo(videos, null, today);
-        console.log(`[Church] Found ${todaysVideos.length} videos from today`);
+        // Filter to only yesterday's videos (Sunday for Monday cron)
+        const yesterdaysVideos = findSermonVideo(videos, null, yesterday);
+        console.log(`[Church] Found ${yesterdaysVideos.length} videos from yesterday`);
 
-        if (todaysVideos.length === 0) { results.push({ church: church.church_name, status: "no videos from today" }); continue; }
+        if (yesterdaysVideos.length === 0) { results.push({ church: church.church_name, status: "no videos from yesterday" }); continue; }
 
         // Try each video until one succeeds (skip live streams)
         let transcriptionResult = null;
         let sermonRecord = null;
         let sermon = null;
 
-        for (const candidateSermon of todaysVideos) {
+        for (const candidateSermon of yesterdaysVideos) {
           console.log(`[Church] Trying: "${candidateSermon.title}" published ${candidateSermon.published.toISOString()}`);
 
           console.log(`[Church] Checking if already processed...`);
