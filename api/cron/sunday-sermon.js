@@ -106,28 +106,35 @@ async function submitTranscriptionJob(videoId) {
 
 // ── Generate puzzle from sermon text ─────────────────────────────────────────
 async function generateSermonPuzzle(sermonText, sermonTitle, churchName, pastorName) {
-  const prompt = `Extract 15-20 crossword puzzle clues from this sermon. Focus on the 3-5 main teaching points and the scriptures the pastor cited.
+  const prompt = `Extract 15-20 crossword puzzle clues from this sermon. Extract ONE clue from EVERY scripture passage the pastor cited.
 
 Sermon: "${sermonTitle}" by Pastor ${pastorName} at ${churchName}
 
 Transcript:
 ${sermonText}
 
+STEP 1: Find every scripture passage the pastor mentioned (by book, chapter, verse)
+
+STEP 2: For EACH scripture passage, create ONE crossword clue:
+- Clue format: "In [Book] [Chapter]:[Verse], [what the scripture says about a key word]"
+- Example: "In John 14:17, the Holy Spirit dwells ___ believers"
+- Example: "In Ephesians 1:13, believers are sealed by the Holy Spirit for the day of ___"
+- Do NOT say "the pastor taught" — scripture speaks for itself
+
+STEP 3: For the hint, use what the pastor said about that verse (direct quote or close paraphrase)
+
 RULES:
-- Clues MUST cite specific scripture passages the pastor mentioned
-- Format: "In [Book] [Chapter]:[Verse], the pastor taught that ___ [blank word] ___"
-- Each word must appear in the sermon or be directly referenced
+- ONLY include clues tied to specific scripture passages
+- If the pastor mentioned it but it's not scripture-founded, SKIP IT
 - Words: single words, ALL CAPS, 3-15 letters
-- Hints: what the pastor actually said about each word
-- Ignore opening remarks, greetings, casual chat
-- 15-20 words total — AIM HIGH for complete sermons
+- Target: 15-20 words (one per scripture passage)
 - Return ONLY valid JSON, no other text
 
 Return format:
 {
   "title": "${sermonTitle} — Sermon Crossword",
   "words": [
-    {"word": "WORD", "clue": "In [Book] [Chapter], [specific reference]", "hint": "What pastor said"}
+    {"word": "WORD", "clue": "In [Book] [Chapter]:[Verse], [scripture truth]", "hint": "What pastor said about this verse"}
   ]
 }`;
 
