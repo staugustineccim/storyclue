@@ -160,13 +160,21 @@ Return ONLY valid JSON, no other text:
 }
 
 // ── Generate puzzle from sermon text ─────────────────────────────────────────
-async function generateSermonPuzzle(sermonText, sermonTitle, churchName, pastorName) {
-  // First, extract the pastor's main points as direct quotes
-  console.log(`[Church] Extracting pastor's main points from transcript...`);
-  const pointsData = await extractPastorMainPoints(sermonText);
-  const mainPointQuotes = pointsData.mainPoints || [];
+async function generateSermonPuzzle(sermonText, sermonTitle, churchName, pastorName, providedMainPoints = null) {
+  let mainPointQuotes = [];
 
-  console.log(`[Church] Found ${mainPointQuotes.length} main points`);
+  if (providedMainPoints && Array.isArray(providedMainPoints) && providedMainPoints.length > 0) {
+    // Use provided main points (user has already extracted them)
+    console.log(`[Church] Using provided main points (${providedMainPoints.length} points)`);
+    mainPointQuotes = providedMainPoints;
+  } else {
+    // Fall back to auto-extraction if no main points provided
+    console.log(`[Church] Extracting pastor's main points from transcript...`);
+    const pointsData = await extractPastorMainPoints(sermonText);
+    mainPointQuotes = pointsData.mainPoints || [];
+  }
+
+  console.log(`[Church] Working with ${mainPointQuotes.length} main points`);
 
   // Build the main points list for Claude
   const mainPointsContext = mainPointQuotes
@@ -404,6 +412,12 @@ async function sendStatusEmail(results, error) {
 export default async function handler(req, res) {
   console.log("[Church Cron] Handler started");
 
+  // Optional: Accept main points from request body for manual testing
+  const providedMainPoints = req.body?.mainPoints || null;
+  if (providedMainPoints) {
+    console.log(`[Church Cron] Main points provided in request (${providedMainPoints.length} points)`);
+  }
+
   const results = [];
 
   try {
@@ -465,7 +479,7 @@ export default async function handler(req, res) {
 
         if (transcriptionResult && transcriptionResult.transcript) {
           // Got transcript immediately (video has captions) — generate puzzle now
-          const puzzleData = await generateSermonPuzzle(transcriptionResult.transcript, sermon.title, church.church_name, church.pastor_name);
+          const puzzleData = await generateSermonPuzzle(transcriptionResult.transcript, sermon.title, church.church_name, church.pastor_name, providedMainPoints);
 
           const savePuzzleRes = await fetch(`${process.env.VERCEL_URL ? "https://"+process.env.VERCEL_URL : "http://localhost:3000"}/api/save-puzzle`, {
             method: "POST",
