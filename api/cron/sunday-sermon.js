@@ -106,40 +106,42 @@ async function submitTranscriptionJob(videoId) {
 
 // ── Generate puzzle from sermon text ─────────────────────────────────────────
 async function generateSermonPuzzle(sermonText, sermonTitle, churchName, pastorName) {
-  const prompt = `Extract 15-20 crossword puzzle clues from this sermon.
+  const prompt = `Extract 15-20 crossword puzzle clues from this sermon by focusing on what the PASTOR ACTUALLY SAID as his main teaching points.
 
 Sermon: "${sermonTitle}" by Pastor ${pastorName} at ${churchName}
 
 Transcript:
 ${sermonText}
 
-STEP 1: Identify the 3-5 main bullet points / teaching points the pastor emphasized
-STEP 2: For EACH main bullet point, create ONE clue with a blank word embedded in it, supported by the scripture that backs it
-STEP 3: Add additional scripture clues (direct from passages mentioned) to reach 15-20 total words
+CRITICAL: Look for what the PASTOR SAID, not just scripture quotes.
 
-MAIN BULLET POINT CLUES:
-- Format: "[Statement with blank] In [Book] [Chapter], the pastor taught ___"
-- Or: "In [Book] [Chapter], [main teaching point with blank]"
-- Example: "In John 14, the Holy Spirit enables believers to ___ Christ's commands"
-- Example: "The Holy Spirit is not just a force but a ___ who lives in believers (John 14:17)"
-- Blank word is the KEY WORD from that teaching point
+STEP 1: Find the 3-5 main teaching POINTS the pastor made (his actual statements/conclusions/emphases)
+Examples of pastor teaching points (not scripture):
+- "The Holy Spirit is God's ___ to believers"
+- "True faith requires a personal ___ with Christ, not inherited belief"
+- "The Holy Spirit empowers us to ___ Christ's commands"
+- "Our ___ in life depends on our connection to Jesus"
 
-ADDITIONAL SCRIPTURE CLUES:
-- Format: "In [Book] [Chapter]:[Verse], [what scripture says]"
-- Example: "In John 15:5, Jesus said apart from him believers can do ___"
-- One per scripture passage mentioned
+STEP 2: For EACH main teaching point, create ONE clue with a blank embedded
+- The blank is the KEY WORD that completes the pastor's point
+- Reference the scripture that backs up that point
+- Example clue: "According to John 14, the Holy Spirit is God's ___ to believers" (HELPER/GIFT/COUNSELOR)
+- Example clue: "In John 3, Jesus taught that true faith requires being ___ again, not inherited" (BORN)
+
+STEP 3: Add additional scripture clues (direct quotes from passages) to reach 15-20 total
 
 RULES:
-- Start with the 3-5 main teaching points (these are critical)
-- Each main point clue uses the teaching point with a blank, anchored to supporting scripture
-- Add scripture clues to reach 15-20 total
+- The 3-5 main teaching point clues are PRIMARY and REQUIRED
+- Each reflects something the PASTOR EMPHASIZED, not just scripture rewording
+- Blank words are the PASTOR'S KEY CONCEPTS, not random scripture words
+- Supporting scripture reference keeps it grounded
 - Words: single words, ALL CAPS, 3-15 letters
 - Return ONLY valid JSON, no other text
 
 {
   "title": "${sermonTitle} — Sermon Crossword",
   "words": [
-    {"word": "WORD", "clue": "Clue with scripture reference", "hint": "Supporting detail"}
+    {"word": "WORD", "clue": "In [Book] [Chapter], [pastor's teaching point with blank]", "hint": "Key concept"}
   ]
 }`;
 
