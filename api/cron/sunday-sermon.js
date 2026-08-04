@@ -106,50 +106,28 @@ async function submitTranscriptionJob(videoId) {
 
 // ── Generate puzzle from sermon text ─────────────────────────────────────────
 async function generateSermonPuzzle(sermonText, sermonTitle, churchName, pastorName) {
-  const prompt = `You are creating a crossword puzzle from a church sermon to help the congregation remember what they heard today.
+  const prompt = `Extract 15-20 crossword puzzle clues from this sermon. Focus on the 3-5 main teaching points and the scriptures the pastor cited.
 
-Sermon title: "${sermonTitle}"
-Church: ${churchName}
-Pastor: ${pastorName}
+Sermon: "${sermonTitle}" by Pastor ${pastorName} at ${churchName}
 
-Full sermon transcript:
+Transcript:
 ${sermonText}
 
-STEP 1: IDENTIFY MAIN TEACHING POINTS
-First, identify the 3-5 main teaching points the pastor emphasized. These are the core ideas they returned to repeatedly.
+RULES:
+- Clues MUST cite specific scripture passages the pastor mentioned
+- Format: "In [Book] [Chapter]:[Verse], the pastor taught that ___ [blank word] ___"
+- Each word must appear in the sermon or be directly referenced
+- Words: single words, ALL CAPS, 3-15 letters
+- Hints: what the pastor actually said about each word
+- Ignore opening remarks, greetings, casual chat
+- 15-20 words total — AIM HIGH for complete sermons
+- Return ONLY valid JSON, no other text
 
-STEP 2: EXTRACT SCRIPTURE REFERENCES
-For each main teaching point, list the specific scripture passages the pastor cited and explained (book, chapter, verse).
-
-STEP 3: BUILD CLUES FROM SCRIPTURES
-For each main teaching point and its related scriptures, create crossword clues that:
-- Reference the EXACT scripture passage: "In [Book] [Chapter]:[Verse], the pastor taught that..."
-- Include a blank for a KEY WORD from that passage or teaching
-- Are specific to THIS sermon's teaching, not generic theology
-
-For each clue, also provide a hint based on what the pastor said (direct quotes or close paraphrases).
-
-CRITICAL RULES:
-- IGNORE opening remarks, greetings, casual chat, and off-topic comments
-- ONLY use scripture passages the pastor actually cited
-- ONLY use concepts the pastor emphasized or illustrated
-- NO generic Bible dictionary definitions
-- NO interpolation or "what you think" the sermon meant
-- Every word must be traceable to either a specific scripture or the pastor's teaching
-- Words must be single words, all caps, 3-15 letters, no spaces
-- Target: 15-20 words total (aim for HIGH end for full sermon)
-- If you cannot directly source a word from the transcript or cited scriptures, DO NOT INCLUDE IT
-
-Example structure for 45-minute sermon with 3 main points:
-- Main Point 1: Jesus promised the Holy Spirit (John 14) → Extract 4-5 clues
-- Main Point 2: The Spirit enables obedience (John 14:15) → Extract 4-5 clues
-- Main Point 3: Pastor's illustration/application → Extract 4-5 clues
-
-Return ONLY valid JSON in this exact format:
+Return format:
 {
   "title": "${sermonTitle} — Sermon Crossword",
   "words": [
-    {"word": "WORD", "clue": "In [Book] [Chapter], the pastor taught that...", "hint": "Direct reference to what pastor said"}
+    {"word": "WORD", "clue": "In [Book] [Chapter], [specific reference]", "hint": "What pastor said"}
   ]
 }`;
 
@@ -160,7 +138,7 @@ Return ONLY valid JSON in this exact format:
       "x-api-key": process.env.ANTHROPIC_API_KEY,
       "anthropic-version": "2023-06-01",
     },
-    body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1500, messages: [{ role: "user", content: prompt }] }),
+    body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 3000, messages: [{ role: "user", content: prompt }] }),
   });
   const data = await response.json();
   const text = data.content[0].text;
