@@ -104,44 +104,98 @@ async function submitTranscriptionJob(videoId) {
   }
 }
 
-// ── Generate puzzle from sermon text ─────────────────────────────────────────
-async function generateSermonPuzzle(sermonText, sermonTitle, churchName, pastorName) {
-  const prompt = `Extract 15-20 crossword puzzle clues from this sermon by focusing on what the PASTOR ACTUALLY SAID as his main teaching points.
-
-Sermon: "${sermonTitle}" by Pastor ${pastorName} at ${churchName}
+// ── Extract pastor's main points as direct quotes from transcript ─────────────
+async function extractPastorMainPoints(sermonText) {
+  const prompt = `Extract the pastor's 3-5 main teaching points as DIRECT QUOTES from this sermon transcript.
 
 Transcript:
 ${sermonText}
 
-CRITICAL: Look for what the PASTOR SAID, not just scripture quotes.
+STEP 1: Find where the pastor EXPLICITLY STATES main points (look for statements like "The main point is...", "Three things...", "My emphasis today is...", "We learn that...", "The key is...", etc.)
 
-STEP 1: Find the 3-5 main teaching POINTS the pastor made (his actual statements/conclusions/emphases)
-Examples of pastor teaching points (not scripture):
-- "The Holy Spirit is God's ___ to believers"
-- "True faith requires a personal ___ with Christ, not inherited belief"
-- "The Holy Spirit empowers us to ___ Christ's commands"
-- "Our ___ in life depends on our connection to Jesus"
+STEP 2: Extract EXACT QUOTES (word-for-word from the transcript) of these main points
 
-STEP 2: For EACH main teaching point, create ONE clue with a blank embedded
-- The blank is the KEY WORD that completes the pastor's point
-- Reference the scripture that backs up that point
-- Example clue: "According to John 14, the Holy Spirit is God's ___ to believers" (HELPER/GIFT/COUNSELOR)
-- Example clue: "In John 3, Jesus taught that true faith requires being ___ again, not inherited" (BORN)
+STEP 3: For EACH main point quote, identify which scripture(s) support it
 
-STEP 3: Add additional scripture clues (direct quotes from passages) to reach 15-20 total
+Return ONLY valid JSON, no other text:
+{
+  "mainPoints": [
+    {
+      "quote": "Exact quote from pastor",
+      "supportingScriptures": ["John 14:16", "John 14:26"]
+    }
+  ]
+}`;
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": process.env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 2000, messages: [{ role: "user", content: prompt }] }),
+  });
+  const data = await response.json();
+  const text = data.content[0].text;
+  try {
+    const jsonStart = text.indexOf("{");
+    const jsonEnd = text.lastIndexOf("}");
+    if (jsonStart === -1 || jsonEnd === -1) {
+      throw new Error("No JSON found in response");
+    }
+    const jsonStr = text.substring(jsonStart, jsonEnd + 1);
+    return JSON.parse(jsonStr);
+  } catch (err) {
+    console.error("[Claude] Failed to extract main points:", err.message);
+    return { mainPoints: [] };
+  }
+}
+
+// ── Generate puzzle from sermon text ─────────────────────────────────────────
+async function generateSermonPuzzle(sermonText, sermonTitle, churchName, pastorName) {
+  // First, extract the pastor's main points as direct quotes
+  console.log(`[Church] Extracting pastor's main points from transcript...`);
+  const pointsData = await extractPastorMainPoints(sermonText);
+  const mainPointQuotes = pointsData.mainPoints || [];
+
+  console.log(`[Church] Found ${mainPointQuotes.length} main points`);
+
+  // Build the main points list for Claude
+  const mainPointsContext = mainPointQuotes
+    .map((p, i) => `${i + 1}. "${p.quote}" (Supported by: ${p.supportingScriptures.join(", ")})`)
+    .join("\n");
+
+  const prompt = `Create 15-20 crossword puzzle clues from this sermon.
+
+Sermon: "${sermonTitle}" by Pastor ${pastorName} at ${churchName}
+
+Full Transcript:
+${sermonText}
+
+PASTOR'S MAIN POINTS (as direct quotes):
+${mainPointsContext || "No main points extracted. Identify 3-5 key statements the pastor made."}
+
+INSTRUCTIONS:
+1. For EACH pastor's main point quote, create ONE crossword clue with a blank word embedded
+   - Example: Main point "The Holy Spirit is God's gift to believers" → Clue: "According to John 14:16, the Holy Spirit is God's ___ to believers" (GIFT)
+   - Example: Main point "We must be personally born again, not inherit faith" → Clue: "In John 3, being born ___ means personal rebirth, not inherited faith" (AGAIN)
+
+2. Add additional scripture clues (direct from passages mentioned) to reach 15-20 total
+
+3. Each clue should cite the scripture that supports it
 
 RULES:
-- The 3-5 main teaching point clues are PRIMARY and REQUIRED
-- Each reflects something the PASTOR EMPHASIZED, not just scripture rewording
-- Blank words are the PASTOR'S KEY CONCEPTS, not random scripture words
-- Supporting scripture reference keeps it grounded
+- Blank words come from the PASTOR'S QUOTES
+- Each clue references supporting scripture
 - Words: single words, ALL CAPS, 3-15 letters
-- Return ONLY valid JSON, no other text
+- Target: 15-20 total words
+- Return ONLY valid JSON
 
 {
   "title": "${sermonTitle} — Sermon Crossword",
   "words": [
-    {"word": "WORD", "clue": "In [Book] [Chapter], [pastor's teaching point with blank]", "hint": "Key concept"}
+    {"word": "WORD", "clue": "In [Book] [Chapter], [clue with blank]", "hint": "Supporting detail"}
   ]
 }`;
 
