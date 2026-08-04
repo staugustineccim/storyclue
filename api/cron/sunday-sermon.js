@@ -180,8 +180,10 @@ INSTRUCTIONS:
 1. For EACH pastor's main point quote, create ONE crossword clue with a blank word embedded
    - Example: Main point "The Holy Spirit is God's gift to believers" → Clue: "According to John 14:16, the Holy Spirit is God's ___ to believers" (GIFT)
    - Example: Main point "We must be personally born again, not inherit faith" → Clue: "In John 3, being born ___ means personal rebirth, not inherited faith" (AGAIN)
+   - Hint for pastor points: Wrap in **bold** format to mark as pastor's teaching
 
 2. Add additional scripture clues (direct from passages mentioned) to reach 15-20 total
+   - Hints for scripture clues: Just cite the passage reference plainly
 
 3. Each clue should cite the scripture that supports it
 
@@ -190,12 +192,14 @@ RULES:
 - Each clue references supporting scripture
 - Words: single words, ALL CAPS, 3-15 letters
 - Target: 15-20 total words
+- Mark clue type: "pastor_point" or "scripture_clue"
 - Return ONLY valid JSON
 
 {
   "title": "${sermonTitle} — Sermon Crossword",
   "words": [
-    {"word": "WORD", "clue": "In [Book] [Chapter], [clue with blank]", "hint": "Supporting detail"}
+    {"word": "WORD", "clue": "In [Book] [Chapter], [clue with blank]", "hint": "**Bold hint for pastor points**", "type": "pastor_point"},
+    {"word": "WORD", "clue": "In [Book] [Chapter], [clue with blank]", "hint": "John 14:16", "type": "scripture_clue"}
   ]
 }`;
 
