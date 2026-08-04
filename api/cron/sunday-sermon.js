@@ -147,12 +147,21 @@ Return format:
     const jsonStart = text.indexOf("{");
     const jsonEnd = text.lastIndexOf("}");
     if (jsonStart === -1 || jsonEnd === -1) {
+      console.error("[Claude] Response text:", text);
       throw new Error("No JSON object found in response");
     }
     const jsonStr = text.substring(jsonStart, jsonEnd + 1);
-    return JSON.parse(jsonStr);
+
+    // Attempt to parse; if it fails, try to clean common issues
+    try {
+      return JSON.parse(jsonStr);
+    } catch (parseErr) {
+      console.error("[Claude] JSON parse error:", parseErr.message);
+      console.error("[Claude] JSON substring:", jsonStr.substring(0, 500));
+      console.error("[Claude] Full response:", text.substring(0, 1000));
+      throw parseErr;
+    }
   } catch (err) {
-    console.error("[Claude] Failed to parse puzzle JSON. Response:", text.substring(0, 200));
     throw new Error(`Claude did not return valid JSON: ${err.message}`);
   }
 }
