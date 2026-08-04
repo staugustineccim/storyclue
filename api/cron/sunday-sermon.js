@@ -113,51 +113,43 @@ Church: ${churchName}
 Pastor: ${pastorName}
 
 Full sermon transcript:
-${sermonText.slice(0, 6000)}
+${sermonText}
+
+STEP 1: IDENTIFY MAIN TEACHING POINTS
+First, identify the 3-5 main teaching points the pastor emphasized. These are the core ideas they returned to repeatedly.
+
+STEP 2: EXTRACT SCRIPTURE REFERENCES
+For each main teaching point, list the specific scripture passages the pastor cited and explained (book, chapter, verse).
+
+STEP 3: BUILD CLUES FROM SCRIPTURES
+For each main teaching point and its related scriptures, create crossword clues that:
+- Reference the EXACT scripture passage: "In [Book] [Chapter]:[Verse], the pastor taught that..."
+- Include a blank for a KEY WORD from that passage or teaching
+- Are specific to THIS sermon's teaching, not generic theology
+
+For each clue, also provide a hint based on what the pastor said (direct quotes or close paraphrases).
 
 CRITICAL RULES:
-- IGNORE opening remarks, greetings, and casual chat (e.g., "I've been watching Colonial Church...", "look at your neighbor", audience participation calls)
-- FOCUS ONLY on the core sermon teaching from the scripture passages being taught
-- Every clue MUST reference the SCRIPTURE PASSAGES and teachings in THIS SERMON
-- Reference the Bible passages, not generic definitions: "In Matthew 5, Jesus taught...", "The passage describes...", "This scripture illustrates..."
-- NO generic Bible dictionary definitions. NO generic church vocabulary. NO generic theology.
-- NO interpolation. NO filling in what you think the sermon meant.
-- Example BAD: "A word said in church to express agreement" (generic theology)
-- Example GOOD: "In Matthew 5, Jesus described those who hunger and thirst for righteousness as ___" (scripture-specific)
-
-Your job is to pull out words from the SERMON TEACHING that are:
-1. Directly quoted or emphasized by the pastor (words they repeated or highlighted)
-2. Central to a specific story or illustration the pastor told (the object, person, concept, or action at the heart of their story)
-3. Part of a specific scripture verse the pastor cited and explained
-4. Part of specific action items or challenges the pastor gave
-5. Key phrases the pastor used multiple times
-
-For EACH word, generate TWO versions:
-
-**CLUE** (scripture-based, bullet-point style):
-- Reference what the SCRIPTURE PASSAGE teaches, not generic theology
-- Ground every clue in the specific passage being taught: "In [book] [chapter], the passage says..."
-- Example: "In Matthew 5, Jesus taught that those who _____ and _____ for righteousness are blessed" (Answer: HUNGER, THIRST)
-- Example: "The Beatitudes describe those blessed when they mourn, when they are meek, when they..." (Answer: BLESSED)
-
-**HINT** (direct reference to what pastor said):
-- What the pastor actually said or emphasized about this word — can include brief direct quotes
-- Example: "He said it shapes what we spiritually hunger for, like culture shapes food preferences"
-- Example: "The book he told everyone to open to, chapter 5"
-
-Rules:
-- Every word must appear in the sermon text or be a direct reference to content in the sermon
-- Clues must reference something specific from the sermon (a concept, story element, verse, or repeated theme)
-- Hints should be direct enough to remind people what the pastor said
+- IGNORE opening remarks, greetings, casual chat, and off-topic comments
+- ONLY use scripture passages the pastor actually cited
+- ONLY use concepts the pastor emphasized or illustrated
+- NO generic Bible dictionary definitions
+- NO interpolation or "what you think" the sermon meant
+- Every word must be traceable to either a specific scripture or the pastor's teaching
 - Words must be single words, all caps, 3-15 letters, no spaces
-- 15-20 words total
-- If you cannot find specific source material for a word, DO NOT INCLUDE IT
+- Target: 15-20 words total (aim for HIGH end for full sermon)
+- If you cannot directly source a word from the transcript or cited scriptures, DO NOT INCLUDE IT
+
+Example structure for 45-minute sermon with 3 main points:
+- Main Point 1: Jesus promised the Holy Spirit (John 14) → Extract 4-5 clues
+- Main Point 2: The Spirit enables obedience (John 14:15) → Extract 4-5 clues
+- Main Point 3: Pastor's illustration/application → Extract 4-5 clues
 
 Return ONLY valid JSON in this exact format:
 {
   "title": "${sermonTitle} — Sermon Crossword",
   "words": [
-    {"word": "WORD", "clue": "Thematic/bullet-point version", "hint": "Direct reference to what pastor said"}
+    {"word": "WORD", "clue": "In [Book] [Chapter], the pastor taught that...", "hint": "Direct reference to what pastor said"}
   ]
 }`;
 
