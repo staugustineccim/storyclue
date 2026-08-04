@@ -106,22 +106,29 @@ async function submitTranscriptionJob(videoId) {
 
 // ── Extract pastor's main points as direct quotes from transcript ─────────────
 async function extractPastorMainPoints(sermonText) {
-  const prompt = `Extract the pastor's 3-5 main teaching points as DIRECT QUOTES from this sermon transcript.
+  const prompt = `Extract the pastor's main teaching points as DIRECT QUOTES from this sermon transcript.
 
 Transcript:
 ${sermonText}
 
-STEP 1: Find where the pastor EXPLICITLY STATES main points (look for statements like "The main point is...", "Three things...", "My emphasis today is...", "We learn that...", "The key is...", etc.)
+STEP 1: Search the transcript for EXPLICIT VERBAL MARKERS where the pastor states main points:
+- Look for: "point #1", "point #2", "point #3", etc.
+- Look for: "first point", "second point", "third point", etc.
+- Look for: "my first point is", "my second point is", etc.
+- Look for: "here's point #1", "here's my first point", etc.
+- These are EXPLICIT statements the pastor makes — extract them exactly
 
-STEP 2: Extract EXACT QUOTES (word-for-word from the transcript) of these main points
+STEP 2: For EACH main point (identified by these markers), extract the EXACT QUOTE from the transcript
+- Include the pastor's own words explaining that point
+- Quote from where he states it through his explanation of it
 
-STEP 3: For EACH main point quote, identify which scripture(s) support it
+STEP 3: For EACH main point quote, identify which scripture(s) support/back it up
 
 Return ONLY valid JSON, no other text:
 {
   "mainPoints": [
     {
-      "quote": "Exact quote from pastor",
+      "quote": "Exact quote from pastor starting with the point marker",
       "supportingScriptures": ["John 14:16", "John 14:26"]
     }
   ]
