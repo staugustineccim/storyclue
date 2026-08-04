@@ -14,38 +14,25 @@ async function getChannelIdFromUrl(channelUrl) {
   return match ? match[1] : null;
 }
 
-async function getRecentVideos(channelId) {
+// Get the newest (most recent) video from channel
+async function getNewestVideo(channelId) {
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) throw new Error("YOUTUBE_API_KEY not set");
 
-  const url = `https://www.googleapis.com/youtube/v3/search?channelId=${channelId}&order=date&part=snippet&key=${apiKey}&maxResults=50`;
+  const url = `https://www.googleapis.com/youtube/v3/search?channelId=${channelId}&order=date&part=snippet&key=${apiKey}&maxResults=1`;
   const res = await fetch(url);
   const data = await res.json();
 
-  if (!data.items) return [];
+  if (!data.items || !data.items[0]) return null;
 
-  return data.items.map(item => ({
+  const item = data.items[0];
+  if (!item.id.videoId) return null;
+
+  return {
     videoId: item.id.videoId,
     title: item.snippet.title,
     published: new Date(item.snippet.publishedAt),
-  })).filter(v => v.videoId); // Exclude non-video results
-}
-
-function findSermonVideo(videos, serviceTime, sunday) {
-  // TESTING: Match any video from the entire day
-  // PRODUCTION: Switch back to time-window matching
-  const dayStart = new Date(sunday);
-  dayStart.setUTCHours(0, 0, 0, 0);
-
-  const dayEnd = new Date(sunday);
-  dayEnd.setUTCHours(23, 59, 59, 999);
-
-  console.log(`[Church] Video window: ${dayStart.toISOString()} to ${dayEnd.toISOString()}`);
-
-  return videos.filter(v => {
-    console.log(`[Church] Checking video "${v.title}" published: ${v.published.toISOString()}`);
-    return v.published >= dayStart && v.published <= dayEnd;
-  });
+  };
 }
 
 // ── Transcribe sermon via Supadata (submit job, don't wait) ──────────────────
@@ -359,12 +346,6 @@ async function sendStatusEmail(results, error) {
 export default async function handler(req, res) {
   console.log("[Church Cron] Handler started");
 
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-
-  console.log(`[Church Cron] Using date: ${yesterday.toISOString()}`);
-
   const results = [];
 
   try {
@@ -380,58 +361,56 @@ export default async function handler(req, res) {
         if (!channelId) { results.push({ church: church.church_name, status: "no channel ID" }); continue; }
         console.log(`[Church] Got channel ID: ${channelId}`);
 
-        console.log(`[Church] Fetching recent videos...`);
-        const videos = await getRecentVideos(channelId);
-        console.log(`[Church] Got ${videos.length} videos`);
+        console.log(`[Church] Fetching newest video...`);
+        const newestVideo = await getNewestVideo(channelId);
+        if (!newestVideo) { results.push({ church: church.church_name, status: "no videos found" }); continue; }
 
-        if (videos.length === 0) { results.push({ church: church.church_name, status: "no videos found" }); continue; }
+        console.log(`[Church] Newest video: "${newestVideo.title}" published ${newestVideo.published.toISOString()}`);
 
-        // Filter to only yesterday's videos (Sunday for Monday cron)
-        const yesterdaysVideos = findSermonVideo(videos, null, yesterday);
-        console.log(`[Church] Found ${yesterdaysVideos.length} videos from yesterday`);
+        // Check if already processed
+        console.log(`[Church] Checking if already processed...`);
+        const existing = await getExistingSermon(church.id, newestVideo.videoId);
+        if (existing) { results.push({ church: church.church_name, status: "already processed" }); continue; }
 
-        if (yesterdaysVideos.length === 0) { results.push({ church: church.church_name, status: "no videos from yesterday" }); continue; }
-
-        // Try each video until one succeeds (skip live streams)
+        // Try to transcribe the newest video
         let transcriptionResult = null;
         let sermonRecord = null;
         let sermon = null;
 
-        for (const candidateSermon of yesterdaysVideos) {
-          console.log(`[Church] Trying: "${candidateSermon.title}" published ${candidateSermon.published.toISOString()}`);
+        try {
 
-          console.log(`[Church] Checking if already processed...`);
-          const existing = await getExistingSermon(church.id, candidateSermon.videoId);
-          if (existing) { console.log(`[Church] Already processed, skipping`); continue; }
+        // Create sermon record
+        console.log(`[Church] Creating sermon record...`);
+        const record = await createSermonRecord(church.id, newestVideo.videoId, newestVideo.title);
+        if (!record.id) { results.push({ church: church.church_name, status: "DB error creating record" }); continue; }
+        console.log(`[Church] Sermon record created, submitting transcription...`);
 
-          // Create sermon record
-          console.log(`[Church] Creating sermon record...`);
-          const record = await createSermonRecord(church.id, candidateSermon.videoId, candidateSermon.title);
-          if (!record.id) { console.log(`[Church] DB error, skipping`); continue; }
-          console.log(`[Church] Sermon record created, submitting transcription...`);
-
-          // Try to transcribe
-          try {
-            const result = await submitTranscriptionJob(candidateSermon.videoId);
-            console.log(`[Church] Transcription submitted`);
-            transcriptionResult = result;
-            sermonRecord = record;
-            sermon = candidateSermon;
-            break; // Success, exit loop
-          } catch (err) {
-            // If transcription completely failed, check if it's a "waiting for captions" situation
-            if (err.message.includes("No captions found")) {
-              console.log(`[Church] YouTube captions not available yet, setting to waiting state...`);
-              await updateSermonRecord(record.id, { status: "waiting_for_captions", video_id: candidateSermon.videoId });
-              results.push({ church: church.church_name, status: "waiting for YouTube captions (will retry hourly)" });
-              break; // Done with this church
-            }
-            console.log(`[Church] Transcription failed for this video: ${err.message}, trying next...`);
-            continue; // Try next video
+        // Try to transcribe
+        try {
+          const result = await submitTranscriptionJob(newestVideo.videoId);
+          console.log(`[Church] Transcription submitted`);
+          transcriptionResult = result;
+          sermonRecord = record;
+          sermon = newestVideo;
+        } catch (err) {
+          // If transcription completely failed, check if it's a "waiting for captions" situation
+          if (err.message.includes("No captions found")) {
+            console.log(`[Church] YouTube captions not available yet, setting to waiting state...`);
+            await updateSermonRecord(record.id, { status: "waiting_for_captions", video_id: newestVideo.videoId });
+            results.push({ church: church.church_name, status: "waiting for captions (will retry later)" });
+            continue;
           }
+          console.log(`[Church] Transcription failed: ${err.message}`);
+          results.push({ church: church.church_name, status: `transcription error: ${err.message}` });
+          continue;
+        }
+        } catch (err) {
+          console.log(`[Church] Error: ${err.message}`);
+          results.push({ church: church.church_name, status: `error: ${err.message}` });
+          continue;
         }
 
-        if (!sermon) { results.push({ church: church.church_name, status: "no usable videos found" }); continue; }
+        if (!sermon) { results.push({ church: church.church_name, status: "no video to process" }); continue; }
 
         if (transcriptionResult && transcriptionResult.transcript) {
           // Got transcript immediately (video has captions) — generate puzzle now
