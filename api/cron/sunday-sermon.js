@@ -106,44 +106,40 @@ async function submitTranscriptionJob(videoId) {
 
 // ── Generate puzzle from sermon text ─────────────────────────────────────────
 async function generateSermonPuzzle(sermonText, sermonTitle, churchName, pastorName) {
-  const prompt = `Extract 15-20 crossword puzzle clues from this sermon by pulling from TWO sources:
-(1) Every scripture passage the pastor cited
-(2) Every main teaching point/bullet point the pastor emphasized
+  const prompt = `Extract 15-20 crossword puzzle clues from this sermon.
 
 Sermon: "${sermonTitle}" by Pastor ${pastorName} at ${churchName}
 
 Transcript:
 ${sermonText}
 
-STEP 1: List all main teaching points (bullet points / main ideas) the pastor emphasized
-STEP 2: List all scripture passages the pastor cited
-STEP 3: For EACH scripture passage AND EACH main teaching point, create one clue
+STEP 1: Identify the 3-5 main bullet points / teaching points the pastor emphasized
+STEP 2: For EACH main bullet point, create ONE clue with a blank word embedded in it, supported by the scripture that backs it
+STEP 3: Add additional scripture clues (direct from passages mentioned) to reach 15-20 total words
 
-CLUE TYPES:
-
-A) SCRIPTURE CLUES (direct from what the passage says):
-- Format: "In [Book] [Chapter]:[Verse], [what scripture says]"
-- Example: "In John 14:17, the Holy Spirit dwells ___ believers"
-- Example: "In Ephesians 1:13, believers are sealed by the Holy Spirit for the day of ___"
-
-B) TEACHING POINT CLUES (from pastor's main ideas, grounded in supporting scripture):
-- Format: "In [Book] [Chapter], [the main teaching point using a blank word]"
+MAIN BULLET POINT CLUES:
+- Format: "[Statement with blank] In [Book] [Chapter], the pastor taught ___"
+- Or: "In [Book] [Chapter], [main teaching point with blank]"
 - Example: "In John 14, the Holy Spirit enables believers to ___ Christ's commands"
-- Example: "In John 3, becoming a Christian is not inherited but requires being ___ again"
+- Example: "The Holy Spirit is not just a force but a ___ who lives in believers (John 14:17)"
+- Blank word is the KEY WORD from that teaching point
+
+ADDITIONAL SCRIPTURE CLUES:
+- Format: "In [Book] [Chapter]:[Verse], [what scripture says]"
+- Example: "In John 15:5, Jesus said apart from him believers can do ___"
+- One per scripture passage mentioned
 
 RULES:
-- ONLY include clues tied to specific scripture passages
-- Every teaching point must be supported by a scripture reference
-- Do NOT say "the pastor taught" — let scripture and the teaching stand on their own
+- Start with the 3-5 main teaching points (these are critical)
+- Each main point clue uses the teaching point with a blank, anchored to supporting scripture
+- Add scripture clues to reach 15-20 total
 - Words: single words, ALL CAPS, 3-15 letters
-- Target: 15-20 words total (scriptures + teaching points)
 - Return ONLY valid JSON, no other text
 
-Return format:
 {
   "title": "${sermonTitle} — Sermon Crossword",
   "words": [
-    {"word": "WORD", "clue": "In [Book] [Chapter]:[Verse], [clue]", "hint": "Direct quote or key point"}
+    {"word": "WORD", "clue": "Clue with scripture reference", "hint": "Supporting detail"}
   ]
 }`;
 
