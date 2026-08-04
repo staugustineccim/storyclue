@@ -106,35 +106,44 @@ async function submitTranscriptionJob(videoId) {
 
 // ── Generate puzzle from sermon text ─────────────────────────────────────────
 async function generateSermonPuzzle(sermonText, sermonTitle, churchName, pastorName) {
-  const prompt = `Extract 15-20 crossword puzzle clues from this sermon. Extract ONE clue from EVERY scripture passage the pastor cited.
+  const prompt = `Extract 15-20 crossword puzzle clues from this sermon by pulling from TWO sources:
+(1) Every scripture passage the pastor cited
+(2) Every main teaching point/bullet point the pastor emphasized
 
 Sermon: "${sermonTitle}" by Pastor ${pastorName} at ${churchName}
 
 Transcript:
 ${sermonText}
 
-STEP 1: Find every scripture passage the pastor mentioned (by book, chapter, verse)
+STEP 1: List all main teaching points (bullet points / main ideas) the pastor emphasized
+STEP 2: List all scripture passages the pastor cited
+STEP 3: For EACH scripture passage AND EACH main teaching point, create one clue
 
-STEP 2: For EACH scripture passage, create ONE crossword clue:
-- Clue format: "In [Book] [Chapter]:[Verse], [what the scripture says about a key word]"
+CLUE TYPES:
+
+A) SCRIPTURE CLUES (direct from what the passage says):
+- Format: "In [Book] [Chapter]:[Verse], [what scripture says]"
 - Example: "In John 14:17, the Holy Spirit dwells ___ believers"
 - Example: "In Ephesians 1:13, believers are sealed by the Holy Spirit for the day of ___"
-- Do NOT say "the pastor taught" — scripture speaks for itself
 
-STEP 3: For the hint, use what the pastor said about that verse (direct quote or close paraphrase)
+B) TEACHING POINT CLUES (from pastor's main ideas, grounded in supporting scripture):
+- Format: "In [Book] [Chapter], [the main teaching point using a blank word]"
+- Example: "In John 14, the Holy Spirit enables believers to ___ Christ's commands"
+- Example: "In John 3, becoming a Christian is not inherited but requires being ___ again"
 
 RULES:
 - ONLY include clues tied to specific scripture passages
-- If the pastor mentioned it but it's not scripture-founded, SKIP IT
+- Every teaching point must be supported by a scripture reference
+- Do NOT say "the pastor taught" — let scripture and the teaching stand on their own
 - Words: single words, ALL CAPS, 3-15 letters
-- Target: 15-20 words (one per scripture passage)
+- Target: 15-20 words total (scriptures + teaching points)
 - Return ONLY valid JSON, no other text
 
 Return format:
 {
   "title": "${sermonTitle} — Sermon Crossword",
   "words": [
-    {"word": "WORD", "clue": "In [Book] [Chapter]:[Verse], [scripture truth]", "hint": "What pastor said about this verse"}
+    {"word": "WORD", "clue": "In [Book] [Chapter]:[Verse], [clue]", "hint": "Direct quote or key point"}
   ]
 }`;
 
