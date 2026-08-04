@@ -377,8 +377,6 @@ export default async function handler(req, res) {
         let sermonRecord = null;
         let sermon = null;
 
-        try {
-
         // Create sermon record
         console.log(`[Church] Creating sermon record...`);
         const record = await createSermonRecord(church.id, newestVideo.videoId, newestVideo.title);
@@ -402,11 +400,6 @@ export default async function handler(req, res) {
           }
           console.log(`[Church] Transcription failed: ${err.message}`);
           results.push({ church: church.church_name, status: `transcription error: ${err.message}` });
-          continue;
-        }
-        } catch (err) {
-          console.log(`[Church] Error: ${err.message}`);
-          results.push({ church: church.church_name, status: `error: ${err.message}` });
           continue;
         }
 
