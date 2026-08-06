@@ -332,9 +332,10 @@ async function getChurches() {
   return data;
 }
 
-async function getExistingSermon(churchId, videoId) {
+async function getExistingSermon(churchId, videoPublishedAt) {
+  // Check if we already processed a video from this church published on this date
   const res = await fetch(
-    `${process.env.SUPABASE_URL}/rest/v1/church_sermons?church_account_id=eq.${churchId}&video_id=eq.${videoId}`,
+    `${process.env.SUPABASE_URL}/rest/v1/church_sermons?church_account_id=eq.${churchId}&video_published_at=eq.${videoPublishedAt}`,
     {
       headers: {
         "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()}`,
@@ -345,7 +346,7 @@ async function getExistingSermon(churchId, videoId) {
   return data[0] || null;
 }
 
-async function createSermonRecord(churchId, videoId, title) {
+async function createSermonRecord(churchId, videoId, title, videoPublishedAt) {
   const res = await fetch(`${process.env.SUPABASE_URL}/rest/v1/church_sermons`, {
     method: "POST",
     headers: {
@@ -357,6 +358,7 @@ async function createSermonRecord(churchId, videoId, title) {
     body: JSON.stringify({
       church_account_id: churchId,
       video_id: videoId,
+      video_published_at: videoPublishedAt,
       sermon_title: title,
       status: "queued",
     }),
@@ -439,10 +441,10 @@ export default async function handler(req, res) {
 
         console.log(`[Church] Newest video: "${newestVideo.title}" published ${newestVideo.published.toISOString()}`);
 
-        // Check if already processed
-        console.log(`[Church] Checking if already processed...`);
-        const existing = await getExistingSermon(church.id, newestVideo.videoId);
-        if (existing) { results.push({ church: church.church_name, status: "already processed" }); continue; }
+        // Check if already processed (by publication timestamp, not video ID)
+        console.log(`[Church] Checking if video published ${newestVideo.published.toISOString()} was already processed...`);
+        const existing = await getExistingSermon(church.id, newestVideo.published.toISOString());
+        if (existing) { results.push({ church: church.church_name, status: "already processed (same publish date)" }); continue; }
 
         // Try to transcribe the newest video
         let transcriptionResult = null;
@@ -451,7 +453,7 @@ export default async function handler(req, res) {
 
         // Create sermon record
         console.log(`[Church] Creating sermon record...`);
-        const record = await createSermonRecord(church.id, newestVideo.videoId, newestVideo.title);
+        const record = await createSermonRecord(church.id, newestVideo.videoId, newestVideo.title, newestVideo.published.toISOString());
         if (!record.id) { results.push({ church: church.church_name, status: "DB error creating record" }); continue; }
         console.log(`[Church] Sermon record created, submitting transcription...`);
 
