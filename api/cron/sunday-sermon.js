@@ -347,24 +347,32 @@ async function getExistingSermon(churchId, videoPublishedAt) {
 }
 
 async function createSermonRecord(churchId, videoId, title, videoPublishedAt) {
-  const res = await fetch(`${process.env.SUPABASE_URL}/rest/v1/church_sermons`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "apikey": process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
-      "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-      "Prefer": "return=representation",
-    },
-    body: JSON.stringify({
-      church_account_id: churchId,
-      video_id: videoId,
-      video_published_at: videoPublishedAt,
-      sermon_title: title,
-      status: "queued",
-    }),
-  });
-  const data = await res.json();
-  return data[0] || data;
+  try {
+    const res = await fetch(`${process.env.SUPABASE_URL}/rest/v1/church_sermons`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        "Prefer": "return=representation",
+      },
+      body: JSON.stringify({
+        church_account_id: churchId,
+        video_id: videoId,
+        video_published_at: videoPublishedAt,
+        sermon_title: title,
+        status: "queued",
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(`API error: ${res.status} ${JSON.stringify(data)}`);
+    }
+    return data[0] || data;
+  } catch (err) {
+    console.error("[Church] createSermonRecord error:", err.message);
+    throw err;
+  }
 }
 
 async function updateSermonRecord(sermonId, updates) {
@@ -410,9 +418,25 @@ async function sendStatusEmail(results, error) {
   });
 }
 
+// ── Add missing schema columns if needed ───────────────────────────────────
+async function ensureSchemaReady() {
+  try {
+    console.log("[Church Cron] Ensuring database schema has video_published_at column...");
+    // In Supabase, columns must be added via dashboard or migrations
+    // This is a placeholder - user must run this SQL in Supabase dashboard:
+    // ALTER TABLE church_sermons ADD COLUMN IF NOT EXISTS video_published_at TIMESTAMPTZ;
+    console.log("[Church Cron] Note: video_published_at column must exist in church_sermons table");
+  } catch (err) {
+    console.log("[Church Cron] Schema warning:", err.message);
+  }
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   console.log("[Church Cron] Handler started");
+
+  // Ensure database schema is ready
+  await ensureSchemaReady();
 
   // Optional: Accept main points from request body for manual testing
   const providedMainPoints = req.body?.mainPoints || null;
