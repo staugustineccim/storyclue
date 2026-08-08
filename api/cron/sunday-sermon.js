@@ -332,8 +332,8 @@ async function getChurches() {
   return data;
 }
 
-async function getExistingSermon(churchId, videoPublishedAt) {
-  // Check if we already processed a video from this church published on this date
+async function getExistingSermon(churchId, videoPublishedAt, videoId) {
+  // Check by published timestamp (new records)
   const res = await fetch(
     `${process.env.SUPABASE_URL}/rest/v1/church_sermons?church_account_id=eq.${churchId}&video_published_at=eq.${videoPublishedAt}`,
     {
@@ -343,7 +343,19 @@ async function getExistingSermon(churchId, videoPublishedAt) {
     }
   );
   const data = await res.json();
-  return data[0] || null;
+  if (data && data.length > 0) return data[0];
+
+  // Fallback: check by video_id (old records without published_at)
+  const res2 = await fetch(
+    `${process.env.SUPABASE_URL}/rest/v1/church_sermons?church_account_id=eq.${churchId}&video_id=eq.${videoId}`,
+    {
+      headers: {
+        "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()}`,
+      },
+    }
+  );
+  const data2 = await res2.json();
+  return data2[0] || null;
 }
 
 async function createSermonRecord(churchId, videoId, title, videoPublishedAt) {
@@ -465,10 +477,10 @@ export default async function handler(req, res) {
 
         console.log(`[Church] Newest video: "${newestVideo.title}" published ${newestVideo.published.toISOString()}`);
 
-        // Check if already processed (by publication timestamp, not video ID)
-        console.log(`[Church] Checking if video published ${newestVideo.published.toISOString()} was already processed...`);
-        const existing = await getExistingSermon(church.id, newestVideo.published.toISOString());
-        if (existing) { results.push({ church: church.church_name, status: "already processed (same publish date)" }); continue; }
+        // Check if already processed (by timestamp first, then fallback to video_id)
+        console.log(`[Church] Checking if already processed...`);
+        const existing = await getExistingSermon(church.id, newestVideo.published.toISOString(), newestVideo.videoId);
+        if (existing) { results.push({ church: church.church_name, status: "already processed" }); continue; }
 
         // Try to transcribe the newest video
         let transcriptionResult = null;
