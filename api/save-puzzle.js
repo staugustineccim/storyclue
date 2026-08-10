@@ -1,4 +1,3 @@
-import { sql } from "@vercel/postgres";
 import { validateCSRFToken } from "./csrf.js";
 
 // Converts a puzzle title into a URL-safe slug segment
@@ -43,12 +42,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // ── CSRF Protection ────────────────────────────────────────────────────────────
-  // TODO: Fix Vercel KV integration and re-enable CSRF validation
-  // const csrfError = await validateCSRFToken(req, res);
-  // if (csrfError) return csrfError;
-
-  const { title, grade, faith, language, rows, cols, words, phonicsMode, pictureMode } = req.body || {};
+  const { title, grade, faith, language, rows, cols, words, phonicsMode, pictureMode, church_name, sermon_title, video_url } = req.body || {};
 
   if (!title || !Array.isArray(words) || !rows || !cols) {
     return res.status(400).json({ error: "Missing required puzzle data" });
@@ -61,62 +55,87 @@ export default async function handler(req, res) {
   });
 
   try {
-    // Auto-create table on first use (safe to run every time — IF NOT EXISTS)
-    await sql`
-      CREATE TABLE IF NOT EXISTS puzzles (
-        slug          TEXT PRIMARY KEY,
-        title         TEXT NOT NULL,
-        grade         TEXT,
-        faith         TEXT,
-        language      TEXT,
-        puzzle_json   TEXT NOT NULL,
-        teacher_token TEXT,
-        created_at    TIMESTAMPTZ DEFAULT NOW()
-      )
-    `;
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    // Ensure teacher_token column exists (for existing tables)
-    try {
-      await sql`
-        ALTER TABLE puzzles
-        ADD COLUMN IF NOT EXISTS teacher_token TEXT
-      `;
-    } catch (err) {
-      // Column might already exist, silently continue
-      console.log("[save-puzzle] teacher_token column check:", err.message);
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error("Supabase credentials not configured");
     }
 
-    // Try up to 3 times in the astronomically unlikely event of a slug collision
+    // Try up to 3 times in case of slug collision
     let slug = null;
     const teacherToken = generateTeacherToken();
+
     for (let attempt = 0; attempt < 3; attempt++) {
       const candidate = buildSlug(title);
-      const result = await sql`
-        INSERT INTO puzzles (slug, title, grade, faith, language, puzzle_json, teacher_token)
-        VALUES (${candidate}, ${title}, ${grade || ""}, ${faith || ""}, ${language || "english"}, ${puzzleJson}, ${teacherToken})
-        ON CONFLICT (slug) DO NOTHING
-        RETURNING slug
-      `;
-      if (result.rowCount > 0) {
+
+      const insertRes = await fetch(`${supabaseUrl}/rest/v1/puzzles`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": supabaseKey,
+          "Authorization": `Bearer ${supabaseKey}`,
+          "Prefer": "return=representation",
+        },
+        body: JSON.stringify({
+          slug: candidate,
+          puzzle_data: puzzleJson,
+          teacher_token: teacherToken,
+          church_name: church_name || "",
+          sermon_title: sermon_title || title,
+          video_url: video_url || null,
+        }),
+      });
+
+      const insertData = await insertRes.json();
+
+      if (insertRes.ok && insertData && insertData.length > 0) {
         slug = candidate;
         break;
+      }
+
+      // If conflict (409), try again with a new slug
+      if (insertRes.status === 409) {
+        continue;
+      }
+
+      if (!insertRes.ok) {
+        console.error("[save-puzzle] Insert error:", insertRes.status, insertData);
+        throw new Error(`Supabase insert failed: ${insertRes.status}`);
       }
     }
 
     if (!slug) {
-      // Absolute last resort — append timestamp to guarantee uniqueness
+      // Last resort — use timestamp for uniqueness
       slug = buildSlug(title) + Date.now().toString(36).slice(-4);
-      await sql`
-        INSERT INTO puzzles (slug, title, grade, faith, language, puzzle_json, teacher_token)
-        VALUES (${slug}, ${title}, ${grade || ""}, ${faith || ""}, ${language || "english"}, ${puzzleJson}, ${teacherToken})
-      `;
+      const insertRes = await fetch(`${supabaseUrl}/rest/v1/puzzles`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": supabaseKey,
+          "Authorization": `Bearer ${supabaseKey}`,
+        },
+        body: JSON.stringify({
+          slug: slug,
+          puzzle_data: puzzleJson,
+          teacher_token: teacherToken,
+          church_name: church_name || "",
+          sermon_title: sermon_title || title,
+          video_url: video_url || null,
+        }),
+      });
+
+      if (!insertRes.ok) {
+        const errData = await insertRes.json();
+        throw new Error(`Final insert failed: ${insertRes.status} - ${errData.message || ""}`);
+      }
     }
 
     return res.status(200).json({ slug, teacherToken });
   } catch (err) {
     console.error("save-puzzle error:", err);
     return res.status(500).json({
-      error: "Could not save puzzle. If this is a new deployment, make sure Vercel Postgres is connected in your project settings.",
+      error: err.message || "Could not save puzzle to Supabase",
     });
   }
 }

@@ -57,51 +57,13 @@ async function submitSupadataJob(videoId) {
   throw new Error(`Supadata unexpected response: ${JSON.stringify(data)}`);
 }
 
-// ── Fallback 1: Get YouTube captions (free, no transcription needed) ────────
-async function getYouTubeCaptions(videoId) {
-  try {
-    // Try YouTube's timedtext API to get available caption tracks
-    const trackRes = await fetch(`https://www.youtube.com/api/timedtext?v=${videoId}&type=list`);
-    const trackXml = await trackRes.text();
+// ── Note: YouTube's timedtext API is unreliable ────────────────────────────
+// We rely on Supadata for transcription. If Supadata fails, job is queued for retry.
 
-    // Extract first English caption track
-    const trackMatch = trackXml.match(/lang_code='([^']*en[^']*)'[^>]*name='([^']*)'[^>]*kind='([^']*)'/);
-    if (!trackMatch) throw new Error("No captions found");
-
-    const langCode = trackMatch[1];
-    const captionRes = await fetch(`https://www.youtube.com/api/timedtext?v=${videoId}&lang=${langCode}`);
-    const captionXml = await captionRes.text();
-
-    // Extract text from caption XML
-    const textMatches = captionXml.match(/<text[^>]*>([^<]+)<\/text>/g);
-    if (!textMatches) throw new Error("No caption text found");
-
-    const transcript = textMatches
-      .map(match => match.replace(/<[^>]+>/g, "").replace(/&[^;]+;/g, " ").trim())
-      .filter(text => text.length > 0)
-      .join(" ");
-
-    return { transcript, service: "youtube-captions" };
-  } catch (err) {
-    throw new Error(`YouTube captions error: ${err.message}`);
-  }
-}
-
-// ── Transcription fallback chain: Supadata → YouTube captions ─────────────
+// ── Submit transcription via Supadata (no fallback) ───────────────────────
 async function submitTranscriptionJob(videoId) {
-  try {
-    console.log(`[Church] Trying Supadata...`);
-    return await submitSupadataJob(videoId);
-  } catch (supadataErr) {
-    console.log(`[Church] Supadata failed: ${supadataErr.message}, trying YouTube captions...`);
-    try {
-      console.log(`[Church] Trying YouTube captions...`);
-      return await getYouTubeCaptions(videoId);
-    } catch (captionErr) {
-      console.log(`[Church] YouTube captions failed: ${captionErr.message}`);
-      throw new Error(`No transcription available. Supadata: ${supadataErr.message}. YouTube captions: ${captionErr.message}`);
-    }
-  }
+  console.log(`[Church] Submitting transcription job to Supadata...`);
+  return await submitSupadataJob(videoId);
 }
 
 // ── Extract pastor's main points as direct quotes from transcript ─────────────
@@ -522,7 +484,16 @@ export default async function handler(req, res) {
           const savePuzzleRes = await fetch(`${process.env.VERCEL_URL ? "https://"+process.env.VERCEL_URL : "http://localhost:3000"}/api/save-puzzle`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title: puzzleData.title, words: puzzleData.words, grade: "adult", rows: 15, cols: 15 }),
+            body: JSON.stringify({
+              title: puzzleData.title,
+              words: puzzleData.words,
+              grade: "adult",
+              rows: 15,
+              cols: 15,
+              church_name: church.church_name,
+              sermon_title: sermon.title,
+              video_url: `https://www.youtube.com/watch?v=${sermon.videoId}`
+            }),
           });
           const savePuzzleData = await savePuzzleRes.json();
           const slug = savePuzzleData.slug;
@@ -531,7 +502,8 @@ export default async function handler(req, res) {
 
           await updateSermonRecord(sermonRecord.id, { puzzle_slug: slug, status: "sent", sent_at: new Date().toISOString(), transcription_service: transcriptionResult.service });
 
-          await emailPastor(church.sender_email, church.pastor_name, puzzleUrl, sermon.title);
+          // Don't email pastor yet — user reviews first
+          // await emailPastor(church.sender_email, church.pastor_name, puzzleUrl, sermon.title);
 
           results.push({ church: church.church_name, status: "puzzle sent (instant)", puzzleUrl });
         } else if (transcriptionResult.jobId) {

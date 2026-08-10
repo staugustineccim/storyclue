@@ -6,6 +6,7 @@ import CrosswordPuzzle from "./components/CrosswordPuzzle";
 import PuzzleHistory from "./components/PuzzleHistory";
 import CitizenshipFlashcard from "./components/CitizenshipFlashcard";
 import AdminDashboard from "./components/AdminDashboard";
+import ChurchPipelineDashboard from "./components/ChurchPipelineDashboard";
 import ChurchMode from "./components/ChurchMode";
 import ChurchSignup from "./components/ChurchSignup";
 import Privacy from "./components/Privacy";
@@ -22,6 +23,7 @@ export default function App() {
         <Route path="/history" element={<PuzzleHistory />} />
         <Route path="/citizenship" element={<CitizenshipFlashcard />} />
         <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/marketing-admin" element={<ChurchPipelineDashboard />} />
         <Route path="/church" element={<ChurchMode />} />
         <Route path="/church/setup" element={<ChurchSignup />} />
         <Route path="/privacy" element={<Privacy />} />
