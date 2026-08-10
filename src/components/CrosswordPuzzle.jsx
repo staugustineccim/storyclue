@@ -236,7 +236,7 @@ export default function CrosswordPuzzle() {
 function PuzzleBoard({
   title, grade, language = "english", rows, cols, words, isTeacher = false,
   phonicsMode = false, pictureMode = false, songId = null,
-  pastorName = null, sermonDate = null, sermonDescription = null,
+  pastorName = null, sermonDate = null, sermonDescription = null, videoUrl = null,
 }) {
   const navigate   = useNavigate();
   const SOLUTION   = buildGrid(words, rows, cols);
@@ -1048,6 +1048,13 @@ function PuzzleBoard({
             {sermonDescription && (
               <div style={{ fontSize:"11px", color:"#d9cfc1", fontStyle:"italic", marginBottom:"3px", maxWidth:"400px", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                 "{sermonDescription}"
+              </div>
+            )}
+            {videoUrl && (
+              <div style={{ marginBottom:"3px" }}>
+                <a href={videoUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize:"11px", color:"#a5d6a7", textDecoration:"none", padding:"3px 8px", background:"rgba(255,255,255,.1)", borderRadius:"4px", display:"inline-block", marginTop:"3px" }}>
+                  ▶️ Watch Sermon
+                </a>
               </div>
             )}
             <div className="hdr-sub" style={{ fontSize:"10px", color: isEarlyLearner ? "#a5d6a7" : "#a8d890", fontStyle:"italic", letterSpacing:"1px" }}>
