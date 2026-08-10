@@ -1245,9 +1245,12 @@ function PuzzleBoard({
 
           {/* CLUE PANEL */}
           <div className="no-print clue-panel" style={{ flex:"40", display:"flex", flexDirection:"column", background:"#fff", minHeight:0 }}>
-            <div style={{ display:"flex", borderBottom:"2px solid #e0d8c8", flexShrink:0 }}>
+            <div style={{ display:"flex", borderBottom:"2px solid #e0d8c8", flexShrink:0, gap:"12px", alignItems:"center" }}>
               <button className={`ctab${clueTab==="across"?" on":""}`} onClick={() => setClueTab("across")}>Across ({ACROSS.length})</button>
               <button className={`ctab${clueTab==="down"?" on":""}`}   onClick={() => setClueTab("down")}>Down ({DOWN.length})</button>
+              <div style={{ marginLeft:"auto", fontSize:"11px", color:"#8a7a5a", fontFamily:"Lora,serif", paddingRight:"8px" }}>
+                ⭐ = Pastor's Main Teaching Point
+              </div>
             </div>
             <div style={{
               overflowY:"auto", WebkitOverflowScrolling:"touch", flex:1, minHeight:0,
@@ -1292,7 +1295,7 @@ function PuzzleBoard({
                       )}
                       <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700,
                         fontSize:"11px", color: isActive ? "#2D5A1A" : "#6a5a30", marginTop:"4px" }}>
-                        {w.number}. {w.orientation === "across" ? "→" : "↓"}
+                        {w.number}.{w.type === "pastor_point" && " ⭐"} {w.orientation === "across" ? "→" : "↓"}
                       </div>
                     </div>
                   );
@@ -1306,7 +1309,7 @@ function PuzzleBoard({
                     className={`clue${isActive?" act":""}${isSimpler?" simpler":""}${clueStatusClass(w)}`}
                     onClick={() => { setActiveWord(w); setClueTab(w.orientation); focusFirstEmpty(w); }}
                   >
-                    <span className="cn">{w.number}.</span>
+                    <span className="cn">{w.number}.{w.type === "pastor_point" && " ⭐"}</span>
                     {/* Picture mode: Wikipedia image thumbnail with emoji fallback */}
                     {pictureMode && (
                       imgSrc
