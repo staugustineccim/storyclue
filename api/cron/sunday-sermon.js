@@ -35,6 +35,56 @@ async function getNewestVideo(channelId) {
   };
 }
 
+// ── Fetch YouTube captions (free, no API key needed) ─────────────────────────
+async function getYouTubeCaptions(videoId) {
+  try {
+    console.log(`[Church] Checking for YouTube auto-captions on video ${videoId}...`);
+    const captionUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en`;
+    const res = await fetch(captionUrl);
+
+    if (!res.ok) {
+      console.log(`[Church] No captions found (HTTP ${res.status})`);
+      return null;
+    }
+
+    const text = await res.text();
+
+    // YouTube timedtext returns XML, extract text content
+    const textMatches = text.match(/<text[^>]*>([^<]+)<\/text>/g);
+    if (!textMatches || textMatches.length === 0) {
+      console.log(`[Church] Caption XML found but no text content`);
+      return null;
+    }
+
+    // Extract and decode text from XML
+    const captions = textMatches
+      .map(match => {
+        const textContent = match.match(/<text[^>]*>([^<]+)<\/text>/)[1];
+        // Decode HTML entities
+        return textContent
+          .replace(/&amp;/g, "&")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/<[^>]+>/g, ""); // Remove any remaining XML tags
+      })
+      .join(" ")
+      .trim();
+
+    if (captions.length < 100) {
+      console.log(`[Church] Captions too short (${captions.length} chars), likely not ready yet`);
+      return null;
+    }
+
+    console.log(`[Church] Got YouTube captions (${captions.length} characters)`);
+    return captions;
+  } catch (err) {
+    console.log(`[Church] Error fetching YouTube captions:`, err.message);
+    return null;
+  }
+}
+
 // ── Transcribe sermon via Supadata (submit job, don't wait) ──────────────────
 async function submitSupadataJob(videoId) {
   const encodedUrl = encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`);
@@ -57,13 +107,17 @@ async function submitSupadataJob(videoId) {
   throw new Error(`Supadata unexpected response: ${JSON.stringify(data)}`);
 }
 
-// ── Note: YouTube's timedtext API is unreliable ────────────────────────────
-// We rely on Supadata for transcription. If Supadata fails, job is queued for retry.
-
-// ── Submit transcription via Supadata (no fallback) ───────────────────────
+// ── Submit transcription: YouTube captions first, skip Whisper ────────────────
 async function submitTranscriptionJob(videoId) {
-  console.log(`[Church] Submitting transcription job to Supadata...`);
-  return await submitSupadataJob(videoId);
+  // STEP 1: Try YouTube captions first (free, no quota)
+  const captions = await getYouTubeCaptions(videoId);
+  if (captions) {
+    return { transcript: captions, jobId: null, service: "youtube_captions" };
+  }
+
+  // STEP 2: If no captions, don't use Supadata — wait for captions to be ready
+  console.log(`[Church] No YouTube captions available yet. Will retry tomorrow.`);
+  throw new Error("No captions found - will retry when YouTube captions are ready");
 }
 
 // ── Extract pastor's main points as direct quotes from transcript ─────────────
