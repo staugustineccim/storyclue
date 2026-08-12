@@ -480,6 +480,7 @@ export default function PuzzleGenerator() {
           words:       layout.words,
           phonicsMode: isK2 && phonicsMode,
           pictureMode: isK2 && pictureMode,
+          puzzle_source: "user",
         }),
       });
       const saveData = await saveRes.json();

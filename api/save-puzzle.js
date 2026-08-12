@@ -42,7 +42,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { title, grade, faith, language, rows, cols, words, phonicsMode, pictureMode, church_name, sermon_title, video_url } = req.body || {};
+  const { title, grade, faith, language, rows, cols, words, phonicsMode, pictureMode, church_name, sermon_title, video_url, puzzle_source } = req.body || {};
 
   if (!title || !Array.isArray(words) || !rows || !cols) {
     return res.status(400).json({ error: "Missing required puzzle data" });
@@ -84,6 +84,7 @@ export default async function handler(req, res) {
           church_name: church_name || "",
           sermon_title: sermon_title || title,
           video_url: video_url || null,
+          puzzle_source: puzzle_source || "user",
         }),
       });
 

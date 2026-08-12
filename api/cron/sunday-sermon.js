@@ -546,7 +546,8 @@ export default async function handler(req, res) {
               cols: 15,
               church_name: church.church_name,
               sermon_title: sermon.title,
-              video_url: `https://www.youtube.com/watch?v=${sermon.videoId}`
+              video_url: `https://www.youtube.com/watch?v=${sermon.videoId}`,
+              puzzle_source: "pastor"
             }),
           });
           const savePuzzleData = await savePuzzleRes.json();
