@@ -9,6 +9,7 @@ import { fetchWithCSRF, withCSRFToken } from "../utils/csrf";
 import { useAuth } from "../context/AuthContext";
 import { authEnabled } from "../utils/supabase";
 import { initTrial, getDaysRemaining, getTrialStatus, isExpiring, isInGrace, isTrialOver } from "../utils/trial";
+import { getTrialStatus as getTrialStatusNew, startTrial } from "../utils/trialManager";
 import AudienceSelector from "./AudienceSelector";
 import SongsLibrary from "./SongsLibrary";
 import AuthButton from "./AuthButton";
@@ -115,6 +116,13 @@ export default function PuzzleGenerator() {
   // Init trial on first visit to /create
   useEffect(() => {
     initTrial();
+
+    // Also start the new trial system if not already started
+    const status = getTrialStatusNew();
+    if (status.status === "started") {
+      startTrial(); // Ensure trial is initialized
+    }
+
     // Auto-show upgrade modal if trial is fully over (day 38+)
     if (isTrialOver()) setShowUpgradeModal(true);
   }, []);

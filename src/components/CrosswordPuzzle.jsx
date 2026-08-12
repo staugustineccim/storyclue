@@ -6,6 +6,9 @@ import FeedbackModal from "./FeedbackModal";
 import VocabModal from "./VocabModal";
 import ContextReviewModal from "./ContextReviewModal";
 import WordListModal from "./WordListModal";
+import TrialEmailModal from "./TrialEmailModal";
+import TrialExpiredModal from "./TrialExpiredModal";
+import { getTrialStatus } from "../utils/trialManager";
 import { trackEvent } from "../utils/analytics";
 
 function formatTime(s) {
@@ -172,9 +175,26 @@ export default function CrosswordPuzzle() {
   const [loadState,  setLoadState]  = useState("loading");
   const [puzzleData, setPuzzleData] = useState(null);
   const [isTeacher,  setIsTeacher]  = useState(false);
+  const [trialStatus, setTrialStatus] = useState(null);
+  const [showTrialEmail, setShowTrialEmail] = useState(false);
+  const [showTrialExpired, setShowTrialExpired] = useState(false);
+  const [trialEmailShownOnce, setTrialEmailShownOnce] = useState(false);
 
   const teacherToken = searchParams.get("teacher") || null;
   const songId       = searchParams.get("song") || null;
+
+  // Check trial status on mount
+  useEffect(() => {
+    const status = getTrialStatus();
+    setTrialStatus(status);
+    if (status.shouldPromptEmail && !trialEmailShownOnce) {
+      setShowTrialEmail(true);
+      setTrialEmailShownOnce(true);
+    }
+    if (status.shouldPromptUpgrade) {
+      setShowTrialExpired(true);
+    }
+  }, [trialEmailShownOnce]);
 
   useEffect(() => {
     if (slug) {
@@ -1593,6 +1613,37 @@ function PuzzleBoard({
           </div>
         );
       })()}
+
+      {/* Trial email prompt (day 25) */}
+      {showTrialEmail && (
+        <TrialEmailModal
+          onClose={() => setShowTrialEmail(false)}
+          onSave={() => setTrialStatus({ ...trialStatus, hasEmail: true, daysLeft: 15 })}
+        />
+      )}
+
+      {/* Trial expired prompt (day 40+) */}
+      {showTrialExpired && (
+        <TrialExpiredModal onClose={() => setShowTrialExpired(false)} />
+      )}
+
+      {/* Trial days counter - top right */}
+      {trialStatus && !trialStatus.hasEmail && (
+        <div style={{
+          position: "fixed",
+          top: "12px",
+          right: "12px",
+          background: trialStatus.daysLeft <= 5 ? "#ffb0b0" : "#d4edda",
+          color: trialStatus.daysLeft <= 5 ? "#8b1010" : "#155724",
+          padding: "6px 12px",
+          borderRadius: "4px",
+          fontSize: "12px",
+          fontFamily: "Georgia, serif",
+          zIndex: 999,
+        }}>
+          {trialStatus.daysLeft} day{trialStatus.daysLeft !== 1 ? "s" : ""} free
+        </div>
+      )}
     </>
   );
 }
