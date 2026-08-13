@@ -337,7 +337,8 @@ async function getChurches() {
   if (!res.ok) {
     const errorBody = await res.text();
     console.log("[Supabase] Error body:", errorBody);
-    throw new Error(`Supabase error: ${res.status} ${res.statusText}`);
+    console.log("[Supabase] Request URL was:", url);
+    throw new Error(`Supabase error: ${res.status} ${res.statusText} — ${errorBody}`);
   }
 
   const data = await res.json();
