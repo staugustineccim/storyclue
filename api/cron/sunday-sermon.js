@@ -539,6 +539,10 @@ export default async function handler(req, res) {
 
     for (const church of churches) {
       console.log(`[Church] Processing: ${church.church_name}`);
+      if (churches.indexOf(church) === 0) {
+        console.log(`[Church] Sample record keys:`, Object.keys(church));
+        console.log(`[Church] Sample record:`, JSON.stringify(church).substring(0, 200));
+      }
       try {
         console.log(`[Church] Getting channel ID from: ${church.youtube_url}`);
         const channelId = await getChannelIdFromUrl(church.youtube_url);
