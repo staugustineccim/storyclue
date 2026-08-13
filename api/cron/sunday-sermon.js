@@ -486,7 +486,8 @@ export default async function handler(req, res) {
         "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()}`,
       },
     });
-    const waitingSermons = await waitingRes.json() || [];
+    const waitingData = await waitingRes.json();
+    const waitingSermons = Array.isArray(waitingData) ? waitingData : [];
     console.log(`[Church Cron] Found ${waitingSermons.length} waiting sermons to retry`);
 
     for (const sermon of waitingSermons) {
