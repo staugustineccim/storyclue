@@ -320,7 +320,7 @@ async function emailPastor(toEmail, pastorName, puzzleUrl, sermonTitle) {
 
 // ── Supabase REST API helpers ──────────────────────────────────────────────
 async function getChurches() {
-  const url = `${process.env.SUPABASE_URL}/rest/v1/church_accounts`;
+  const url = `${process.env.SUPABASE_URL}/rest/v1/church_accounts?limit=500`;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   console.log("[Supabase] URL:", process.env.SUPABASE_URL);
   console.log("[Supabase] Key exists:", !!key, "Length:", key?.length);
