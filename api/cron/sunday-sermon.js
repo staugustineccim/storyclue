@@ -479,6 +479,62 @@ export default async function handler(req, res) {
     const churches = await getChurches();
     console.log(`[Church Cron] Found ${churches.length} churches`);
 
+    // ── RETRY waiting sermons first ────────────────────────────────────────
+    console.log("[Church Cron] Checking for waiting_for_captions sermons to retry...");
+    const waitingRes = await fetch(`${process.env.SUPABASE_URL}/rest/v1/church_sermons?status=eq.waiting_for_captions&select=*`, {
+      headers: {
+        "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()}`,
+      },
+    });
+    const waitingSermons = await waitingRes.json() || [];
+    console.log(`[Church Cron] Found ${waitingSermons.length} waiting sermons to retry`);
+
+    for (const sermon of waitingSermons) {
+      try {
+        console.log(`[Church Cron] Retrying captions for: ${sermon.sermon_title} (${sermon.video_id})`);
+        const captions = await getYouTubeCaptions(sermon.video_id);
+
+        if (captions) {
+          // Captions available! Generate puzzle
+          console.log(`[Church Cron] Captions now available, generating puzzle...`);
+          const church = churches.find(c => c.id === sermon.church_account_id);
+          if (!church) {
+            console.log(`[Church Cron] Church not found for sermon, skipping`);
+            continue;
+          }
+
+          const puzzleData = await generateSermonPuzzle(captions, sermon.sermon_title, church.church_name, church.pastor_name, null);
+          const savePuzzleRes = await fetch(`${process.env.VERCEL_URL ? "https://"+process.env.VERCEL_URL : "http://localhost:3000"}/api/save-puzzle`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: puzzleData.title,
+              words: puzzleData.words,
+              grade: "adult",
+              rows: 15,
+              cols: 15,
+              church_name: church.church_name,
+              sermon_title: sermon.sermon_title,
+              video_url: `https://www.youtube.com/watch?v=${sermon.video_id}`,
+              puzzle_source: "pastor"
+            }),
+          });
+          const savePuzzleData = await savePuzzleRes.json();
+          if (savePuzzleRes.ok) {
+            const slug = savePuzzleData.slug;
+            await updateSermonRecord(sermon.id, { puzzle_slug: slug, status: "sent", sent_at: new Date().toISOString() });
+            results.push({ church: church.church_name, status: "puzzle generated (retry success)", puzzleUrl: `https://storyclue.ai/play/${slug}` });
+          }
+        } else {
+          console.log(`[Church Cron] Captions still not available, will retry tomorrow`);
+          results.push({ church: sermon.sermon_title, status: "still waiting for captions (will retry tomorrow)" });
+        }
+      } catch (err) {
+        console.error(`[Church Cron] Retry error:`, err.message);
+        results.push({ sermon: sermon.sermon_title, status: `retry error: ${err.message}` });
+      }
+    }
+
     for (const church of churches) {
       console.log(`[Church] Processing: ${church.church_name}`);
       try {
