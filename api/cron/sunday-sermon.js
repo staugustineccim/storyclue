@@ -4,14 +4,24 @@
 
 // ── YouTube RSS — no API key needed ──────────────────────────────────────────
 async function getChannelIdFromUrl(channelUrl) {
-  if (channelUrl.includes("/@")) {
-    const res = await fetch(channelUrl);
-    const html = await res.text();
-    const match = html.match(/"channelId":"(UC[^"]+)"/);
-    return match ? match[1] : null;
+  // Direct channel ID extraction: youtube.com/channel/UCxxxxx
+  const directMatch = channelUrl.match(/\/channel\/(UC[^/?]+)/);
+  if (directMatch) return directMatch[1];
+
+  // Handle @handle and /user/ formats by fetching HTML
+  if (channelUrl.includes("/@") || channelUrl.includes("/user/")) {
+    try {
+      const res = await fetch(channelUrl);
+      const html = await res.text();
+      const match = html.match(/"channelId":"(UC[^"]+)"/);
+      return match ? match[1] : null;
+    } catch (err) {
+      console.log(`[Channel ID] Failed to fetch channel page: ${err.message}`);
+      return null;
+    }
   }
-  const match = channelUrl.match(/\/channel\/(UC[^/?]+)/);
-  return match ? match[1] : null;
+
+  return null;
 }
 
 // Get the newest (most recent) video from channel
