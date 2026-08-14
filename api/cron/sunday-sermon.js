@@ -420,11 +420,45 @@ async function updateSermonRecord(sermonId, updates) {
 async function sendStatusEmail(results, error) {
   if (!process.env.RESEND_API_KEY) return;
 
+  // De-duplicate results by church name (take first occurrence)
+  const seen = new Set();
+  const uniqueResults = results.filter(r => {
+    if (seen.has(r.church)) return false;
+    seen.add(r.church);
+    return true;
+  });
+
+  // Count by status
+  const stats = {
+    total: uniqueResults.length,
+    waiting: uniqueResults.filter(r => r.status.includes("waiting")).length,
+    generated: uniqueResults.filter(r => r.status.includes("puzzle")).length,
+    errors: uniqueResults.filter(r => r.status.includes("no channel") || r.error).length
+  };
+
   const statusHtml = error
     ? `<p style="color:red"><strong>CRON FAILED:</strong> ${error}</p>`
-    : `<p style="color:green"><strong>CRON COMPLETED</strong></p>${results.map(r =>
-        `<p>${r.church}: ${r.status}${r.puzzleUrl ? ` — <a href="${r.puzzleUrl}">View Puzzle</a>` : ''}${r.error ? ` — ERROR: ${r.error}` : ''}</p>`
-      ).join('')}`;
+    : `<div>
+        <p style="color:green;font-size:16px;font-weight:bold">✅ CRON COMPLETED</p>
+        <div style="background:#f0f0f0;padding:15px;border-radius:5px;margin:15px 0">
+          <p style="margin:5px 0"><strong>Total churches processed:</strong> ${stats.total}</p>
+          <p style="margin:5px 0"><strong>Waiting for captions:</strong> ${stats.waiting}</p>
+          <p style="margin:5px 0"><strong>Puzzles generated:</strong> ${stats.generated}</p>
+          <p style="margin:5px 0"><strong>Skipped (no channel ID):</strong> ${stats.errors}</p>
+        </div>
+        <details style="margin:15px 0">
+          <summary style="cursor:pointer;font-weight:bold">View Details (${uniqueResults.length} churches)</summary>
+          <div style="margin-top:10px;border-left:3px solid #ccc;padding-left:15px">
+            ${uniqueResults.map(r => `
+              <p style="margin:8px 0;font-size:13px">
+                <strong>${r.church}</strong>: ${r.status}
+                ${r.puzzleUrl ? ` <a href="${r.puzzleUrl}" style="color:#2D5A1A">View</a>` : ''}
+                ${r.error ? ` ⚠️ ${r.error}` : ''}
+              </p>
+            `).join('')}
+          </div>
+        </details>
+      </div>`;
 
   await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -435,12 +469,12 @@ async function sendStatusEmail(results, error) {
     body: JSON.stringify({
       from: "StoryClue <puzzles@storyclue.ai>",
       to: "bob@thepremierproperties.com",
-      subject: error ? "🚨 Church Sermon Cron Failed" : "✅ Church Sermon Cron Completed",
+      subject: error ? "🚨 Church Sermon Cron Failed" : `✅ Church Cron: ${stats.total} churches (${stats.waiting} waiting)`,
       html: `
-        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
+        <div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto;padding:20px;background:#fafafa">
           ${statusHtml}
-          <hr style="border:1px solid #ccc;margin:20px 0">
-          <p style="color:#666;font-size:12px">Timestamp: ${new Date().toISOString()}</p>
+          <hr style="border:1px solid #ddd;margin:20px 0">
+          <p style="color:#999;font-size:11px">Timestamp: ${new Date().toISOString()}</p>
         </div>
       `,
     }),
