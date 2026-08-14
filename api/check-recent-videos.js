@@ -49,7 +49,7 @@ async function getNewestVideo(channelId) {
 }
 
 const churches = [
-  {"church_name":"Colonial Church St. Augustine","youtube_channel":"https://www.youtube.com/colonialchurchsta"},
+  {"church_name":"Colonial Church St. Augustine","youtube_channel":"https://www.youtube.com/c/colonialchurchsta"},
   {"church_name":"Grace and Faith Church","youtube_channel":"https://www.youtube.com/c/graceandfaithchurch"},
   {"church_name":"The Church of Eleven22","youtube_channel":"https://www.youtube.com/channel/UCqB8wwurUvy5OifhjFR429Q"},
   {"church_name":"Oasis Church","youtube_channel":"https://www.youtube.com/@OasisChurchFL941"},
