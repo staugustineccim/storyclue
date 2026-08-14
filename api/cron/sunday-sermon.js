@@ -540,6 +540,10 @@ export default async function handler(req, res) {
     for (const church of churches) {
       console.log(`[Church] Processing: ${church.church_name}`);
       try {
+        if (!church.youtube_url) {
+          results.push({ church: church.church_name, status: "no youtube URL" });
+          continue;
+        }
         console.log(`[Church] Getting channel ID from: ${church.youtube_url}`);
         const channelId = await getChannelIdFromUrl(church.youtube_url);
         if (!channelId) { results.push({ church: church.church_name, status: "no channel ID" }); continue; }
