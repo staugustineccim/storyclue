@@ -4,6 +4,7 @@ export default async function handler(req, res) {
       `${process.env.SUPABASE_URL}/rest/v1/church_accounts?limit=1`,
       {
         headers: {
+          'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
           'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
         },
       }
