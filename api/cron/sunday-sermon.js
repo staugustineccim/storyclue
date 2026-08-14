@@ -320,7 +320,7 @@ async function emailPastor(toEmail, pastorName, puzzleUrl, sermonTitle) {
 
 // ── Supabase REST API helpers ──────────────────────────────────────────────
 async function getChurches() {
-  const url = `${process.env.SUPABASE_URL}/rest/v1/church_accounts?limit=500`;
+  const url = `${process.env.SUPABASE_URL}/rest/v1/church_accounts?youtube_channel=not.is.null&limit=500`;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   console.log("[Supabase] URL:", process.env.SUPABASE_URL);
   console.log("[Supabase] Key exists:", !!key, "Length:", key?.length);
@@ -540,12 +540,12 @@ export default async function handler(req, res) {
     for (const church of churches) {
       console.log(`[Church] Processing: ${church.church_name}`);
       try {
-        if (!church.youtube_url) {
+        if (!church.youtube_channel) {
           results.push({ church: church.church_name, status: "no youtube URL" });
           continue;
         }
-        console.log(`[Church] Getting channel ID from: ${church.youtube_url}`);
-        const channelId = await getChannelIdFromUrl(church.youtube_url);
+        console.log(`[Church] Getting channel ID from: ${church.youtube_channel}`);
+        const channelId = await getChannelIdFromUrl(church.youtube_channel);
         if (!channelId) { results.push({ church: church.church_name, status: "no channel ID" }); continue; }
         console.log(`[Church] Got channel ID: ${channelId}`);
 
