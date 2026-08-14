@@ -14,7 +14,15 @@ export default async function handler(req, res) {
       body: JSON.stringify(churches),
     });
 
-    const data = await insertRes.json();
+    const text = await insertRes.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      console.error('[BulkLoad] Response was not JSON:', text.substring(0, 500));
+      throw new Error(`Supabase returned non-JSON: ${insertRes.status} ${text.substring(0, 200)}`);
+    }
+
     console.log(`[BulkLoad] Response: ${insertRes.status}`, JSON.stringify(data).substring(0, 200));
 
     if (!insertRes.ok) {
