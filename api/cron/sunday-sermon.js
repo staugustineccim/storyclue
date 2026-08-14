@@ -8,16 +8,27 @@ async function getChannelIdFromUrl(channelUrl) {
   const directMatch = channelUrl.match(/\/channel\/(UC[^/?]+)/);
   if (directMatch) return directMatch[1];
 
-  // Handle @handle and /user/ formats by fetching HTML
-  if (channelUrl.includes("/@") || channelUrl.includes("/user/")) {
+  // Handle @handle, /c/, and /user/ formats by fetching HTML to extract channelId
+  if (channelUrl.includes("/@") || channelUrl.includes("/c/") || channelUrl.includes("/user/")) {
     try {
       const res = await fetch(channelUrl);
       const html = await res.text();
       const match = html.match(/"channelId":"(UC[^"]+)"/);
-      return match ? match[1] : null;
+      if (match) return match[1];
     } catch (err) {
-      console.log(`[Channel ID] Failed to fetch channel page: ${err.message}`);
-      return null;
+      console.log(`[Channel ID] Failed to fetch: ${err.message}`);
+    }
+  }
+
+  // Handle single video links: youtube.com/watch?v=xxxxx → extract channel from metadata
+  if (channelUrl.includes("/watch?v=") || channelUrl.includes("?v=")) {
+    try {
+      const res = await fetch(channelUrl);
+      const html = await res.text();
+      const match = html.match(/"channelId":"(UC[^"]+)"/);
+      if (match) return match[1];
+    } catch (err) {
+      console.log(`[Channel ID] Failed to fetch video: ${err.message}`);
     }
   }
 
