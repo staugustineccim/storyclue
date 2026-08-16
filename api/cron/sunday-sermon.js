@@ -59,47 +59,82 @@ async function getNewestVideo(channelId) {
 // ── Fetch YouTube captions (free, no API key needed) ─────────────────────────
 async function getYouTubeCaptions(videoId) {
   try {
-    console.log(`[Church] Checking for YouTube auto-captions on video ${videoId}...`);
-    const captionUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en`;
-    const res = await fetch(captionUrl);
+    console.log(`[Church] Checking for YouTube captions on video ${videoId}...`);
 
-    if (!res.ok) {
-      console.log(`[Church] No captions found (HTTP ${res.status})`);
+    // Step 1: Fetch the watch page to find caption track URLs
+    const watchRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+
+    if (!watchRes.ok) {
+      console.log(`[Church] Could not fetch watch page (HTTP ${watchRes.status})`);
       return null;
     }
 
-    const text = await res.text();
+    const html = await watchRes.text();
 
-    // YouTube timedtext returns XML, extract text content
-    const textMatches = text.match(/<text[^>]*>([^<]+)<\/text>/g);
-    if (!textMatches || textMatches.length === 0) {
-      console.log(`[Church] Caption XML found but no text content`);
+    // Look for caption tracks in the page HTML
+    // YouTube embeds caption track data in the initial data JSON
+    const captionTracksMatch = html.match(/"captionTracks":\s*(\[.*?\])/);
+    if (!captionTracksMatch) {
+      console.log(`[Church] No caption tracks found on page`);
       return null;
     }
 
-    // Extract and decode text from XML
-    const captions = textMatches
-      .map(match => {
-        const textContent = match.match(/<text[^>]*>([^<]+)<\/text>/)[1];
-        // Decode HTML entities
-        return textContent
-          .replace(/&amp;/g, "&")
-          .replace(/&lt;/g, "<")
-          .replace(/&gt;/g, ">")
-          .replace(/&quot;/g, '"')
-          .replace(/&#39;/g, "'")
-          .replace(/<[^>]+>/g, ""); // Remove any remaining XML tags
-      })
-      .join(" ")
-      .trim();
+    try {
+      const captionTracks = JSON.parse(captionTracksMatch[1]);
 
-    if (captions.length < 100) {
-      console.log(`[Church] Captions too short (${captions.length} chars), likely not ready yet`);
+      if (!captionTracks || captionTracks.length === 0) {
+        console.log(`[Church] Caption tracks array is empty`);
+        return null;
+      }
+
+      // Prefer English captions, fall back to first available
+      let trackUrl = null;
+      for (const track of captionTracks) {
+        if (track.languageCode === 'en' || track.languageCode?.includes('en')) {
+          trackUrl = track.baseUrl;
+          console.log(`[Church] Found English caption track`);
+          break;
+        }
+      }
+
+      if (!trackUrl) {
+        trackUrl = captionTracks[0].baseUrl;
+        console.log(`[Church] Using first available caption track: ${captionTracks[0].languageCode}`);
+      }
+
+      // Step 2: Fetch the caption track (returns VTT format by default)
+      const captionRes = await fetch(trackUrl);
+      if (!captionRes.ok) {
+        console.log(`[Church] Could not fetch caption track (HTTP ${captionRes.status})`);
+        return null;
+      }
+
+      const captionText = await captionRes.text();
+
+      // Parse VTT format: remove timing info and metadata, keep only text
+      const lines = captionText.split('\n');
+      const captions = lines
+        .filter(line => line.trim() && !line.includes('-->') && !line.startsWith('WEBVTT'))
+        .join(' ')
+        .replace(/\n/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      if (captions.length < 100) {
+        console.log(`[Church] Captions too short (${captions.length} chars), likely not ready yet`);
+        return null;
+      }
+
+      console.log(`[Church] Got YouTube captions (${captions.length} characters)`);
+      return captions;
+    } catch (parseErr) {
+      console.log(`[Church] Error parsing caption data:`, parseErr.message);
       return null;
     }
-
-    console.log(`[Church] Got YouTube captions (${captions.length} characters)`);
-    return captions;
   } catch (err) {
     console.log(`[Church] Error fetching YouTube captions:`, err.message);
     return null;
