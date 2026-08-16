@@ -34,9 +34,8 @@ async function getChannelIdFromUrl(channelUrl) {
 
 async function getYouTubeCaptions(videoId) {
   try {
-    console.log(`[Church] Fetching YouTube transcript for video ${videoId}...`);
     const url = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en`;
-    const res = await fetch(url);
+    const res = await withTimeout(fetch(url), 5000);
 
     if (!res.ok) {
       console.log(`[Church] Transcript not available (HTTP ${res.status})`);
@@ -84,6 +83,13 @@ async function getYouTubeCaptions(videoId) {
   }
 }
 
+async function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+  ]);
+}
+
 async function getNewestVideo(channelUrl) {
   try {
     // Extract channel ID from URL
@@ -92,18 +98,25 @@ async function getNewestVideo(channelUrl) {
     if (directMatch) {
       channelId = directMatch[1];
     } else {
-      // Try to fetch and parse the channel page for channel ID
-      const res = await fetch(channelUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-      const html = await res.text();
-      const match = html.match(/"channelId":"(UC[^"]+)"/);
-      if (match) channelId = match[1];
+      // Try to fetch and parse the channel page for channel ID (with timeout)
+      try {
+        const res = await withTimeout(
+          fetch(channelUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } }),
+          5000
+        );
+        const html = await res.text();
+        const match = html.match(/"channelId":"(UC[^"]+)"/);
+        if (match) channelId = match[1];
+      } catch (err) {
+        console.log(`[Video] Channel fetch failed: ${err.message}`);
+      }
     }
 
     if (!channelId) return null;
 
     // Use RSS feed - this always works and doesn't require JavaScript
     const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
-    const rssRes = await fetch(rssUrl);
+    const rssRes = await withTimeout(fetch(rssUrl), 5000);
     if (!rssRes.ok) return null;
 
     const rssText = await rssRes.text();
@@ -194,7 +207,7 @@ export default async function handler(req, res) {
 
   try {
     const churchRes = await fetch(
-      `${process.env.SUPABASE_URL}/rest/v1/church_accounts?select=id,church_name,pastor_name,sender_email,youtube_channel&limit=100&order=church_name.asc`,
+      `${process.env.SUPABASE_URL}/rest/v1/church_accounts?select=id,church_name,pastor_name,sender_email,youtube_channel&limit=1000&order=church_name.asc`,
       {
         headers: {
           'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -203,7 +216,12 @@ export default async function handler(req, res) {
       }
     );
 
+    if (!churchRes.ok) {
+      return res.status(500).json({ error: `DB query failed: ${churchRes.status}` });
+    }
+
     let churches = await churchRes.json();
+    console.log(`[Cron] DB returned ${Array.isArray(churches) ? churches.length : 0} records`);
     if (!Array.isArray(churches)) churches = [];
 
     // Deduplicate by church_name - keep first occurrence only
