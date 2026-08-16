@@ -220,41 +220,47 @@ export default async function handler(req, res) {
 
     const results = [];
 
-    for (const church of uniqueChurches) {
-      try {
-        if (!church.youtube_channel) {
-          results.push({ church: church.church_name, status: "no youtube URL", reason: "Missing URL" });
-          continue;
-        }
+    // Process churches in parallel (3 at a time to avoid overwhelming APIs)
+    for (let i = 0; i < uniqueChurches.length; i += 3) {
+      const batch = uniqueChurches.slice(i, i + 3);
+      await Promise.all(
+        batch.map(async (church) => {
+          try {
+            if (!church.youtube_channel) {
+              results.push({ church: church.church_name, status: "no youtube URL", reason: "Missing URL" });
+              return;
+            }
 
-        const video = await getNewestVideo(church.youtube_channel);
-        if (!video) {
-          results.push({ church: church.church_name, status: "no videos", reason: "No videos found on channel" });
-          continue;
-        }
+            const video = await getNewestVideo(church.youtube_channel);
+            if (!video) {
+              results.push({ church: church.church_name, status: "no videos", reason: "No videos found on channel" });
+              return;
+            }
 
-        const captions = await getYouTubeCaptions(video.videoId);
-        if (!captions) {
-          results.push({
-            church: church.church_name,
-            status: "waiting for captions",
-            reason: `Video: ${video.title} | ${video.published.toISOString().split('T')[0]}`
-          });
-          continue;
-        }
+            const captions = await getYouTubeCaptions(video.videoId);
+            if (!captions) {
+              results.push({
+                church: church.church_name,
+                status: "waiting for captions",
+                reason: `Video: ${video.title} | ${video.published.toISOString().split('T')[0]}`
+              });
+              return;
+            }
 
-        results.push({
-          church: church.church_name,
-          status: "✅ transcript fetched",
-          reason: `Video: ${video.title} | ${captions.length} chars fetched`
-        });
-      } catch (churchErr) {
-        results.push({
-          church: church.church_name,
-          status: "error",
-          reason: churchErr.message
-        });
-      }
+            results.push({
+              church: church.church_name,
+              status: "✅ transcript fetched",
+              reason: `Video: ${video.title} | ${captions.length} chars fetched`
+            });
+          } catch (churchErr) {
+            results.push({
+              church: church.church_name,
+              status: "error",
+              reason: churchErr.message
+            });
+          }
+        })
+      );
     }
 
     // Queue email send in background (don't wait for it)
