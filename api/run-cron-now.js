@@ -1,9 +1,7 @@
 // Manual trigger for Sunday sermon cron - run immediately
 // This is the same logic as the scheduled cron but callable on-demand
 
-import { Resend } from 'resend';
-
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Email will be sent via sendStatusEmail function in main cron
 
 async function getChannelIdFromUrl(channelUrl) {
   const directMatch = channelUrl.match(/\/channel\/(UC[^/?]+)/);
@@ -112,7 +110,7 @@ async function getNewestVideo(channelId) {
 
 async function sendStatusEmail(results) {
   if (!process.env.RESEND_API_KEY) {
-    console.log(`[Email] RESEND_API_KEY not set`);
+    console.log(`[Email] RESEND_API_KEY not set, skipping`);
     return;
   }
 
@@ -126,47 +124,51 @@ async function sendStatusEmail(results) {
   const stats = {
     total: uniqueResults.length,
     waiting: uniqueResults.filter(r => r.status.includes("waiting")).length,
-    generated: uniqueResults.filter(r => r.status.includes("puzzle")).length,
+    generated: uniqueResults.filter(r => r.status.includes("puzzle") || r.status.includes("transcript")).length,
     errors: uniqueResults.filter(r => r.status.includes("no channel") || r.error).length
   };
 
-  const html = `
+  const html = `<div style="font-family:Arial;max-width:700px;margin:0 auto;padding:20px;background:#fafafa">
 <h2>Church Sermon Cron Results</h2>
 <div style="background:#f0f0f0;padding:15px;border-radius:5px;margin:15px 0">
   <p><strong>Total churches processed:</strong> ${stats.total}</p>
-  <p><strong>Waiting for captions:</strong> ${stats.waiting}</p>
-  <p><strong>Puzzles generated:</strong> ${stats.generated}</p>
-  <p><strong>Skipped (no channel ID):</strong> ${stats.errors}</p>
+  <p style="color:green"><strong>✅ Transcripts fetched:</strong> ${stats.generated}</p>
+  <p style="color:orange"><strong>⏳ Waiting for captions:</strong> ${stats.waiting}</p>
+  <p style="color:red"><strong>❌ Errors/Skipped:</strong> ${stats.errors}</p>
 </div>
-<table style="width:100%;border-collapse:collapse">
-  <thead>
-    <tr style="background:#333;color:white">
-      <th style="padding:12px;text-align:left">Church</th>
-      <th style="padding:12px;text-align:left">Status</th>
-      <th style="padding:12px;text-align:left">Details</th>
-    </tr>
-  </thead>
-  <tbody>
-    ${uniqueResults.map(r => `
-      <tr style="border-bottom:1px solid #ddd">
-        <td style="padding:12px"><strong>${r.church}</strong></td>
-        <td style="padding:12px">${r.status}</td>
-        <td style="padding:12px"><small>${r.reason || r.error || 'N/A'}</small></td>
-      </tr>
-    `).join('')}
-  </tbody>
+<table style="width:100%;border-collapse:collapse;background:white">
+  <tr style="background:#333;color:white">
+    <th style="padding:12px;text-align:left">Church</th>
+    <th style="padding:12px;text-align:left">Status</th>
+    <th style="padding:12px;text-align:left">Details</th>
+  </tr>
+  ${uniqueResults.map(r => `
+  <tr style="border-bottom:1px solid #ddd">
+    <td style="padding:12px"><strong>${r.church}</strong></td>
+    <td style="padding:12px">${r.status}</td>
+    <td style="padding:12px"><small>${r.reason || r.error || 'N/A'}</small></td>
+  </tr>
+  `).join('')}
 </table>
 <p style="color:#999;font-size:11px;margin-top:20px">Timestamp: ${new Date().toISOString()}</p>
-  `;
+</div>`;
 
   try {
-    await resend.emails.send({
-      from: "StoryClue <puzzles@storyclue.ai>",
-      to: "bob@thepremierproperties.com",
-      subject: `✅ Manual Cron Run: ${stats.total} churches (${stats.waiting} waiting)`,
-      html: html
+    const emailRes = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: "StoryClue <puzzles@storyclue.ai>",
+        to: "bob@thepremierproperties.com",
+        subject: `✅ Manual Cron Run: ${stats.total} churches (${stats.generated} transcripts fetched)`,
+        html: html
+      })
     });
-    console.log(`[Email] Sent to bob@thepremierproperties.com`);
+    const data = await emailRes.json();
+    console.log(`[Email] Response:`, data);
   } catch (err) {
     console.error(`[Email] Failed: ${err.message}`);
   }
