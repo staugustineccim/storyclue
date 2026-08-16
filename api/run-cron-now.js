@@ -84,23 +84,26 @@ async function getYouTubeCaptions(videoId) {
   }
 }
 
-async function getNewestVideo(channelId) {
+async function getNewestVideo(channelUrl) {
   try {
-    const apiKey = process.env.YOUTUBE_API_KEY;
-    if (!apiKey) throw new Error("YOUTUBE_API_KEY not set");
+    // Fetch channel page and parse for latest video
+    const res = await fetch(channelUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const html = await res.text();
 
-    const url = `https://www.googleapis.com/youtube/v3/search?channelId=${channelId}&order=date&part=snippet&key=${apiKey}&maxResults=1`;
-    const res = await fetch(url);
-    const data = await res.json();
+    // Look for videoId in the page HTML
+    const videoMatch = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
+    if (!videoMatch) return null;
 
-    if (!data.items || !data.items[0]) return null;
-    const item = data.items[0];
-    if (!item.id.videoId) return null;
+    const videoId = videoMatch[1];
+
+    // Try to get title from page
+    const titleMatch = html.match(/"title":"([^"]+)"/);
+    const title = titleMatch ? titleMatch[1] : "Unknown Video";
 
     return {
-      videoId: item.id.videoId,
-      title: item.snippet.title,
-      published: new Date(item.snippet.publishedAt)
+      videoId: videoId,
+      title: title,
+      published: new Date()
     };
   } catch (err) {
     console.log(`[Video] Error: ${err.message}`);
@@ -198,13 +201,7 @@ export default async function handler(req, res) {
           continue;
         }
 
-        const channelId = await getChannelIdFromUrl(church.youtube_channel);
-        if (!channelId) {
-          results.push({ church: church.church_name, status: "no channel ID", reason: "Could not parse channel ID" });
-          continue;
-        }
-
-        const video = await getNewestVideo(channelId);
+        const video = await getNewestVideo(church.youtube_channel);
         if (!video) {
           results.push({ church: church.church_name, status: "no videos", reason: "No videos found on channel" });
           continue;
