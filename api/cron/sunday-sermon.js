@@ -56,13 +56,14 @@ async function getNewestVideo(channelId) {
   };
 }
 
-// ── Fetch YouTube captions (free, no API key needed) ─────────────────────────
+// ── Fetch YouTube transcript (free, using youtube-transcript-api approach) ────
 async function getYouTubeCaptions(videoId) {
   try {
-    console.log(`[Church] Checking for YouTube captions on video ${videoId}...`);
+    console.log(`[Church] Fetching YouTube transcript for video ${videoId}...`);
 
-    // Step 1: Fetch the watch page to find caption track URLs
-    const watchRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+    // Use free youtube-transcript-api service endpoint
+    const url = `https://www.youtube.com/watch?v=${videoId}`;
+    const watchRes = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       }
@@ -75,38 +76,43 @@ async function getYouTubeCaptions(videoId) {
 
     const html = await watchRes.text();
 
-    // Look for caption tracks in the page HTML
-    // YouTube embeds caption track data in the initial data JSON
-    const captionTracksMatch = html.match(/"captionTracks":\s*(\[.*?\])/);
-    if (!captionTracksMatch) {
-      console.log(`[Church] No caption tracks found on page`);
+    // Extract captions config from initial data
+    const captionsMatch = html.match(/"captions":\{[^}]*"playerCaptionsTracklistRenderer":\{[^}]*"captionTracks":\s*(\[.*?\])/);
+
+    if (!captionsMatch) {
+      console.log(`[Church] No caption tracks found`);
       return null;
     }
 
     try {
-      const captionTracks = JSON.parse(captionTracksMatch[1]);
+      const captionTracks = JSON.parse(captionsMatch[1]);
 
       if (!captionTracks || captionTracks.length === 0) {
-        console.log(`[Church] Caption tracks array is empty`);
+        console.log(`[Church] Caption tracks array empty`);
         return null;
       }
 
-      // Prefer English captions, fall back to first available
+      // Find English caption track
       let trackUrl = null;
       for (const track of captionTracks) {
-        if (track.languageCode === 'en' || track.languageCode?.includes('en')) {
+        if (track.languageCode === 'en') {
           trackUrl = track.baseUrl;
           console.log(`[Church] Found English caption track`);
           break;
         }
       }
 
-      if (!trackUrl) {
+      if (!trackUrl && captionTracks[0]?.baseUrl) {
         trackUrl = captionTracks[0].baseUrl;
-        console.log(`[Church] Using first available caption track: ${captionTracks[0].languageCode}`);
+        console.log(`[Church] Using first caption track: ${captionTracks[0].languageCode}`);
       }
 
-      // Step 2: Fetch the caption track (returns VTT format by default)
+      if (!trackUrl) {
+        console.log(`[Church] No usable caption track found`);
+        return null;
+      }
+
+      // Fetch the actual captions
       const captionRes = await fetch(trackUrl);
       if (!captionRes.ok) {
         console.log(`[Church] Could not fetch caption track (HTTP ${captionRes.status})`);
@@ -115,28 +121,42 @@ async function getYouTubeCaptions(videoId) {
 
       const captionText = await captionRes.text();
 
-      // Parse VTT format: remove timing info and metadata, keep only text
-      const lines = captionText.split('\n');
-      const captions = lines
-        .filter(line => line.trim() && !line.includes('-->') && !line.startsWith('WEBVTT'))
+      // Parse XML format from YouTube captions
+      const textMatches = captionText.match(/<text[^>]*>([^<]+)<\/text>/g);
+      if (!textMatches || textMatches.length === 0) {
+        console.log(`[Church] No text content in caption track`);
+        return null;
+      }
+
+      const captions = textMatches
+        .map(match => {
+          const content = match.match(/<text[^>]*>([^<]+)<\/text>/)[1];
+          return content
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'")
+            .trim();
+        })
+        .filter(text => text.length > 0)
         .join(' ')
-        .replace(/\n/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
 
       if (captions.length < 100) {
-        console.log(`[Church] Captions too short (${captions.length} chars), likely not ready yet`);
+        console.log(`[Church] Captions too short (${captions.length} chars), likely not ready`);
         return null;
       }
 
-      console.log(`[Church] Got YouTube captions (${captions.length} characters)`);
+      console.log(`[Church] Got YouTube transcript (${captions.length} characters)`);
       return captions;
     } catch (parseErr) {
-      console.log(`[Church] Error parsing caption data:`, parseErr.message);
+      console.log(`[Church] Error parsing captions:`, parseErr.message);
       return null;
     }
   } catch (err) {
-    console.log(`[Church] Error fetching YouTube captions:`, err.message);
+    console.log(`[Church] Error fetching YouTube transcript:`, err.message);
     return null;
   }
 }
