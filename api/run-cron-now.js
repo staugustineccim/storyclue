@@ -86,24 +86,36 @@ async function getYouTubeCaptions(videoId) {
 
 async function getNewestVideo(channelUrl) {
   try {
-    // Fetch channel page and parse for latest video
-    const res = await fetch(channelUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-    const html = await res.text();
+    // Extract channel ID from URL
+    let channelId = null;
+    const directMatch = channelUrl.match(/\/channel\/(UC[^/?]+)/);
+    if (directMatch) {
+      channelId = directMatch[1];
+    } else {
+      // Try to fetch and parse the channel page for channel ID
+      const res = await fetch(channelUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+      const html = await res.text();
+      const match = html.match(/"channelId":"(UC[^"]+)"/);
+      if (match) channelId = match[1];
+    }
 
-    // Look for videoId in the page HTML
-    const videoMatch = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
-    if (!videoMatch) return null;
+    if (!channelId) return null;
 
-    const videoId = videoMatch[1];
+    // Use RSS feed - this always works and doesn't require JavaScript
+    const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
+    const rssRes = await fetch(rssUrl);
+    if (!rssRes.ok) return null;
 
-    // Try to get title from page
-    const titleMatch = html.match(/"title":"([^"]+)"/);
-    const title = titleMatch ? titleMatch[1] : "Unknown Video";
+    const rssText = await rssRes.text();
+
+    // Parse RSS for latest video
+    const entryMatch = rssText.match(/<entry>\s*<id>yt:video:([a-zA-Z0-9_-]{11})<\/id>.*?<title>([^<]+)<\/title>.*?<published>([^<]+)<\/published>/s);
+    if (!entryMatch) return null;
 
     return {
-      videoId: videoId,
-      title: title,
-      published: new Date()
+      videoId: entryMatch[1],
+      title: entryMatch[2],
+      published: new Date(entryMatch[3])
     };
   } catch (err) {
     console.log(`[Video] Error: ${err.message}`);
