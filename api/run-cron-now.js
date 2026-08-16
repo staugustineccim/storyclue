@@ -194,7 +194,7 @@ export default async function handler(req, res) {
 
   try {
     const churchRes = await fetch(
-      `${process.env.SUPABASE_URL}/rest/v1/church_accounts?select=id,church_name,pastor_name,sender_email,youtube_channel&limit=20&order=church_name.asc`,
+      `${process.env.SUPABASE_URL}/rest/v1/church_accounts?select=id,church_name,pastor_name,sender_email,youtube_channel&limit=100&order=church_name.asc`,
       {
         headers: {
           'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -203,10 +203,24 @@ export default async function handler(req, res) {
       }
     );
 
-    const churches = await churchRes.json();
+    let churches = await churchRes.json();
+    if (!Array.isArray(churches)) churches = [];
+
+    // Deduplicate by church_name - keep first occurrence only
+    const seen = new Set();
+    const uniqueChurches = [];
+    for (const church of churches) {
+      if (!seen.has(church.church_name)) {
+        seen.add(church.church_name);
+        uniqueChurches.push(church);
+      }
+    }
+
+    console.log(`[Cron] Found ${uniqueChurches.length} unique churches (from ${churches.length} total records)`);
+
     const results = [];
 
-    for (const church of churches) {
+    for (const church of uniqueChurches) {
       try {
         if (!church.youtube_channel) {
           results.push({ church: church.church_name, status: "no youtube URL", reason: "Missing URL" });
