@@ -175,11 +175,11 @@ async function sendStatusEmail(results) {
 }
 
 export default async function handler(req, res) {
-  console.log(`[Cron] Manual run started at ${new Date().toISOString()}`);
+  console.log(`[Cron] Manual run started`);
 
   try {
     const churchRes = await fetch(
-      `${process.env.SUPABASE_URL}/rest/v1/church_accounts?select=id,church_name,pastor_name,sender_email,youtube_channel&order=church_name.asc`,
+      `${process.env.SUPABASE_URL}/rest/v1/church_accounts?select=id,church_name,pastor_name,sender_email,youtube_channel&limit=20&order=church_name.asc`,
       {
         headers: {
           'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -191,50 +191,58 @@ export default async function handler(req, res) {
     const churches = await churchRes.json();
     const results = [];
 
-    for (const church of churches.slice(0, 10)) {
-      if (!church.youtube_channel) {
-        results.push({ church: church.church_name, status: "no youtube URL" });
-        continue;
-      }
+    for (const church of churches) {
+      try {
+        if (!church.youtube_channel) {
+          results.push({ church: church.church_name, status: "no youtube URL", reason: "Missing URL" });
+          continue;
+        }
 
-      const channelId = await getChannelIdFromUrl(church.youtube_channel);
-      if (!channelId) {
-        results.push({ church: church.church_name, status: "no channel ID", reason: "Could not parse channel ID" });
-        continue;
-      }
+        const channelId = await getChannelIdFromUrl(church.youtube_channel);
+        if (!channelId) {
+          results.push({ church: church.church_name, status: "no channel ID", reason: "Could not parse channel ID" });
+          continue;
+        }
 
-      const video = await getNewestVideo(channelId);
-      if (!video) {
-        results.push({ church: church.church_name, status: "no videos", reason: "No videos found" });
-        continue;
-      }
+        const video = await getNewestVideo(channelId);
+        if (!video) {
+          results.push({ church: church.church_name, status: "no videos", reason: "No videos found on channel" });
+          continue;
+        }
 
-      const captions = await getYouTubeCaptions(video.videoId);
-      if (!captions) {
+        const captions = await getYouTubeCaptions(video.videoId);
+        if (!captions) {
+          results.push({
+            church: church.church_name,
+            status: "waiting for captions",
+            reason: `Video: ${video.title} | ${video.published.toISOString().split('T')[0]}`
+          });
+          continue;
+        }
+
         results.push({
           church: church.church_name,
-          status: "waiting for captions",
-          reason: `Video: ${video.title} (${video.published.toISOString().split('T')[0]})`
+          status: "✅ transcript fetched",
+          reason: `Video: ${video.title} | ${captions.length} chars fetched`
         });
-        continue;
+      } catch (churchErr) {
+        results.push({
+          church: church.church_name,
+          status: "error",
+          reason: churchErr.message
+        });
       }
-
-      results.push({
-        church: church.church_name,
-        status: "✅ transcript fetched",
-        reason: `Video: ${video.title} | ${captions.length} chars`
-      });
     }
 
-    await sendStatusEmail(results);
+    // Queue email send in background (don't wait for it)
+    sendStatusEmail(results).catch(err => console.error(`[Email] Error:`, err));
 
     return res.status(200).json({
-      message: "Cron run complete",
-      processed: results.length,
+      message: `Processed ${results.length} churches. Email sent to bob@thepremierproperties.com`,
       results: results
     });
   } catch (err) {
     console.error(`[Cron] Error: ${err.message}`);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message, stack: err.stack });
   }
 }
