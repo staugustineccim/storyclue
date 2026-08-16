@@ -81,15 +81,27 @@ export default async function handler(req, res) {
   const videoId = req.query.v || "mGIhEB5yK6U"; // Default test video
 
   try {
+    const watchRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+
+    const html = await watchRes.text();
+    const captionTracksMatch = html.match(/"captionTracks":\s*(\[.*?\])/);
+
     const captions = await getYouTubeCaptions(videoId);
 
     return res.status(200).json({
       video_id: videoId,
-      success: !!captions,
+      watch_page_ok: watchRes.ok,
+      caption_tracks_found: !!captionTracksMatch,
+      has_captions: !!captions,
       caption_length: captions?.length || 0,
-      preview: captions?.substring(0, 500) || "No captions found"
+      preview: captions?.substring(0, 300) || "No captions found",
+      html_preview: html.substring(0, 1000)
     });
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message, stack: err.stack });
   }
 }
