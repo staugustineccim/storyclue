@@ -337,6 +337,13 @@ export default async function handler(req, res) {
     return tooManyRequests(res, rateInfo);
   }
 
+  // ── Bible Version (optional) ───────────────────────────────────────────────────
+  // User may select a Bible version (ESV, NASB, NLT, etc.) or provide a custom one
+  // For now we accept but don't use this info; future enhancement: tailor prompts by version
+  const { bibleVersion, bibleVersionCustom } = req.body || {};
+  const selectedBibleVersion = bibleVersion && bibleVersion !== "other" ? bibleVersion : bibleVersionCustom || null;
+  if (selectedBibleVersion) console.log(`[Bible] Version: ${selectedBibleVersion}`);
+
   // ── Input Validation ───────────────────────────────────────────────────────────
   const inputValidation = validateInputs(req);
   if (!inputValidation.valid) {

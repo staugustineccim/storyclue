@@ -404,6 +404,8 @@ export default function PuzzleGenerator() {
         currentChapter: seriesMode ? currentChapter : "",
         phonicsMode: isK2 && phonicsMode,
         pictureMode: isK2 && pictureMode,
+        bibleVersion: selectedVersion || undefined,
+        bibleVersionCustom: selectedVersion === "other" ? otherVersionText : undefined,
       };
 
       const res = await fetchWithCSRF("/api/generate", {
