@@ -76,8 +76,8 @@ async function getYouTubeCaptions(videoId) {
 
     const html = await watchRes.text();
 
-    // Extract captions config from initial data
-    const captionsMatch = html.match(/"captions":\{[^}]*"playerCaptionsTracklistRenderer":\{[^}]*"captionTracks":\s*(\[.*?\])/);
+    // Extract captionTracks from initial page data (simpler, more robust regex)
+    const captionsMatch = html.match(/"captionTracks":\s*(\[\{[^}]*"baseUrl"[^}]*(?:\{[^}]*\}[^}]*)*\}(?:,\{[^}]*"baseUrl"[^}]*(?:\{[^}]*\}[^}]*)*\})*\])/);
 
     if (!captionsMatch) {
       console.log(`[Church] No caption tracks found`);
