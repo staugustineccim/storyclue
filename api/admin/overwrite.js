@@ -36,7 +36,8 @@ export default async function handler(req, res) {
 
     // Update each with verified data (cycling through if more records than data)
     let updated = 0;
-    for (let i = 0; i < existing.length && i < verified.length; i++) {
+    for (let i = 0; i < existing.length; i++) {
+      const churchIdx = i % verified.length;
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/church_accounts?id.eq.${existing[i].id}`,
         {
@@ -47,8 +48,8 @@ export default async function handler(req, res) {
             Authorization: `Bearer ${KEY}`,
           },
           body: JSON.stringify({
-            church_name: verified[i].church_name,
-            youtube_channel: verified[i].youtube_channel,
+            church_name: verified[churchIdx].church_name,
+            youtube_channel: verified[churchIdx].youtube_channel,
             pastor_name: "Pastor",
             sender_email: "bob@thepremierproperties.com",
           }),
