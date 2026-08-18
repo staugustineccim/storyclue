@@ -56,8 +56,13 @@ export default async function handler(req, res) {
         }
       );
 
-      if (res.ok) updated++;
-      console.log(`[Overwrite] Updated ${i + 1}: ${res.ok ? 'OK' : 'FAIL'}`);
+      if (res.ok) {
+        updated++;
+        console.log(`[Overwrite] Updated ${i + 1}: OK`);
+      } else {
+        const errText = await res.text();
+        console.log(`[Overwrite] Updated ${i + 1}: FAIL ${res.status} - ${errText.substring(0, 200)}`);
+      }
     }
 
     return res.json({ updated, total_records: existing.length });
