@@ -59,6 +59,10 @@ async function checkTranscriptionStatus(jobId, service) {
 
 // ── Generate puzzle from sermon text ─────────────────────────────────────────
 async function generateSermonPuzzle(sermonText, sermonTitle, churchName, pastorName) {
+  console.log(`[Poll] Sermon transcript length: ${sermonText.length} characters`);
+  const wordCount = sermonText.split(/\s+/).length;
+  console.log(`[Poll] Sermon word count: ${wordCount} words`);
+
   const prompt = `You are creating a crossword puzzle from a church sermon to help the congregation remember what they heard today.
 
 Sermon title: "${sermonTitle}"
@@ -121,7 +125,7 @@ Return ONLY valid JSON in this exact format:
       "x-api-key": process.env.ANTHROPIC_API_KEY,
       "anthropic-version": "2023-06-01",
     },
-    body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1500, messages: [{ role: "user", content: prompt }] }),
+    body: JSON.stringify({ model: "claude-opus-5", max_tokens: 1500, messages: [{ role: "user", content: prompt }] }),
   });
   const data = await response.json();
   const text = data.content[0].text;
