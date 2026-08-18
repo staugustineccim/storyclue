@@ -17,9 +17,9 @@ export default async function handler(req, res) {
     const recordId = records[0].id;
     console.log(`[TestPatch] Testing PATCH on ${recordId}`);
 
-    // Try to update just one record
+    // Try to update just one record (quote UUID for Supabase)
     const patchRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/church_accounts?id.eq.${recordId}`,
+      `${SUPABASE_URL}/rest/v1/church_accounts?id=eq.${recordId}`,
       {
         method: 'PATCH',
         headers: {
