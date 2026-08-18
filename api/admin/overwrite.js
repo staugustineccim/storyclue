@@ -39,7 +39,7 @@ export default async function handler(req, res) {
     for (let i = 0; i < existing.length; i++) {
       const churchIdx = i % verified.length;
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/church_accounts?id.eq.${existing[i].id}`,
+        `${SUPABASE_URL}/rest/v1/church_accounts?id=eq.${existing[i].id}`,
         {
           method: 'PATCH',
           headers: {
