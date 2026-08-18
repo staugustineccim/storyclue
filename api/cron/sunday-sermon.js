@@ -4,14 +4,41 @@
 
 // ── YouTube RSS — no API key needed ──────────────────────────────────────────
 async function getChannelIdFromUrl(channelUrl) {
-  if (channelUrl.includes("/@")) {
-    const res = await fetch(channelUrl);
-    const html = await res.text();
-    const match = html.match(/"channelId":"(UC[^"]+)"/);
-    return match ? match[1] : null;
+  // Handle /channel/ID format
+  const channelMatch = channelUrl.match(/\/channel\/(UC[^/?]+)/);
+  if (channelMatch) return channelMatch[1];
+
+  // Handle watch?v=ID format (get channel from video)
+  const videoMatch = channelUrl.match(/v=([^&]+)/);
+  if (videoMatch) {
+    const videoId = videoMatch[1];
+    try {
+      const apiKey = process.env.YOUTUBE_API_KEY;
+      if (apiKey) {
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=snippet&key=${apiKey}`);
+        const data = await res.json();
+        if (data.items?.[0]?.snippet?.channelId) {
+          return data.items[0].snippet.channelId;
+        }
+      }
+    } catch (err) {
+      console.log(`[Church] Could not resolve video ${videoId}: ${err.message}`);
+    }
   }
-  const match = channelUrl.match(/\/channel\/(UC[^/?]+)/);
-  return match ? match[1] : null;
+
+  // Handle @handle format
+  if (channelUrl.includes("/@")) {
+    try {
+      const res = await fetch(channelUrl);
+      const html = await res.text();
+      const match = html.match(/"channelId":"(UC[^"]+)"/);
+      if (match) return match[1];
+    } catch (err) {
+      console.log(`[Church] Could not fetch ${channelUrl}: ${err.message}`);
+    }
+  }
+
+  return null;
 }
 
 async function getRecentVideos(channelId) {
