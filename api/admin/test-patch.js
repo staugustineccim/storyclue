@@ -15,11 +15,12 @@ export default async function handler(req, res) {
     }
 
     const recordId = records[0].id;
-    console.log(`[TestPatch] Testing PATCH on ${recordId}`);
+    console.log(`[TestPatch] Testing PATCH on ID: ${recordId}, type: ${typeof recordId}`);
 
-    // Try to update just one record (quote UUID for Supabase)
+    // Try to update just one record
+    const filterStr = `id=eq.${recordId}`;
     const patchRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/church_accounts?id=eq.${recordId}`,
+      `${SUPABASE_URL}/rest/v1/church_accounts?${filterStr}`,
       {
         method: 'PATCH',
         headers: {
@@ -39,6 +40,8 @@ export default async function handler(req, res) {
     console.log(`[TestPatch] Response body: ${result.substring(0, 500)}`);
 
     return res.json({
+      recordId,
+      filterStr,
       patchStatus: patchRes.status,
       patchOk: patchRes.ok,
       responsePreview: result.substring(0, 200),
