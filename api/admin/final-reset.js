@@ -58,8 +58,15 @@ export default async function handler(req, res) {
     });
 
     console.log(`[FinalReset] Insert response: ${insertRes.status}`);
-    const inserted = await insertRes.json();
-    console.log(`[FinalReset] Inserted: ${Array.isArray(inserted) ? inserted.length : 'error'}`, inserted);
+    let inserted;
+    try {
+      inserted = await insertRes.json();
+    } catch (e) {
+      const text = await insertRes.text();
+      console.log(`[FinalReset] Insert response text: ${text}`);
+      inserted = text;
+    }
+    console.log(`[FinalReset] Inserted: ${Array.isArray(inserted) ? inserted.length : typeof inserted}`);
 
     return res.status(200).json({
       deleted: all.length,
