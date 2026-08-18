@@ -9,7 +9,7 @@ export default async function handler(req, res) {
 
   try {
     const fetchRes = await fetch(
-      `${supabaseUrl}/rest/v1/church_accounts?select=church_name,youtube_channel,updated_at&order=church_name.asc&limit=100`,
+      `${supabaseUrl}/rest/v1/church_accounts?select=*&order=church_name.asc&limit=100`,
       {
         headers: {
           "apikey": supabaseKey,
