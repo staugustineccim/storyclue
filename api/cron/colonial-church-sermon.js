@@ -47,13 +47,17 @@ async function submitSupadataJob(videoId) {
 }
 
 async function generatePuzzle(transcript) {
+  console.log(`[Cron] Transcript length: ${transcript.length} characters`);
+  const wordCount = transcript.split(/\s+/).length;
+  console.log(`[Cron] Transcript word count: ${wordCount} words`);
+
   const res = await fetch("https://storyclue.ai/api/generate", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       inputMode: "paste",
       chapterText: transcript,
-      grade: "4",
+      grade: "adult",
       faith: "christian-protestant",
       language: "english",
     }),
