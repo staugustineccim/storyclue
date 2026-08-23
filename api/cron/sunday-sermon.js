@@ -395,17 +395,31 @@ export default async function handler(req, res) {
 
   const results = [];
 
+  // Summary tracking
+  const summary = {
+    totalProcessed: 0,
+    successfulPuzzles: [],
+    failedPuzzles: [],
+    awaitingCaptions: [],
+    badUrls: []
+  };
+
   try {
     console.log("[Church Cron] Fetching churches from Supabase...");
     const churches = await getChurches();
     console.log(`[Church Cron] Found ${churches.length} churches`);
+    summary.totalProcessed = churches.length;
 
     for (const church of churches) {
       console.log(`[Church] Processing: ${church.church_name}`);
       try {
         console.log(`[Church] Getting channel ID from: ${church.youtube_channel}`);
         const channelId = await getChannelIdFromUrl(church.youtube_channel);
-        if (!channelId) { results.push({ church: church.church_name, status: "no channel ID" }); continue; }
+        if (!channelId) {
+          results.push({ church: church.church_name, status: "no channel ID" });
+          summary.badUrls.push({ church: church.church_name, url: church.youtube_channel, reason: "Could not extract channel ID" });
+          continue;
+        }
         console.log(`[Church] Got channel ID: ${channelId}`);
 
         console.log(`[Church] Fetching recent videos...`);
@@ -452,6 +466,7 @@ export default async function handler(req, res) {
               console.log(`[Church] YouTube captions not available yet, setting to waiting state...`);
               await updateSermonRecord(record.id, { status: "waiting_for_captions", video_id: candidateSermon.videoId });
               results.push({ church: church.church_name, status: "waiting for YouTube captions (will retry hourly)" });
+              summary.awaitingCaptions.push({ church: church.church_name, sermon: candidateSermon.title, reason: "YouTube captions not yet processed" });
               break; // Done with this church
             }
             console.log(`[Church] Transcription failed for this video: ${err.message}, trying next...`);
@@ -459,27 +474,38 @@ export default async function handler(req, res) {
           }
         }
 
-        if (!sermon) { results.push({ church: church.church_name, status: "no usable videos found" }); continue; }
+        if (!sermon) {
+          results.push({ church: church.church_name, status: "no usable videos found" });
+          summary.failedPuzzles.push({ church: church.church_name, reason: "No usable videos found" });
+          continue;
+        }
 
         if (transcriptionResult && transcriptionResult.transcript) {
           // Got transcript immediately (video has captions) — generate puzzle now
-          const puzzleData = await generateSermonPuzzle(transcriptionResult.transcript, sermon.title, church.church_name, church.pastor_name);
+          try {
+            const puzzleData = await generateSermonPuzzle(transcriptionResult.transcript, sermon.title, church.church_name, church.pastor_name);
 
-          const savePuzzleRes = await fetch(`${process.env.VERCEL_URL ? "https://"+process.env.VERCEL_URL : "http://localhost:3000"}/api/save-puzzle`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title: puzzleData.title, words: puzzleData.words, grade: "adult", rows: 15, cols: 15 }),
-          });
-          const savePuzzleData = await savePuzzleRes.json();
-          const slug = savePuzzleData.slug;
+            const savePuzzleRes = await fetch(`${process.env.VERCEL_URL ? "https://"+process.env.VERCEL_URL : "http://localhost:3000"}/api/save-puzzle`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ title: puzzleData.title, words: puzzleData.words, grade: "adult", rows: 15, cols: 15 }),
+            });
+            const savePuzzleData = await savePuzzleRes.json();
+            const slug = savePuzzleData.slug;
 
-          const puzzleUrl = `https://storyclue.ai/play/${slug}`;
+            const puzzleUrl = `https://storyclue.ai/play/${slug}`;
 
-          await updateSermonRecord(sermonRecord.id, { puzzle_slug: slug, status: "sent", sent_at: new Date().toISOString(), transcription_service: transcriptionResult.service });
+            await updateSermonRecord(sermonRecord.id, { puzzle_slug: slug, status: "sent", sent_at: new Date().toISOString(), transcription_service: transcriptionResult.service });
 
-          await emailPastor(church.sender_email, church.pastor_name, puzzleUrl, sermon.title);
+            await emailPastor(church.sender_email, church.pastor_name, puzzleUrl, sermon.title);
 
-          results.push({ church: church.church_name, status: "puzzle sent (instant)", puzzleUrl });
+            results.push({ church: church.church_name, status: "puzzle sent (instant)", puzzleUrl });
+            summary.successfulPuzzles.push({ church: church.church_name, sermon: sermon.title, service: transcriptionResult.service });
+          } catch (puzzleErr) {
+            console.error(`[Church] Failed to generate puzzle for ${church.church_name}:`, puzzleErr);
+            results.push({ church: church.church_name, status: "puzzle generation failed", error: puzzleErr.message });
+            summary.failedPuzzles.push({ church: church.church_name, sermon: sermon.title, reason: puzzleErr.message });
+          }
         } else if (transcriptionResult.jobId) {
           // Got jobId — background polling will handle it
           await updateSermonRecord(sermonRecord.id, { job_id: transcriptionResult.jobId, status: "transcribing", transcription_service: transcriptionResult.service });
@@ -490,16 +516,64 @@ export default async function handler(req, res) {
           await updateSermonRecord(sermonRecord.id, { status: "waiting_for_captions", video_id: sermon.videoId });
 
           results.push({ church: church.church_name, status: "waiting for YouTube captions (will retry hourly)" });
+          summary.awaitingCaptions.push({ church: church.church_name, sermon: sermon.title, reason: "Awaiting caption availability" });
         }
 
       } catch (err) {
         console.error(`[Church] Error for ${church.church_name}:`, err);
         results.push({ church: church.church_name, status: "error", error: err.message });
+        summary.failedPuzzles.push({ church: church.church_name, reason: `Error: ${err.message}` });
       }
     }
 
+    // Build summary report
+    const summaryReport = {
+      timestamp: new Date().toISOString(),
+      totalChurchesProcessed: summary.totalProcessed,
+      puzzlesCreated: summary.successfulPuzzles.length,
+      puzzlesFailed: summary.failedPuzzles.length,
+      awaitingCaptions: summary.awaitingCaptions.length,
+      badUrls: summary.badUrls.length,
+      details: {
+        successful: summary.successfulPuzzles.map(p => `${p.church} — "${p.sermon}" (via ${p.service})`),
+        failed: summary.failedPuzzles.map(p => `${p.church}: ${p.reason}`),
+        awaitingCaptions: summary.awaitingCaptions.map(a => `${a.church} — "${a.sermon}" (${a.reason})`),
+        badUrls: summary.badUrls.map(b => `${b.church}: ${b.url} — ${b.reason}`)
+      }
+    };
+
+    console.log("\n" + "=".repeat(80));
+    console.log("SUNDAY SERMON CRON — SUMMARY REPORT");
+    console.log("=".repeat(80));
+    console.log(`Total Churches Processed: ${summary.totalProcessed}`);
+    console.log(`Puzzles Created: ${summary.successfulPuzzles.length}`);
+    console.log(`Puzzles Failed: ${summary.failedPuzzles.length}`);
+    console.log(`Awaiting Captions: ${summary.awaitingCaptions.length}`);
+    console.log(`Bad URLs: ${summary.badUrls.length}`);
+
+    if (summary.successfulPuzzles.length > 0) {
+      console.log("\n✓ PUZZLES CREATED:");
+      summary.successfulPuzzles.forEach(p => console.log(`  • ${p.church} — "${p.sermon}"`));
+    }
+
+    if (summary.failedPuzzles.length > 0) {
+      console.log("\n✗ PUZZLES FAILED:");
+      summary.failedPuzzles.forEach(p => console.log(`  • ${p.church}: ${p.reason}`));
+    }
+
+    if (summary.awaitingCaptions.length > 0) {
+      console.log("\n⏳ AWAITING CAPTIONS (will retry hourly):");
+      summary.awaitingCaptions.forEach(a => console.log(`  • ${a.church} — "${a.sermon}" (${a.reason})`));
+    }
+
+    if (summary.badUrls.length > 0) {
+      console.log("\n⚠ BAD URLS (check these):");
+      summary.badUrls.forEach(b => console.log(`  • ${b.church}: ${b.url}`));
+    }
+    console.log("=".repeat(80) + "\n");
+
     await sendStatusEmail(results, null);
-    return res.status(200).json({ processed: churches.length, results });
+    return res.status(200).json({ processed: churches.length, results, summary: summaryReport });
 
   } catch (err) {
     console.error("[Church Cron] Handler error:", err);
