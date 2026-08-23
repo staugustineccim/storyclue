@@ -6,6 +6,9 @@ export default async function handler(req, res) {
   try {
     console.log('[CleanSlate] Starting clean slate operation...');
 
+    let sermonCount = 0;
+    let churchCount = 0;
+
     // 1. Delete all church_sermons first (to remove FK constraints)
     console.log('[CleanSlate] Deleting all church sermons...');
     const sermonsRes = await fetch(`${SUPABASE_URL}/rest/v1/church_sermons?select=id`, {
@@ -14,6 +17,7 @@ export default async function handler(req, res) {
 
     if (sermonsRes.ok) {
       const sermons = await sermonsRes.json();
+      sermonCount = sermons.length;
       if (Array.isArray(sermons) && sermons.length > 0) {
         console.log(`[CleanSlate] Found ${sermons.length} sermons to delete`);
 
@@ -40,6 +44,7 @@ export default async function handler(req, res) {
 
     if (churchesRes.ok) {
       const churches = await churchesRes.json();
+      churchCount = churches.length;
       if (Array.isArray(churches) && churches.length > 0) {
         console.log(`[CleanSlate] Found ${churches.length} churches to delete`);
 
@@ -323,8 +328,8 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      sermons_deleted: sermons?.length || 0,
-      churches_deleted: churches?.length || 0,
+      sermons_deleted: sermonCount,
+      churches_deleted: churchCount,
       churches_loaded: inserted,
       message: `Clean slate complete. Deleted all old data. Loaded ${inserted} verified churches from Chat.`
     });
