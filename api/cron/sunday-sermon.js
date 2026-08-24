@@ -26,15 +26,34 @@ async function getChannelIdFromUrl(channelUrl) {
     }
   }
 
-  // Handle @handle format
+  // Handle @handle format — use YouTube API to resolve
   if (channelUrl.includes("/@")) {
+    const apiKey = process.env.YOUTUBE_API_KEY;
+    if (!apiKey) {
+      console.log(`[Church] No YouTube API key set; cannot resolve @handle URLs`);
+      return null;
+    }
+
     try {
-      const res = await fetch(channelUrl);
-      const html = await res.text();
-      const match = html.match(/"channelId":"(UC[^"]+)"/);
-      if (match) return match[1];
+      // Extract handle from URL: https://www.youtube.com/@SomeName → @SomeName
+      const handleMatch = channelUrl.match(/\/@([^/?]+)/);
+      if (!handleMatch) return null;
+      const handle = handleMatch[1];
+
+      // Use YouTube API to search for channel by username
+      const searchRes = await fetch(
+        `https://www.googleapis.com/youtube/v3/search?q=${encodeURIComponent(handle)}&type=channel&part=snippet&key=${apiKey}&maxResults=1`
+      );
+      const searchData = await searchRes.json();
+
+      if (searchData.items?.[0]?.id?.channelId) {
+        console.log(`[Church] Resolved @${handle} to channel ID ${searchData.items[0].id.channelId}`);
+        return searchData.items[0].id.channelId;
+      }
+
+      console.log(`[Church] YouTube API search did not find channel for @${handle}`);
     } catch (err) {
-      console.log(`[Church] Could not fetch ${channelUrl}: ${err.message}`);
+      console.log(`[Church] YouTube API lookup failed for ${channelUrl}: ${err.message}`);
     }
   }
 
