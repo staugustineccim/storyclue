@@ -40,18 +40,27 @@ async function getChannelIdFromUrl(channelUrl) {
       if (!handleMatch) return null;
       const handle = handleMatch[1];
 
+      console.log(`[Church] Resolving handle @${handle} via YouTube API...`);
+
       // Use YouTube API to search for channel by username
-      const searchRes = await fetch(
-        `https://www.googleapis.com/youtube/v3/search?q=${encodeURIComponent(handle)}&type=channel&part=snippet&key=${apiKey}&maxResults=1`
-      );
+      const searchUrl = `https://www.googleapis.com/youtube/v3/search?q=${encodeURIComponent(handle)}&type=channel&part=snippet&key=${apiKey}&maxResults=1`;
+      const searchRes = await fetch(searchUrl);
       const searchData = await searchRes.json();
 
-      if (searchData.items?.[0]?.id?.channelId) {
-        console.log(`[Church] Resolved @${handle} to channel ID ${searchData.items[0].id.channelId}`);
-        return searchData.items[0].id.channelId;
+      console.log(`[Church] API response: ${JSON.stringify(searchData).substring(0, 200)}`);
+
+      if (searchData.error) {
+        console.log(`[Church] YouTube API error: ${searchData.error.message}`);
+        return null;
       }
 
-      console.log(`[Church] YouTube API search did not find channel for @${handle}`);
+      if (searchData.items?.[0]?.id?.channelId) {
+        const channelId = searchData.items[0].id.channelId;
+        console.log(`[Church] ✅ Resolved @${handle} to channel ID ${channelId}`);
+        return channelId;
+      }
+
+      console.log(`[Church] ❌ YouTube API search found no channel for @${handle}. Items: ${searchData.items?.length || 0}`);
     } catch (err) {
       console.log(`[Church] YouTube API lookup failed for ${channelUrl}: ${err.message}`);
     }
