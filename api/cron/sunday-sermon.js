@@ -406,8 +406,12 @@ export default async function handler(req, res) {
 
   try {
     console.log("[Church Cron] Fetching churches from Supabase...");
-    const churches = await getChurches();
-    console.log(`[Church Cron] Found ${churches.length} churches`);
+    const allChurches = await getChurches();
+    console.log(`[Church Cron] Found ${allChurches.length} total churches`);
+
+    // Process only first 10 churches per run to avoid Vercel 60s timeout
+    const churches = allChurches.slice(0, 10);
+    console.log(`[Church Cron] Processing ${churches.length} churches this run (limited to 10 per run)`);
     summary.totalProcessed = churches.length;
 
     for (const church of churches) {
