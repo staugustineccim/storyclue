@@ -1,82 +1,92 @@
 // ── Trial & Founding Member logic ─────────────────────────────────────────────
-// Trial starts the first time a user visits /create.
+// Global trial end date: October 22, 2026 (60 days from August 23, 2026)
+// ALL users get free trial until this date, regardless of when they started.
 // Stored in localStorage so it works immediately — no account required.
 // When a user signs in via Supabase, trial_started_at syncs to their profile.
 //
-// Timeline:
-//   Day 0–24  : active trial — full access, small "Trial: X days" indicator
-//   Day 25–30 : expiring — gentle banner shown, founding member deal highlighted
-//   Day 31–37 : grace period — upgrade prompt shown each session, never hard blocked
-//   Day 38+   : ended — upgrade prompt shown, current session always completes
+// Timeline (remaining days until TRIAL_END_DATE):
+//   51+ days : active trial — full access, small "Trial: X days" indicator
+//   1–50 days: expiring — gentle banner shown, founding member deal highlighted
+//   Grace period: 30 extra days after trial end before hard block
+//   After grace: ended — upgrade prompt shown, current session always completes
 
-export const TRIAL_DAYS  = 30;
-export const GRACE_DAYS  = 45; // Extended grace period for beta testing (was 7)
-export const WARN_AT_DAY = 25; // start showing banner at this day
+const TRIAL_END_DATE = new Date(2026, 9, 22); // October 22, 2026 (months are 0-indexed)
+const GRACE_PERIOD_DAYS = 30;
+const WARN_AT_DAYS_REMAINING = 50;
 
 const STORAGE_KEY  = "sc_trial_start";
 const INTENT_KEY   = "sc_upgrade_intent";
 const GRACE_EXT_KEY = "sc_grace_extended"; // set when "Not ready yet" clicked
 
-// ── Trial start ────────────────────────────────────────────────────────────────
+// ── Trial initialization ──────────────────────────────────────────────────────
 
 export function initTrial() {
+  // Marker that trial has been viewed; now uses global end date
   if (!localStorage.getItem(STORAGE_KEY)) {
-    localStorage.setItem(STORAGE_KEY, new Date().toISOString());
+    localStorage.setItem(STORAGE_KEY, "true");
   }
 }
 
 export function getTrialStart() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  return raw ? new Date(raw) : null;
+  // Returns global TRIAL_END_DATE for reference (backward compatibility)
+  return TRIAL_END_DATE;
 }
 
 // ── Days calculations ──────────────────────────────────────────────────────────
 
-export function getDaysElapsed() {
-  const start = getTrialStart();
-  if (!start) return 0;
-  return Math.floor((Date.now() - start.getTime()) / (1000 * 60 * 60 * 24));
-}
-
 export function getDaysRemaining() {
-  return Math.max(0, TRIAL_DAYS - getDaysElapsed());
+  const now = new Date();
+  const daysUntilEnd = Math.ceil((TRIAL_END_DATE.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  return Math.max(0, daysUntilEnd);
 }
 
 export function getGraceEnd() {
-  // If "Not ready yet" was clicked, grace extends by another 7 days from that click
+  // If "Not ready yet" was clicked, grace extends by another N days from that click
   const graceExt = localStorage.getItem(GRACE_EXT_KEY);
   if (graceExt) {
     const extDate = new Date(graceExt);
     const daysSince = Math.floor((Date.now() - extDate.getTime()) / (1000 * 60 * 60 * 24));
-    return Math.max(0, GRACE_DAYS - daysSince);
+    return Math.max(0, GRACE_PERIOD_DAYS - daysSince);
   }
-  return Math.max(0, (TRIAL_DAYS + GRACE_DAYS) - getDaysElapsed());
+  // Grace period starts after TRIAL_END_DATE
+  const graceEndDate = new Date(TRIAL_END_DATE);
+  graceEndDate.setDate(graceEndDate.getDate() + GRACE_PERIOD_DAYS);
+  const daysUntilGraceEnd = Math.ceil((graceEndDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  return Math.max(0, daysUntilGraceEnd);
 }
 
 // ── Status ─────────────────────────────────────────────────────────────────────
 
-// Returns: 'active' | 'expiring' | 'grace' | 'ended' | 'no-trial'
+// Returns: 'active' | 'expiring' | 'grace' | 'ended' | 'subscribed'
 export function getTrialStatus() {
-  const start = getTrialStart();
-  if (!start) return "no-trial";
-
-  const elapsed = getDaysElapsed();
-
   // Already upgraded — check intent
   const intent = getUpgradeIntent();
   if (intent?.confirmed) return "subscribed";
 
-  if (elapsed < WARN_AT_DAY)           return "active";
-  if (elapsed < TRIAL_DAYS)            return "expiring";
+  const now = new Date();
+  const daysRemaining = getDaysRemaining();
 
-  // Check grace extension
+  // Trial still active
+  if (now < TRIAL_END_DATE) {
+    if (daysRemaining > WARN_AT_DAYS_REMAINING) {
+      return "active";
+    } else {
+      return "expiring";
+    }
+  }
+
+  // Trial ended — check grace period
   const graceExt = localStorage.getItem(GRACE_EXT_KEY);
   if (graceExt) {
     const extDate = new Date(graceExt);
     const daysSinceExt = Math.floor((Date.now() - extDate.getTime()) / (1000 * 60 * 60 * 24));
-    if (daysSinceExt < GRACE_DAYS) return "grace";
-  } else if (elapsed < TRIAL_DAYS + GRACE_DAYS) {
-    return "grace";
+    if (daysSinceExt < GRACE_PERIOD_DAYS) return "grace";
+  } else {
+    const graceEndDate = new Date(TRIAL_END_DATE);
+    graceEndDate.setDate(graceEndDate.getDate() + GRACE_PERIOD_DAYS);
+    if (now < graceEndDate) {
+      return "grace";
+    }
   }
 
   return "ended";
