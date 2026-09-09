@@ -516,7 +516,8 @@ export default async function handler(req, res) {
 
           console.log(`[Church] Checking if already processed...`);
           const existing = await getExistingSermon(church.id, candidateSermon.videoId);
-          if (existing) { console.log(`[Church] Already processed, skipping`); continue; }
+          if (existing && existing.status !== "waiting_for_captions") { console.log(`[Church] Already processed, skipping`); continue; }
+          if (existing && existing.status === "waiting_for_captions") { console.log(`[Church] Retrying captions for existing video...`); sermonRecord = existing; }
 
           // Create sermon record
           console.log(`[Church] Creating sermon record...`);
