@@ -501,10 +501,13 @@ export default async function handler(req, res) {
         // Find the most recent video (not just today's)
         if (videos.length === 0) { results.push({ church: church.church_name, status: "no videos found" }); continue; }
 
-        // Sort by published date descending and take the most recent
-        const sortedVideos = videos.sort((a, b) => new Date(b.snippet.publishedAt) - new Date(a.snippet.publishedAt));
+        // Sort by published date descending, filter out invalid items, and take the most recent
+        const validVideos = videos.filter(v => v && v.snippet && v.snippet.publishedAt);
+        if (validVideos.length === 0) { results.push({ church: church.church_name, status: "no valid videos found" }); continue; }
+
+        const sortedVideos = validVideos.sort((a, b) => new Date(b.snippet.publishedAt) - new Date(a.snippet.publishedAt));
         const recentVideos = sortedVideos.slice(0, 1); // Take just the most recent
-        console.log(`[Church] Found ${sortedVideos.length} videos total. Processing most recent from ${new Date(recentVideos[0].snippet.publishedAt).toDateString()}`);
+        console.log(`[Church] Found ${sortedVideos.length} valid videos. Processing most recent from ${new Date(recentVideos[0].snippet.publishedAt).toDateString()}`);
 
         // Try each video until one succeeds (skip live streams)
         let transcriptionResult = null;
