@@ -193,21 +193,10 @@ async function getYouTubeCaptions(videoId) {
   }
 }
 
-// ── Transcription fallback chain: Supadata → YouTube captions ─────────────
+// ── Transcription via Supadata (handles captions automatically) ──────────────
 async function submitTranscriptionJob(videoId) {
-  try {
-    console.log(`[Church] Trying Supadata...`);
-    return await submitSupadataJob(videoId);
-  } catch (supadataErr) {
-    console.log(`[Church] Supadata failed: ${supadataErr.message}, trying YouTube captions...`);
-    try {
-      console.log(`[Church] Trying YouTube captions...`);
-      return await getYouTubeCaptions(videoId);
-    } catch (captionErr) {
-      console.log(`[Church] YouTube captions failed: ${captionErr.message}`);
-      throw new Error(`No transcription available. Supadata: ${supadataErr.message}. YouTube captions: ${captionErr.message}`);
-    }
-  }
+  console.log(`[Church] Submitting to Supadata for transcription...`);
+  return await submitSupadataJob(videoId);
 }
 
 // ── Generate puzzle from sermon text ─────────────────────────────────────────
