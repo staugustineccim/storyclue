@@ -498,18 +498,20 @@ export default async function handler(req, res) {
 
         if (videos.length === 0) { results.push({ church: church.church_name, status: "no videos found" }); continue; }
 
-        // Filter to only today's videos
-        const todaysVideos = findSermonVideo(videos, null, today);
-        console.log(`[Church] Found ${todaysVideos.length} videos from today`);
+        // Find the most recent video (not just today's)
+        if (videos.length === 0) { results.push({ church: church.church_name, status: "no videos found" }); continue; }
 
-        if (todaysVideos.length === 0) { results.push({ church: church.church_name, status: "no videos from today" }); continue; }
+        // Sort by published date descending and take the most recent
+        const sortedVideos = videos.sort((a, b) => new Date(b.snippet.publishedAt) - new Date(a.snippet.publishedAt));
+        const recentVideos = sortedVideos.slice(0, 1); // Take just the most recent
+        console.log(`[Church] Found ${sortedVideos.length} videos total. Processing most recent from ${new Date(recentVideos[0].snippet.publishedAt).toDateString()}`);
 
         // Try each video until one succeeds (skip live streams)
         let transcriptionResult = null;
         let sermonRecord = null;
         let sermon = null;
 
-        for (const candidateSermon of todaysVideos) {
+        for (const candidateSermon of recentVideos) {
           console.log(`[Church] Trying: "${candidateSermon.title}" published ${candidateSermon.published.toISOString()}`);
 
           console.log(`[Church] Checking if already processed...`);
