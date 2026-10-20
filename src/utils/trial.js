@@ -1,5 +1,6 @@
 // ── Trial & Founding Member logic ─────────────────────────────────────────────
-// Global trial end date: October 22, 2026 (60 days from August 23, 2026)
+// Global trial end date: December 31, 2026 (extended by owner directive 2026-10-19;
+// previously October 22, 2026 — 60 days from August 23, 2026)
 // ALL users get free trial until this date, regardless of when they started.
 // Stored in localStorage so it works immediately — no account required.
 // When a user signs in via Supabase, trial_started_at syncs to their profile.
@@ -10,7 +11,7 @@
 //   Grace period: 30 extra days after trial end before hard block
 //   After grace: ended — upgrade prompt shown, current session always completes
 
-const TRIAL_END_DATE = new Date(2026, 9, 22); // October 22, 2026 (months are 0-indexed)
+const TRIAL_END_DATE = new Date(2026, 11, 31); // December 31, 2026 (months are 0-indexed)
 const GRACE_PERIOD_DAYS = 30;
 const WARN_AT_DAYS_REMAINING = 50;
 
