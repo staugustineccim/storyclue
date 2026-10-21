@@ -145,24 +145,103 @@ function shuffle(arr) {
   return a;
 }
 
+// ── Deterministic layout validation (handoff §14.4) ───────────────────────────
+// Independent of the generator: re-derives the grid from the placements and
+// checks the finished layout the way an editor would — legal word lengths, no
+// duplicate answers, every crossing letter consistent, one connected grid,
+// and a clue number on every entry. Returns { ok, errors }.
+export function validateLayout(words, rows, cols) {
+  const errors = [];
+  if (!Array.isArray(words) || !words.length) {
+    return { ok: false, errors: ["no words in layout"] };
+  }
+
+  const seen = new Set();
+  const grid = Array.from({ length: rows }, () => Array(cols).fill(null));
+
+  for (const w of words) {
+    const answer = (w.answer || w.word || "").toUpperCase();
+    if (answer.length < 3) errors.push(`"${answer}" is shorter than the 3-letter minimum`);
+    if (seen.has(answer)) errors.push(`duplicate answer "${answer}"`);
+    seen.add(answer);
+    for (let i = 0; i < answer.length; i++) {
+      const r = w.orientation === "down"   ? w.starty + i : w.starty;
+      const c = w.orientation === "across" ? w.startx + i : w.startx;
+      if (r < 0 || r >= rows || c < 0 || c >= cols) {
+        errors.push(`"${answer}" runs outside the grid`);
+        break;
+      }
+      if (grid[r][c] !== null && grid[r][c] !== answer[i]) {
+        errors.push(`crossing conflict in "${answer}" at row ${r}, col ${c}`);
+      }
+      grid[r][c] = answer[i];
+    }
+  }
+
+  // Connectivity: every filled cell must belong to one connected grid
+  let start = null, filled = 0;
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    if (grid[r][c] !== null) { filled++; if (!start) start = [r, c]; }
+  }
+  if (start) {
+    const visited = new Set([start.join(",")]);
+    const stack = [start];
+    while (stack.length) {
+      const [r, c] = stack.pop();
+      for (const [dr, dc] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+        const nr = r + dr, nc = c + dc, k = `${nr},${nc}`;
+        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && grid[nr][nc] !== null && !visited.has(k)) {
+          visited.add(k); stack.push([nr, nc]);
+        }
+      }
+    }
+    if (visited.size !== filled) errors.push("grid is not fully connected");
+  }
+
+  // Numbering: every entry must receive a clue number
+  const numbering = buildNumbering(words, rows, cols);
+  for (const w of words) {
+    if (!numbering[`${w.starty},${w.startx}`]) {
+      errors.push(`"${(w.answer || w.word || "").toUpperCase()}" has no clue number`);
+    }
+  }
+
+  return { ok: errors.length === 0, errors };
+}
+
+function placeWord(word, best, grid, placedWords) {
+  placedWords.push({ ...word, orientation: best.orientation, startx: best.col, starty: best.row });
+  for (let i = 0; i < word.answer.length; i++) {
+    const r = best.orientation === "down"   ? best.row + i : best.row;
+    const c = best.orientation === "across" ? best.col + i : best.col;
+    grid[r][c] = word.answer[i];
+  }
+}
+
 export function buildLayout(apiWords, grade = "3") {
   if (!apiWords?.length) return null;
 
   const seen = new Set();
   const baseList = apiWords
     .filter(w => { const k = w.word.toUpperCase(); if (seen.has(k)) return false; seen.add(k); return true; })
-    .map(w => ({ ...w, answer: w.word.toUpperCase(), clue: w.clue }));
+    .map(w => ({ ...w, answer: w.word.toUpperCase(), clue: w.clue }))
+    // Crossword entries are 3+ letters (handoff §14.4). Shorter "words" from
+    // the AI can never be legal entries, so they are excluded up front rather
+    // than silently vanishing during placement.
+    .filter(w => w.answer.length >= 3);
+  if (baseList.length < 4) return null;
   const sorted = [...baseList].sort((a, b) => b.answer.length - a.answer.length);
 
   const longestLen = sorted[0].answer.length;
   const SIZE = pickGridSize(sorted.length, longestLen);
   const rows = SIZE, cols = SIZE;
 
-  const MIN_PLACED = Math.max(4, Math.floor(sorted.length * 0.6));
   const MAX_ATTEMPTS = 6;
 
   let bestResult = null;
   let bestPlacedCount = 0;
+  let bestValidResult = null;
+  let bestValidPlacedCount = 0;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const wordList = attempt === 0 ? sorted : [sorted[0], ...shuffle(sorted.slice(1))];
@@ -182,12 +261,20 @@ export function buildLayout(apiWords, grade = "3") {
       if (placedWords.some(p => p.answer === word.answer)) continue;
       const placements = findPlacements(word.answer, grid, rows, cols, placedWords);
       if (!placements.length) continue;
-      const best = placements[0];
-      placedWords.push({ ...word, orientation: best.orientation, startx: best.col, starty: best.row });
-      for (let i = 0; i < word.answer.length; i++) {
-        const r = best.orientation === "down"   ? best.row + i : best.row;
-        const c = best.orientation === "across" ? best.col + i : best.col;
-        grid[r][c] = word.answer[i];
+      placeWord(word, placements[0], grid, placedWords);
+    }
+
+    // Rescue pass: a word skipped early may cross a word placed later.
+    // Retry the leftovers against the grown grid until nothing new fits.
+    let progressed = true;
+    while (progressed) {
+      progressed = false;
+      for (const word of wordList) {
+        if (placedWords.some(p => p.answer === word.answer)) continue;
+        const placements = findPlacements(word.answer, grid, rows, cols, placedWords);
+        if (!placements.length) continue;
+        placeWord(word, placements[0], grid, placedWords);
+        progressed = true;
       }
     }
 
@@ -195,12 +282,21 @@ export function buildLayout(apiWords, grade = "3") {
       bestPlacedCount = placedWords.length;
       bestResult = { rows, cols, placedWords, grid };
     }
-    if (placedWords.length >= MIN_PLACED) break;
+
+    const check = validateLayout(placedWords, rows, cols);
+    if (check.ok && placedWords.length > bestValidPlacedCount) {
+      bestValidPlacedCount = placedWords.length;
+      bestValidResult = { rows, cols, placedWords, grid };
+    }
+
+    // Only a complete layout ends the search early — never a partial one.
+    if (placedWords.length >= sorted.length) break;
   }
 
-  if (!bestResult || bestResult.placedWords.length < 4) return null;
+  const chosen = bestValidResult || bestResult;
+  if (!chosen || chosen.placedWords.length < 4) return null;
 
-  const { placedWords, grid } = bestResult;
+  const { placedWords } = chosen;
   const numbering = buildNumbering(placedWords, rows, cols);
   const words = placedWords.map(w => ({
     ...w,
