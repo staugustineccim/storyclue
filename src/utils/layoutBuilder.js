@@ -145,6 +145,46 @@ function shuffle(arr) {
   return a;
 }
 
+// ── Layout quality score ──────────────────────────────────────────────────────
+// Placing every word is necessary but not sufficient — a grid where words dangle
+// off a single crossing with dead space around them reads as amateur. This
+// scores a finished layout the way the handoff's quality gate (§14.2) intends:
+// crossing richness (letters checked by a perpendicular word), compactness
+// (filled share of the bounding box), and a penalty per dangling word
+// (fewer than 2 crossings). Used only to choose BETWEEN layouts that place
+// the same number of words — completeness always wins first.
+export function scoreLayout(words, rows, cols) {
+  const cellDirs = new Map();
+  let minR = rows, maxR = -1, minC = cols, maxC = -1, filled = 0;
+  for (const w of words) {
+    for (let i = 0; i < w.answer.length; i++) {
+      const r = w.orientation === "down" ? w.starty + i : w.starty;
+      const c = w.orientation === "across" ? w.startx + i : w.startx;
+      const k = `${r},${c}`;
+      if (!cellDirs.has(k)) { cellDirs.set(k, new Set()); filled++; }
+      cellDirs.get(k).add(w.orientation);
+      if (r < minR) minR = r; if (r > maxR) maxR = r;
+      if (c < minC) minC = c; if (c > maxC) maxC = c;
+    }
+  }
+  let crossings = 0, dangling = 0;
+  for (const w of words) {
+    let cw = 0;
+    for (let i = 0; i < w.answer.length; i++) {
+      const r = w.orientation === "down" ? w.starty + i : w.starty;
+      const c = w.orientation === "across" ? w.startx + i : w.startx;
+      if (cellDirs.get(`${r},${c}`).size > 1) cw++;
+    }
+    crossings += cw;
+    if (cw < 2) dangling++;
+  }
+  const avgCrossings = words.length ? crossings / words.length : 0;
+  const bbox = maxR >= 0 ? (maxR - minR + 1) * (maxC - minC + 1) : 0;
+  const density = bbox ? filled / bbox : 0;
+  const score = Math.max(0, Math.min(100, Math.round(avgCrossings * 22 + density * 30 - dangling * 4)));
+  return { score, avgCrossings: Math.round(avgCrossings * 100) / 100, density: Math.round(density * 100) / 100, dangling };
+}
+
 // ── Deterministic layout validation (handoff §14.4) ───────────────────────────
 // Independent of the generator: re-derives the grid from the placements and
 // checks the finished layout the way an editor would — legal word lengths, no
@@ -218,6 +258,194 @@ function placeWord(word, best, grid, placedWords) {
   }
 }
 
+// ── One greedy attempt (the original strategy + rescue pass) ─────────────────
+// Kept as the guaranteed baseline: buildLayout's result is never worse than
+// this attempt, because the search attempts below only replace it when they
+// place strictly more words in a valid layout.
+function greedyAttempt(wordList, rows, cols) {
+  const grid = Array.from({ length: rows }, () => Array(cols).fill(null));
+  const placedWords = [];
+
+  const firstWord = wordList[0];
+  const startRow = Math.floor(rows / 2);
+  const startCol = Math.floor((cols - firstWord.answer.length) / 2);
+  placedWords.push({ ...firstWord, orientation: "across", startx: startCol, starty: startRow });
+  for (let i = 0; i < firstWord.answer.length; i++) {
+    grid[startRow][startCol + i] = firstWord.answer[i];
+  }
+
+  for (let wi = 1; wi < wordList.length; wi++) {
+    const word = wordList[wi];
+    if (placedWords.some(p => p.answer === word.answer)) continue;
+    const placements = findPlacements(word.answer, grid, rows, cols, placedWords);
+    if (!placements.length) continue;
+    placeWord(word, placements[0], grid, placedWords);
+  }
+
+  // Rescue pass: a word skipped early may cross a word placed later.
+  // Retry the leftovers against the grown grid until nothing new fits.
+  let progressed = true;
+  while (progressed) {
+    progressed = false;
+    for (const word of wordList) {
+      if (placedWords.some(p => p.answer === word.answer)) continue;
+      const placements = findPlacements(word.answer, grid, rows, cols, placedWords);
+      if (!placements.length) continue;
+      placeWord(word, placements[0], grid, placedWords);
+      progressed = true;
+    }
+  }
+
+  return placedWords;
+}
+
+// ── Backtracking search attempt ───────────────────────────────────────────────
+// Greedy placement paints itself into corners: an early word placed at its
+// best crossing can block three later words. This search instead picks, at
+// every step, the unplaced word with the FEWEST legal placements (most
+// constrained first), tries its best few placements, and backs out of choices
+// that strand the remaining words. A word with no legal placement is deferred,
+// not fatal — the goal is to maximize the number placed. The search is bounded
+// by a node budget and a wall-clock deadline, and keeps its best snapshot, so
+// it always returns promptly with the best layout it found.
+function searchAttempt(sorted, rows, cols, { nodeBudget = 250000, deadline = Infinity, jitter = 0, seedWord = null } = {}) {
+  const grid = Array.from({ length: rows }, () => Array(cols).fill(null));
+  const cover = Array.from({ length: rows }, () => Array(cols).fill(0));
+  const placedWords = [];
+  let nodes = 0;
+  let best = null;
+
+  const firstWord = seedWord || sorted[0];
+  const startRow = Math.floor(rows / 2);
+  const startCol = Math.floor((cols - firstWord.answer.length) / 2);
+
+  function place(w, cand) {
+    placedWords.push({ ...w, orientation: cand.orientation, startx: cand.col, starty: cand.row });
+    for (let i = 0; i < w.answer.length; i++) {
+      const r = cand.orientation === "down" ? cand.row + i : cand.row;
+      const c = cand.orientation === "across" ? cand.col + i : cand.col;
+      grid[r][c] = w.answer[i];
+      cover[r][c]++;
+    }
+  }
+  function unplace(w, cand) {
+    placedWords.pop();
+    for (let i = 0; i < w.answer.length; i++) {
+      const r = cand.orientation === "down" ? cand.row + i : cand.row;
+      const c = cand.orientation === "across" ? cand.col + i : cand.col;
+      cover[r][c]--;
+      if (cover[r][c] === 0) grid[r][c] = null;
+    }
+  }
+
+  place(firstWord, { orientation: "across", row: startRow, col: startCol });
+
+  function recurse() {
+    if (!best || placedWords.length > best.length) {
+      best = placedWords.map(w => ({ ...w }));
+      if (best.length >= sorted.length) return true;
+    }
+    if (nodes >= nodeBudget || Date.now() > deadline) return false;
+
+    // Most-constrained-first: the placeable word with the fewest candidates.
+    let chosen = null, chosenCands = null;
+    for (const w of sorted) {
+      if (placedWords.some(p => p.answer === w.answer)) continue;
+      const cands = findPlacements(w.answer, grid, rows, cols, placedWords);
+      nodes++;
+      if (!cands.length) continue;
+      if (!chosenCands || cands.length < chosenCands.length ||
+          (cands.length === chosenCands.length && w.answer.length > chosen.answer.length)) {
+        chosen = w; chosenCands = cands;
+        if (cands.length === 1) break;
+      }
+    }
+    if (!chosen) return false; // nothing else can be placed on this branch
+
+    // Try the best few placements (score order, lightly jittered per attempt
+    // so repeated searches explore different corners of the space).
+    const cands = chosenCands
+      .map(c => ({ c, k: c.score + (jitter ? Math.random() * jitter : 0) }))
+      .sort((a, b) => b.k - a.k)
+      .slice(0, 4)
+      .map(x => x.c);
+
+    for (const cand of cands) {
+      place(chosen, cand);
+      const done = recurse();
+      unplace(chosen, cand);
+      if (done) return true;
+      if (nodes >= nodeBudget || Date.now() > deadline) return false;
+    }
+    return false;
+  }
+
+  recurse();
+  return best || placedWords;
+}
+
+// ── Rescue completion ─────────────────────────────────────────────────────────
+// Rebuilds the grid from a finished (or best-effort) placement set and greedily
+// retries any leftover words against it — the search's leftovers sometimes fit
+// once the full picture exists. Can only add words, never removes any.
+function completeWithRescue(placedWords, sorted, rows, cols) {
+  const grid = Array.from({ length: rows }, () => Array(cols).fill(null));
+  const result = placedWords.map(w => ({ ...w }));
+  for (const w of result) {
+    for (let i = 0; i < w.answer.length; i++) {
+      const r = w.orientation === "down" ? w.starty + i : w.starty;
+      const c = w.orientation === "across" ? w.startx + i : w.startx;
+      grid[r][c] = w.answer[i];
+    }
+  }
+  let progressed = true;
+  while (progressed) {
+    progressed = false;
+    for (const word of sorted) {
+      if (result.some(p => p.answer === word.answer)) continue;
+      const placements = findPlacements(word.answer, grid, rows, cols, result);
+      if (!placements.length) continue;
+      placeWord(word, placements[0], grid, result);
+      progressed = true;
+    }
+  }
+  return result;
+}
+
+// ── Randomized swarm attempt ──────────────────────────────────────────────────
+// The search above is deep but narrow: this engine only lets a word join the
+// grid by crossing the existing component, so a component whose exposed
+// letters can't reach the leftover words is a dead end no backtracking fixes.
+// The way out is width — many cheap, diverse components. Each swarm attempt
+// seeds a different long word at a jittered position, grows it in shuffled
+// order with randomized placement picks, and finishes with the rescue pass.
+// Individually weaker than the search; in a swarm, one of them usually finds
+// the component that reaches almost everything.
+function swarmAttempt(sorted, rows, cols) {
+  const grid = Array.from({ length: rows }, () => Array(cols).fill(null));
+  const placedWords = [];
+
+  const seedPool = sorted.slice(0, Math.min(5, sorted.length));
+  const seed = seedPool[Math.floor(Math.random() * seedPool.length)];
+  const startRow = Math.max(0, Math.min(rows - 1, Math.floor(rows / 2) + (Math.floor(Math.random() * 5) - 2)));
+  const startCol = Math.max(0, Math.min(cols - seed.answer.length,
+    Math.floor((cols - seed.answer.length) / 2) + (Math.floor(Math.random() * 5) - 2)));
+  placedWords.push({ ...seed, orientation: "across", startx: startCol, starty: startRow });
+  for (let i = 0; i < seed.answer.length; i++) {
+    grid[startRow][startCol + i] = seed.answer[i];
+  }
+
+  const rest = shuffle(sorted.filter(w => w.answer !== seed.answer));
+  for (const word of rest) {
+    const placements = findPlacements(word.answer, grid, rows, cols, placedWords);
+    if (!placements.length) continue;
+    const pick = placements[Math.floor(Math.random() * Math.min(3, placements.length))];
+    placeWord(word, pick, grid, placedWords);
+  }
+
+  return completeWithRescue(placedWords, sorted, rows, cols);
+}
+
 export function buildLayout(apiWords, grade = "3") {
   if (!apiWords?.length) return null;
 
@@ -236,61 +464,69 @@ export function buildLayout(apiWords, grade = "3") {
   const SIZE = pickGridSize(sorted.length, longestLen);
   const rows = SIZE, cols = SIZE;
 
-  const MAX_ATTEMPTS = 6;
-
   let bestResult = null;
   let bestPlacedCount = 0;
   let bestValidResult = null;
   let bestValidPlacedCount = 0;
 
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+  let bestValidScore = -1;
+  let lastGainAt = Date.now();
+  const consider = (placedWords) => {
+    if (placedWords.length > bestPlacedCount) {
+      bestPlacedCount = placedWords.length;
+      bestResult = { rows, cols, placedWords };
+    }
+    const check = validateLayout(placedWords, rows, cols);
+    if (!check.ok) return;
+    // Completeness first; quality score breaks ties between full layouts.
+    const q = scoreLayout(placedWords, rows, cols).score;
+    if (placedWords.length > bestValidPlacedCount ||
+        (placedWords.length === bestValidPlacedCount && q > bestValidScore)) {
+      bestValidPlacedCount = placedWords.length;
+      bestValidResult = { rows, cols, placedWords };
+      bestValidScore = q;
+      lastGainAt = Date.now();
+    }
+  };
+
+  // Attempt 0: the original greedy strategy (sorted, then shuffled retries) —
+  // the baseline the search must beat, kept so results can never regress.
+  for (let attempt = 0; attempt < 6; attempt++) {
     const wordList = attempt === 0 ? sorted : [sorted[0], ...shuffle(sorted.slice(1))];
-    const grid = Array.from({ length: rows }, () => Array(cols).fill(null));
-    const placedWords = [];
+    consider(greedyAttempt(wordList, rows, cols));
+    if (bestValidPlacedCount >= sorted.length) break;
+  }
 
-    const firstWord = wordList[0];
-    const startRow = Math.floor(rows / 2);
-    const startCol = Math.floor((cols - firstWord.answer.length) / 2);
-    placedWords.push({ ...firstWord, orientation: "across", startx: startCol, starty: startRow });
-    for (let i = 0; i < firstWord.answer.length; i++) {
-      grid[startRow][startCol + i] = firstWord.answer[i];
-    }
-
-    for (let wi = 1; wi < wordList.length; wi++) {
-      const word = wordList[wi];
-      if (placedWords.some(p => p.answer === word.answer)) continue;
-      const placements = findPlacements(word.answer, grid, rows, cols, placedWords);
-      if (!placements.length) continue;
-      placeWord(word, placements[0], grid, placedWords);
-    }
-
-    // Rescue pass: a word skipped early may cross a word placed later.
-    // Retry the leftovers against the grown grid until nothing new fits.
-    let progressed = true;
-    while (progressed) {
-      progressed = false;
-      for (const word of wordList) {
-        if (placedWords.some(p => p.answer === word.answer)) continue;
-        const placements = findPlacements(word.answer, grid, rows, cols, placedWords);
-        if (!placements.length) continue;
-        placeWord(word, placements[0], grid, placedWords);
-        progressed = true;
+  // Then the backtracking search, while time remains in the budget. A teacher
+  // is waiting on this call, so the whole layout build stays snappy: the
+  // search shares one ~2.5s deadline across its attempts and returns its best.
+  const needsWords = bestValidPlacedCount < sorted.length;
+  const needsPolish = !needsWords && bestValidScore < 70;
+  if (needsWords || needsPolish) {
+    // The improvement phase shares a ~1.2s budget (the AI call before this
+    // already takes seconds; layout must not add a long tail) — or ~0.4s when
+    // every word is already placed and only grid quality is being polished.
+    // The swarm stops early once it goes 600ms without a better layout —
+    // some leftover words are letter-starved and no amount of hunting helps.
+    const deadline = Date.now() + (needsWords ? 1200 : 400);
+    if (needsWords) {
+      for (let s = 0; s < 6 && bestValidPlacedCount < sorted.length && Date.now() < deadline; s++) {
+        const found = searchAttempt(sorted, rows, cols, {
+          nodeBudget: 250000,
+          deadline,
+          jitter: s * 2,
+          seedWord: sorted[s % Math.min(3, sorted.length)],
+        });
+        consider(completeWithRescue(found, sorted, rows, cols));
       }
     }
 
-    if (placedWords.length > bestPlacedCount) {
-      bestPlacedCount = placedWords.length;
-      bestResult = { rows, cols, placedWords, grid };
+    // Swarm phase: spend whatever time remains on diverse randomized
+    // components — the starvation problem is width, not depth.
+    while (Date.now() < deadline && Date.now() - lastGainAt < 600) {
+      if (bestValidPlacedCount >= sorted.length && bestValidScore >= 85) break;
+      consider(swarmAttempt(sorted, rows, cols));
     }
-
-    const check = validateLayout(placedWords, rows, cols);
-    if (check.ok && placedWords.length > bestValidPlacedCount) {
-      bestValidPlacedCount = placedWords.length;
-      bestValidResult = { rows, cols, placedWords, grid };
-    }
-
-    // Only a complete layout ends the search early — never a partial one.
-    if (placedWords.length >= sorted.length) break;
   }
 
   const chosen = bestValidResult || bestResult;
