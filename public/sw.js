@@ -1,7 +1,7 @@
 // StoryClue Service Worker
 // Cache-first for static assets, network-first for API calls
 
-const CACHE_NAME = 'storyclue-v1';
+const CACHE_NAME = 'storyclue-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -58,6 +58,23 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
       )
+    );
+    return;
+  }
+
+  // Page navigations: network-first so a new deploy is never hidden behind a
+  // stale cached shell (the Dec 2026 trial extension was invisible to returning
+  // visitors on 2026-10-22 because the old shell came from cache). The fresh
+  // shell is cached for offline use; cache is the fallback when offline.
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).then((response) => {
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      }).catch(() => caches.match(event.request).then((cached) => cached || caches.match('/index.html')))
     );
     return;
   }
