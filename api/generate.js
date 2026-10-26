@@ -438,6 +438,92 @@ function countSupportedWords(text, limits) {
   return seen.size;
 }
 
+// ── Real validation pass (field test fix #5) ────────────────────────────────
+// Both prompts used to instruct the model to "validate" its own output —
+// the Spanish pass and the word-clue review were prompt text, never code.
+// This is the code version: deterministic checks on every returned pair,
+// ONE repair call naming the exact failures, a re-check, and any pair still
+// failing is dropped rather than shipped. Outcomes are logged to KV
+// ("validation-events") so the pass is observable, not decorative.
+const EN_MARKERS = new Set(["the","and","is","are","you","your","with","this","that","from","what","when"]);
+const ES_MARKERS = new Set(["el","la","los","las","de","que","en","una","con","por","para","del","es","su","al"]);
+
+function clueLooksEnglish(clue) {
+  const toks = String(clue).normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().match(/[a-z]+/g) || [];
+  const en = toks.filter(t => EN_MARKERS.has(t)).length;
+  const es = toks.filter(t => ES_MARKERS.has(t)).length;
+  return en >= 2 && es === 0;
+}
+
+function validatePuzzleWords(words, spanishAnswers) {
+  const seenClues = new Set();
+  const clean = [];
+  const violations = [];
+  for (const w of words) {
+    const reasons = [];
+    const clue = String(w.clue || "").trim();
+    const cluePlain = clue.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+    if (clue.length < 8) reasons.push("clue is too short to describe the word");
+    if (w.word && cluePlain.includes(w.word)) reasons.push("clue contains the answer word");
+    const clueKey = clue.toLowerCase();
+    if (clue && seenClues.has(clueKey)) reasons.push("clue is a duplicate of another clue");
+    seenClues.add(clueKey);
+    if (spanishAnswers && clueLooksEnglish(clue)) reasons.push("clue is in English, but this puzzle's clues must be in Spanish");
+    if (reasons.length) violations.push({ word: w.word, clue, reasons });
+    else clean.push(w);
+  }
+  return { clean, violations };
+}
+
+async function repairWordPairs(violations, gradeDesc, spanishAnswers) {
+  const list = violations
+    .map(v => `- ${v.word}: clue "${v.clue}" — FAILED: ${v.reasons.join("; ")}`)
+    .join("\n");
+  const prompt = `You wrote crossword clues that failed validation. Rewrite ONLY the clues (keep the exact same answer words, same order) so every failure is fixed.
+
+Rules: never use the answer word (or a form of it) inside its own clue; each clue must be unique, at least a short phrase, written for ${gradeDesc}${spanishAnswers ? ", and written in Spanish" : ""}.
+
+Failed pairs:
+${list}
+
+Return ONLY this JSON, no other text:
+{ "words": [ { "word": "WORD", "clue": "corrected clue" } ] }`;
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": process.env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1024,
+        messages: [{ role: "user", content: prompt }],
+      }),
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    const text = d.content?.[0]?.text?.trim() || "";
+    const parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || "null");
+    if (!parsed?.words?.length) return null;
+    const byWord = new Map();
+    for (const w of parsed.words) {
+      const word = String(w.word || "").toUpperCase().replace(/[^A-Z]/g, "");
+      if (word && w.clue) byWord.set(word, String(w.clue));
+    }
+    return byWord;
+  } catch { return null; }
+}
+
+async function logValidation(summary) {
+  try {
+    await kv.lpush("validation-events", JSON.stringify({ ...summary, ts: new Date().toISOString() }));
+  } catch { /* KV may not be available */ }
+}
+
 // ── Main handler ───────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -917,6 +1003,34 @@ Return this exact JSON structure with no other text:
       .map(w => ({ ...w, word: String(w.word).toUpperCase().replace(/[^A-Z]/g, "") }))
       .filter(w => w.word.length >= limits.minLen && w.word.length <= limits.maxLen && w.clue)
       .slice(0, limits.wordCount); // Hard cap at grade limit
+
+    // Dedupe repeated words deterministically (keep the first pair).
+    {
+      const seen = new Set();
+      parsed.words = parsed.words.filter(w => (seen.has(w.word) ? false : (seen.add(w.word), true)));
+    }
+
+    // ── Fix #5: the validation pass, in code ────────────────────────────────
+    {
+      const spanishAnswers = langFlag === "spanish" || /spanish-word$/.test(langFlag || "");
+      let v = validatePuzzleWords(parsed.words, spanishAnswers);
+      if (v.violations.length) {
+        let repairedCount = 0;
+        const fixes = await repairWordPairs(v.violations, gradeDesc, spanishAnswers);
+        if (fixes) {
+          parsed.words = parsed.words.map(w =>
+            fixes.has(w.word) ? { ...w, clue: fixes.get(w.word) } : w
+          );
+          const after = validatePuzzleWords(parsed.words, spanishAnswers);
+          repairedCount = v.violations.length - after.violations.length;
+          v = after;
+        }
+        const droppedCount = v.violations.length;
+        parsed.words = v.clean;
+        parsed.validation = { checked: true, repaired: repairedCount, dropped: droppedCount };
+        await logValidation({ repaired: repairedCount, dropped: droppedCount, lang: langFlag });
+      }
+    }
 
     if (parsed.words.length < 3) {
       return res.status(500).json({
