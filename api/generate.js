@@ -410,6 +410,34 @@ function wordCountInstruction(grade, limits) {
   return `${limits.wordCount} to ${Math.min(limits.wordCount + 3, 25)} important vocabulary words`;
 }
 
+// ── Thin-source measurement (field test fix #4) ─────────────────────────────
+// Mr. Bob's standing rule (2026-10-25): short chapters have short word
+// content. A narrow word list must produce the SMALLER puzzle it can sustain
+// with the reason stated — never a silent stretch to full size, never a
+// silent stop. This counts how many distinct puzzle-grade words a source
+// text genuinely contains (right length band, not function words), so the
+// handler can right-size the request and disclose it in the response.
+const FUNCTION_WORDS = new Set([
+  // English function words + ultra-common light verbs
+  "the","a","an","and","or","but","if","then","else","when","while","of","at","by","for","with","about","into","through","after","over","before","between","out","against","during","without","upon","to","from","in","on","is","are","was","were","be","been","being","have","has","had","having","do","does","did","doing","would","should","could","ought","i","you","he","she","it","we","they","them","his","her","its","our","their","this","that","these","those","am","an","as","so","than","too","very","can","will","just","not","no","yes","all","any","each","per","via","went","goes","gone","said","says","say","got","get","gets","came","come","comes","saw","see","sees","took","take","takes","made","make","makes","knew","know","knows","one","two","also","more","much","many","such","only","own","same","now",
+  // Spanish function words
+  "el","la","los","las","un","una","unos","unas","de","del","en","y","o","que","es","son","fue","fueron","con","por","para","se","su","sus","al","lo","como","mas","pero","este","esta","estos","estas","ese","esa","mi","tu","nos","les","ya","muy","sin","sobre","tambien","cuando","donde","quien","estaba","estan","hay","era","eran","ser","estar",
+]);
+
+function countSupportedWords(text, limits) {
+  const plain = String(text || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  const seen = new Set();
+  for (const m of plain.matchAll(/[a-z]+/g)) {
+    const w = m[0];
+    if (w.length >= limits.minLen && w.length <= limits.maxLen && !FUNCTION_WORDS.has(w)) {
+      seen.add(w);
+    }
+  }
+  return seen.size;
+}
+
 // ── Main handler ───────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -424,7 +452,11 @@ export default async function handler(req, res) {
     songsMode = false,
   } = req.body || {};
 
-  const limits   = GRADE_LIMITS[grade]  || GRADE_LIMITS["3"];
+  // Per-request COPY (fix #4 drive-by): this used to be the shared
+  // GRADE_LIMITS object itself, and the songs branch mutates maxLen — one
+  // songs request permanently shrank the limit for that grade for every
+  // later request in the same server process.
+  const limits   = { ...(GRADE_LIMITS[grade] || GRADE_LIMITS["3"]) };
   const gradeDesc = GRADE_DESCRIPTIONS[grade] || GRADE_DESCRIPTIONS["3"];
   const wci      = wordCountInstruction(grade, limits);
 
@@ -678,6 +710,32 @@ The child should fill in the answer word because they already know it from singi
     }
   }
 
+  // ── Fix #4: thin-source sizing (paste / URL modes carry a real text) ─────
+  // Right-size the word count to what the source can sustain, and prepare
+  // the disclosure. A hopeless text (< 3 usable words) stops HERE with an
+  // honest reason, before any model spend — it never just stops silently.
+  let thinSource = null;
+  let thinNote = "";
+  if (inputMode !== "lookup" && resolvedText) {
+    const supported = countSupportedWords(resolvedText, limits);
+    if (supported < 3) {
+      return res.status(400).json({
+        error: `This text is too short to build a puzzle from — it has only ${supported} usable vocabulary word${supported === 1 ? "" : "s"} at this grade level. Add a bit more text and we'll build it.`,
+      });
+    }
+    // Thin = the source can't fill a full puzzle SELECTIVELY: either fewer
+    // usable words than the target, or less than ~2 candidates per slot
+    // (the model would have to use nearly every word it can find — the
+    // 39-word Jonah text that silently stretched to 18, field test case 14).
+    const target = limits.wordCount;
+    if (supported < target * 2) {
+      const cap = supported < target ? supported : Math.max(3, Math.floor(supported * 0.6));
+      thinSource = { supported, cap, target };
+      limits.wordCount = cap;
+      thinNote = `\n\nSOURCE SIZE — IMPORTANT: This text is short. It genuinely supports a puzzle of about ${cap} vocabulary words at this grade. Return the ${cap} strongest words the text actually contains. Do NOT pad the list to a full-size puzzle with filler words (common verbs, number words, or words barely present in the text). A smaller, honest puzzle is the correct result for this text.`;
+    }
+  }
+
   // ── Content safety check (runs on ALL input types) ────────────────────────
   const safetyInput =
     inputMode === "lookup"
@@ -756,7 +814,7 @@ Return this exact JSON structure with no other text:
 ${resolvedText.slice(0, 6000)}
 """
 
-Grade level for clues: ${gradeDesc}${faithNote}${seriesNote}${languageNote}${phonicsNote}${pictureNote}${songsNote}
+Grade level for clues: ${gradeDesc}${faithNote}${seriesNote}${languageNote}${phonicsNote}${pictureNote}${songsNote}${thinNote}
 
 Instructions:
 
@@ -864,6 +922,12 @@ Return this exact JSON structure with no other text:
       return res.status(500).json({
         error: "Not enough suitable vocabulary found for this grade level. Try a different chapter or paste the text directly.",
       });
+    }
+
+    // Fix #4 disclosure: a thin source produced a deliberately smaller
+    // puzzle — say so on the record so the client can show it.
+    if (thinSource) {
+      parsed.sourceNote = `Your text was short, so this puzzle has ${parsed.words.length} words — that's what the text could support. A full puzzle at this grade has ${thinSource.target}.`;
     }
 
     parsed.language = langFlag;
