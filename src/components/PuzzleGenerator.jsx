@@ -149,9 +149,9 @@ export default function PuzzleGenerator() {
   const [otherVersionText, setOtherVersionText] = useState("");
 
   // ── K-2 Early Learner features ────────────────────────────────────────────
-  // Default ON: at K-2 a vocabulary puzzle means sounds and pictures; teachers may opt out.
-  const [phonicsMode, setPhonicsMode] = useState(true);
-  const [pictureMode, setPictureMode] = useState(true);
+  // Defaults OFF by owner decision (2026-10-26): modes are the teacher's choice, never pre-checked.
+  const [phonicsMode, setPhonicsMode] = useState(false);
+  const [pictureMode, setPictureMode] = useState(false);
 
   // ── Songs & Rhymes ────────────────────────────────────────────────────────
   const [selectedSong, setSelectedSong] = useState(null); // { id, title, emoji }
