@@ -290,6 +290,9 @@ function PuzzleBoard({
   // ── Context review (sermon quotes) ────────────────────────────────────────
   const [showContextReview, setShowContextReview] = useState(false);
 
+  // ── All-filled-but-not-solved notice (field test fix #2) ─────────────────
+  const [filledNotice, setFilledNotice] = useState(false);
+
   // ── Refs ──────────────────────────────────────────────────────────────────
   const refs              = useRef({});
   const timerRef          = useRef(null);
@@ -373,6 +376,24 @@ function PuzzleBoard({
         setTimeout(() => setShowWordsLearned(true), 2800); // after confetti settles
       }
     }
+  }, [cells]); // eslint-disable-line
+
+  // ── All-filled detection (field test fix #2) ──────────────────────────────
+  // The auto-win effect above only fires when every letter is CORRECT. A
+  // grid filled with even one wrong letter used to dead-end in silence — no
+  // message, no prompt (Mr. Bob's "it just stopped", 2026-10-25). Now: a
+  // fully filled but unsolved grid raises a notice telling the player to
+  // check their answers. Clears itself when a letter is erased or changed,
+  // and on a win.
+  useEffect(() => {
+    if (won || revealed || !timerActive) { setFilledNotice(false); return; }
+    const allFilled = SOLUTION.every((row, r) =>
+      row.every((cell, c) => !cell || cells[r][c])
+    );
+    const allCorrect = SOLUTION.every((row, r) =>
+      row.every((cell, c) => !cell || cells[r][c] === cell)
+    );
+    setFilledNotice(allFilled && !allCorrect);
   }, [cells]); // eslint-disable-line
 
   // Feedback modal timing — suppress entirely for K-2 (kids can't fill it out,
@@ -654,7 +675,7 @@ function PuzzleBoard({
     setBurstCells(new Set()); setConfettiPieces([]);
     setMascotMood("idle");
     setShowContextReview(false);
-    setContextAutoShown(false);
+    setFilledNotice(false);
     completedWordsRef.current = new Set();
   }
 
@@ -1168,6 +1189,15 @@ function PuzzleBoard({
           </div>
           <div className="ptrack"><div className="pfill" style={{ width:pct+"%" }}/></div>
         </div>
+
+        {/* ALL-FILLED NOTICE — grid is full but something's wrong (fix #2) */}
+        {filledNotice && !won && !revealed && (
+          <div className="no-print" style={{ background:"#fff8e8", borderBottom:"1px solid #e0c860", padding:"6px 14px", textAlign:"center", flexShrink:0 }}>
+            <span style={{ fontFamily:"Lora,serif", fontSize:"12px", color:"#7a5500" }}>
+              Every square is filled — but something doesn't check out yet. Tap <strong>Check Answers</strong> to spot the letters that need another look.
+            </span>
+          </div>
+        )}
 
         {/* WIN BANNER — 3rd grade and above only */}
         {won && !isEarlyLearner && (
