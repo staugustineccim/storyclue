@@ -122,12 +122,13 @@ Rule: Alert Bob if total estimated monthly cost exceeds $50.
 
 ---
 
-### 12. YouTube oEmbed + Watch Page Parsing
-- **Purpose:** Extracts captions/transcripts from YouTube URLs
-- **Pricing:** FREE — no API key required
-- **Method:** Fetches public watch page HTML, parses `ytInitialPlayerResponse` for caption tracks
-- **Limitation:** Private/age-restricted videos have no accessible captions
-- **Status:** ✅ Working
+### 12. YouTube Transcripts (Supadata primary + scrape backup)
+- **Purpose:** Extracts captions/transcripts from YouTube URLs for puzzle generation
+- **Method (fixed 2026-10-26, branch `fix/youtube-extraction`):** Supadata (`api.supadata.ai/v1/transcript`, same key/service as the church sermon pipeline) is now PRIMARY — it fetches captions on its own infrastructure. The old watch-page scrape (`ytInitialPlayerResponse` caption tracks, manual-English tracks preferred) remains as backup only. Async Supadata jobs return a jobId; the client polls `/api/transcription-status` (max ~3 min, real failure state) and re-submits the finished transcript as pasted text.
+- **Why it changed:** the 2026-10-25 field test proved the scrape-first flow fails from Vercel's datacenter IPs (YouTube bot wall) — captioned videos (e.g. a Colonial Church sermon) got a false *"may have no captions"* error, and some "successes" were silently built from the video's title + description. **The metadata fallback is removed: no transcript, no puzzle — with an honest error telling the user how to paste the transcript instead.**
+- **Requires:** `SUPADATA_API_KEY` in Vercel env (shared with the church pipeline)
+- **Limitation:** Private videos have no accessible captions
+- **Status:** 🟡 Fixed on branch — pending supervised PR + live verification with the sermon video that failed
 
 ---
 
