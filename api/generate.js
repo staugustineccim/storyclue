@@ -175,6 +175,11 @@ const FAMOUS_TEXTS = new Set([
 
 function probeTitle(bookRef) {
   let t = String(bookRef || "").split(" — ")[0].split(" - ")[0].toLowerCase();
+  // Apostrophes are REMOVED, not spaced: "charlotte's" must normalize to
+  // "charlottes" — the original bug turned it into "charlotte s", whose
+  // stray "s" token poisoned the Open Library search (production refused
+  // "Charlotte's Web" on day one; caught by live verification 2026-10-26).
+  t = t.replace(/['’]/g, "");
   t = t.replace(/&/g, " and ").replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
   t = t.replace(/\b(chapter|ch|part|section|lesson|unit)\s+\d+\b/g, " ").replace(/\s+/g, " ").trim();
   t = t.replace(/^(the\s+)?(book\s+of|gospel\s+of|letter\s+of|epistle\s+of)\s+/, "").trim();
@@ -197,10 +202,16 @@ async function verifyBookRef(bookRef) {
   if (!probe) return { ok: false, via: null, probe };
   if (isBibleRef(probe)) return { ok: true, via: "bible-canon", probe };
   if (FAMOUS_TEXTS.has(probe)) return { ok: true, via: "famous-text", probe };
+  // Search Open Library with the title as a human would type it
+  // (original case and apostrophes — OL understands them natively);
+  // the normalized probe is only for COMPARING the returned titles.
+  const searchRef = String(bookRef || "").split(" — ")[0]
+    .replace(/\b(chapter|ch|part|section|lesson|unit)\s+\d+\b/gi, " ")
+    .replace(/\s+/g, " ").trim();
   try {
     const r = await fetch(
-      `https://openlibrary.org/search.json?title=${encodeURIComponent(probe)}&limit=3&fields=title`,
-      { signal: AbortSignal.timeout(4000) }
+      `https://openlibrary.org/search.json?title=${encodeURIComponent(searchRef || probe)}&limit=10&fields=title`,
+      { signal: AbortSignal.timeout(6000) }
     );
     if (r.ok) {
       const d = await r.json();
