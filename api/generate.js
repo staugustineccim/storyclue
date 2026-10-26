@@ -151,11 +151,21 @@ function extractVideoId(url) {
   return m ? m[1] : null;
 }
 
+// Transcript resolution order (fixed 2026-10-26 — see field test):
+//   1. Supadata (primary): fetches captions/transcribes on ITS infrastructure,
+//      so it is not subject to the datacenter bot-wall that killed the old
+//      scrape-first flow. Returns content synchronously when captions exist,
+//      or a jobId when AI transcription is needed (client polls
+//      /api/transcription-status, then re-submits AS TEXT).
+//   2. Watch-page scrape (backup): works only when YouTube serves the real
+//      page to a datacenter IP — increasingly rare.
+// There is deliberately NO title+description fallback: building a puzzle from
+// metadata while implying it came from the video was a silent lie. If no real
+// transcript can be obtained, the caller returns an honest error instead.
 async function getYouTubeTranscript(videoId) {
   let videoTitle = "";
-  let videoDescription = "";
 
-  // Get basic metadata via oEmbed (fast, no key needed)
+  // Get the title via oEmbed (fast, no key needed)
   try {
     const oe = await fetch(
       `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
@@ -167,7 +177,38 @@ async function getYouTubeTranscript(videoId) {
     }
   } catch {}
 
-  // Fetch YouTube watch page and parse captions
+  const withTitle = (t) => (videoTitle ? `${videoTitle}\n\n${t}` : t);
+
+  // ── 1. Supadata (primary) ────────────────────────────────────────────────
+  if (process.env.SUPADATA_API_KEY) {
+    try {
+      const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+      const res = await fetch(
+        `https://api.supadata.ai/v1/transcript?url=${encodeURIComponent(videoUrl)}`,
+        {
+          headers: { "x-api-key": process.env.SUPADATA_API_KEY },
+          signal: AbortSignal.timeout(25000),
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        let transcript = null;
+        if (typeof data.content === "string") transcript = data.content;
+        else if (Array.isArray(data.content)) transcript = data.content.map(c => c.text || c).join(" ");
+        else if (typeof data.transcript === "string") transcript = data.transcript;
+
+        if (transcript?.trim().length > 100) {
+          return { transcript: withTitle(transcript.trim()), jobId: null, service: "supadata" };
+        }
+        // No immediate transcript — Supadata is transcribing asynchronously.
+        if (data.jobId) {
+          return { transcript: null, jobId: data.jobId, service: "supadata" };
+        }
+      }
+    } catch { /* fall through to the scrape backup */ }
+  }
+
+  // ── 2. Watch-page scrape (backup) ────────────────────────────────────────
   try {
     const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
       headers: {
@@ -194,21 +235,20 @@ async function getYouTubeTranscript(videoId) {
     }
     const pr = JSON.parse(html.slice(jsonStart, jsonEnd));
     videoTitle = videoTitle || pr?.videoDetails?.title || "";
-    videoDescription = pr?.videoDetails?.shortDescription || "";
 
     const tracks = pr?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
-    if (!tracks?.length) {
-      const fallbackText = videoTitle
-        ? `Video Title: ${videoTitle}\n\n${videoDescription}`
-        : null;
-      return fallbackText
-        ? { transcript: fallbackText, jobId: null, service: "youtube-metadata" }
-        : null;
-    }
+    if (!tracks?.length) throw new Error("No caption tracks");
 
-    // Prefer English captions; fall back to first track
+    // Prefer uploader-provided (manual) captions over auto-generated (asr),
+    // English within each class — the old code never looked at `kind`, so an
+    // auto-translate track could be mistaken for the real thing.
+    const isManual = (t) => t.kind !== "asr";
+    const isEnglish = (t) => t.languageCode?.startsWith("en");
     const track =
-      tracks.find(t => t.languageCode?.startsWith("en")) || tracks[0];
+      tracks.find(t => isManual(t) && isEnglish(t)) ||
+      tracks.find(t => isEnglish(t)) ||
+      tracks.find(t => isManual(t)) ||
+      tracks[0];
 
     // Try JSON3 format first (cleaner text)
     const captRes = await fetch(`${track.baseUrl}&fmt=json3`, {
@@ -225,8 +265,7 @@ async function getYouTubeTranscript(videoId) {
         ?.replace(/\s+/g, " ")
         ?.trim();
       if (transcript?.length > 100) {
-        const fullText = videoTitle ? `${videoTitle}\n\n${transcript}` : transcript;
-        return { transcript: fullText, jobId: null, service: "youtube-captions" };
+        return { transcript: withTitle(transcript), jobId: null, service: "youtube-captions" };
       }
     }
 
@@ -248,45 +287,10 @@ async function getYouTubeTranscript(videoId) {
       ?.trim();
 
     if (transcript?.length > 100) {
-      const fullText = videoTitle ? `${videoTitle}\n\n${transcript}` : transcript;
-      return { transcript: fullText, jobId: null, service: "youtube-captions" };
+      return { transcript: withTitle(transcript), jobId: null, service: "youtube-captions" };
     }
-  } catch { /* fall through to Whisper fallback */ }
+  } catch { /* fall through — no transcript obtainable */ }
 
-  // Fallback: use Supadata/Whisper to transcribe the video if captions unavailable
-  try {
-    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    const encodedUrl = encodeURIComponent(videoUrl);
-    const res = await fetch(`https://api.supadata.ai/v1/transcript?url=${encodedUrl}`, {
-      headers: { "x-api-key": process.env.SUPADATA_API_KEY },
-      signal: AbortSignal.timeout(30000),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      let transcript = null;
-      if (typeof data.content === "string") transcript = data.content;
-      else if (Array.isArray(data.content)) transcript = data.content.map(c => c.text || c).join(" ");
-      else if (data.transcript) transcript = data.transcript;
-
-      if (transcript?.length > 100) {
-        const fullText = videoTitle ? `${videoTitle}\n\n${transcript}` : transcript;
-        // Check if Supadata returned a jobId (async transcription)
-        if (data.jobId && !transcript) {
-          return { transcript: null, jobId: data.jobId, service: "supadata" };
-        }
-        return { transcript: fullText, jobId: null, service: "supadata" };
-      }
-      // Supadata returned jobId but no immediate transcript
-      if (data.jobId) {
-        return { transcript: null, jobId: data.jobId, service: "supadata" };
-      }
-    }
-  } catch { /* fall through to description */ }
-
-  if (videoTitle || videoDescription) {
-    const fullText = `Video: ${videoTitle}\n\n${videoDescription}`;
-    return { transcript: fullText, jobId: null, service: "youtube-metadata" };
-  }
   return null;
 }
 
@@ -525,9 +529,13 @@ The child should fill in the answer word because they already know it from singi
       }
 
       if (!result || !result.transcript || result.transcript.trim().length < 50) {
+        // Honest error (fixed 2026-10-26): the old message blamed the video
+        // ("may have no captions") when the usual cause is on our side —
+        // YouTube blocking the server's caption request. Say what's true and
+        // give the user a working alternative.
         return res.status(400).json({
           error:
-            "Could not extract content from this YouTube video. The video may be private, age-restricted, or have no captions available. Try copying the video description and using Paste Text instead.",
+            "We couldn't get this video's transcript. YouTube may have blocked our request, or the captions couldn't be read. You can still build the puzzle: open the video, copy its transcript (the ••• menu under the video → Open transcript) or its description, and use Paste Text instead.",
         });
       }
       resolvedText = result.transcript;
