@@ -376,9 +376,8 @@ export default function PuzzleGenerator() {
 
     setLoading(true);
 
-    try {
-      const isK2 = ["k","1","2"].includes(grade);
-      const body = {
+    const isK2 = ["k","1","2"].includes(grade);
+    const body = {
         // PDF/songs mode: both resolve to lookup on the server (no chapterText needed)
         inputMode: inputMode === "pdf" ? "paste" : inputMode === "songs" ? "lookup" : inputMode,
         bookRef: inputMode === "songs" ? selectedSong.title : resolvedBookRef,
@@ -396,8 +395,17 @@ export default function PuzzleGenerator() {
         currentChapter: seriesMode ? currentChapter : "",
         phonicsMode: isK2 && phonicsMode,
         pictureMode: isK2 && pictureMode,
-      };
+    };
+    await runGenerate(body, inputMode);
+  }
 
+  // Runs a prepared /api/generate request to completion. Split out of
+  // handleGenerate so a finished transcription can be re-submitted AS PASTED
+  // TEXT: the old code re-entered handleGenerate, which rebuilt the request
+  // from component state (still URL mode, transcript nowhere) and silently
+  // threw the transcript away (field test, 2026-10-26).
+  async function runGenerate(body, inputMethod = body.inputMode) {
+    try {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -410,18 +418,37 @@ export default function PuzzleGenerator() {
       if (res.status === 202 && data.jobId) {
         setIsTranscribing(true);
         setLoading(false);
-        // Poll for transcription completion every 2 seconds
+        // Poll for transcription completion every 2 seconds — capped at ~3
+        // minutes, with a real failure state. The old loop polled forever,
+        // ignored "failed" results, and discarded the transcript on success.
+        let polls = 0;
         const pollInterval = setInterval(async () => {
+          polls += 1;
+          if (polls > 90) {
+            clearInterval(pollInterval);
+            setIsTranscribing(false);
+            setError("Transcription is taking too long. Please try again, or use Paste Text with the video's transcript instead.");
+            return;
+          }
           try {
             const checkRes = await fetch(`/api/transcription-status?jobId=${data.jobId}`);
             const checkData = await checkRes.json();
             if (checkData.status === "complete" && checkData.transcript) {
               clearInterval(pollInterval);
               setIsTranscribing(false);
-              // Re-submit with the transcript
-              body.chapterText = checkData.transcript;
+              // Re-submit the transcript AS PASTED TEXT — in URL mode the
+              // server would re-resolve the video and ignore it.
               setLoading(true);
-              handleGenerate(e); // Recursively call to retry
+              await runGenerate(
+                { ...body, inputMode: "paste", chapterText: checkData.transcript, urlRef: "" },
+                "paste"
+              );
+              return;
+            }
+            if (checkData.status === "failed") {
+              clearInterval(pollInterval);
+              setIsTranscribing(false);
+              setError(checkData.error || "Transcription failed. Please try Paste Text with the video's transcript instead.");
               return;
             }
           } catch (err) {
@@ -472,8 +499,8 @@ export default function PuzzleGenerator() {
           rows:        layout.rows,
           cols:        layout.cols,
           words:       layout.words,
-          phonicsMode: isK2 && phonicsMode,
-          pictureMode: isK2 && pictureMode,
+          phonicsMode: body.phonicsMode,
+          pictureMode: body.pictureMode,
         }),
       });
       const saveData = await saveRes.json();
@@ -485,7 +512,7 @@ export default function PuzzleGenerator() {
 
       const origin = window.location.origin;
       // Songs puzzles append ?song=id so CrosswordPuzzle can show the reward card
-      const songParam = (inputMode === "songs" && selectedSong) ? `?song=${selectedSong.id}` : "";
+      const songParam = (body.songsMode && body.songId) ? `?song=${body.songId}` : "";
       setGeneratedPuzzle({
         title:      puzzleData.title,
         studentUrl: `${origin}/play/${saveData.slug}${songParam}`,
@@ -501,7 +528,7 @@ export default function PuzzleGenerator() {
         grade_level:     grade,
         faith_tradition: faith,
         language:        data.language || "english",
-        input_method:    inputMode,
+        input_method:    inputMethod,
       });
 
       setLoading(false);
