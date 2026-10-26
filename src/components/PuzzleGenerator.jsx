@@ -519,6 +519,7 @@ export default function PuzzleGenerator() {
         teacherUrl: `${origin}/play/${saveData.slug}?t=1`,
         playPath:   `/play/${saveData.slug}${songParam}`,
         slug:       saveData.slug,
+        note:       data.sourceNote || null, // Fix #4: thin-source disclosure
       });
       setSessionPuzzleCount(n => n + 1);
 
@@ -832,6 +833,13 @@ export default function PuzzleGenerator() {
               <div style={{ fontFamily:"Lora,serif", fontSize:"14px", color:"#4a6a28", marginBottom:"14px", fontStyle:"italic" }}>
                 {generatedPuzzle.title}
               </div>
+
+              {/* Fix #4: thin-source disclosure — smaller puzzle, reason stated */}
+              {generatedPuzzle.note && (
+                <div style={{ background:"#fff8e8", border:"1px solid #d4a020", borderRadius:"6px", padding:"8px 12px", marginBottom:"14px", fontFamily:"Lora,serif", fontSize:"13px", color:"#7a5000", textAlign:"left" }}>
+                  📝 {generatedPuzzle.note}
+                </div>
+              )}
 
               {/* Save-this-link warning — required by spec */}
               <div style={{ background:"#fff8e8", border:"2px solid #d4a020", borderRadius:"8px", padding:"12px 14px", marginBottom:"20px" }}>
