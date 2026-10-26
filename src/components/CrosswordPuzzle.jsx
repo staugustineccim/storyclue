@@ -962,6 +962,7 @@ function PuzzleBoard({
         <div style={{
           position:"fixed",
           bottom:"100px", right:"16px",
+          width:"44px", height:"44px",
           zIndex:7000,
           fontSize:"2.4rem", lineHeight:1,
           transition:"transform .25s ease, filter .25s ease",
