@@ -143,6 +143,85 @@ async function logBlock(input, grade, reason) {
   } catch { /* KV may not be available */ }
 }
 
+// ── Book-existence gate (field test fix #3) ─────────────────────────────────
+// Lookup mode used to send any typed title straight to the model, which
+// happily invented vocabulary for books that do not exist (a nonsense title
+// returned 15 confident words, 2026-10-25). Before a lookup generates, the
+// reference must verify against something OUTSIDE the model:
+//   1. the Bible canon (built-in list — the app's most common lookups), or
+//   2. a short built-in list of famous documents/speeches, or
+//   3. Open Library (openlibrary.org, free, no key) holding the title.
+// The probe title is the reference with chapter/part qualifiers and the
+// client-appended " — Version" suffix stripped. Verification FAILS CLOSED:
+// if nothing verifies (including the library being unreachable), the caller
+// refuses with an honest message instead of inventing a puzzle. Rejections
+// are logged to KV ("unverified-books") so false rejections stay visible.
+const BIBLE_BOOKS = new Set([
+  "genesis","exodus","leviticus","numbers","deuteronomy","joshua","judges",
+  "ruth","samuel","kings","chronicles","ezra","nehemiah","esther","job",
+  "psalms","psalm","proverbs","ecclesiastes","song of solomon",
+  "song of songs","canticles","isaiah","jeremiah","lamentations","ezekiel",
+  "daniel","hosea","joel","amos","obadiah","jonah","micah","nahum","habakkuk",
+  "zephaniah","haggai","zechariah","malachi","matthew","mark","luke","john",
+  "acts","romans","corinthians","galatians","ephesians","philippians",
+  "colossians","thessalonians","timothy","titus","philemon","hebrews",
+  "james","peter","jude","revelation","revelations","apocalypse",
+]);
+const FAMOUS_TEXTS = new Set([
+  "gettysburg address","declaration of independence","united states constitution",
+  "us constitution","constitution of the united states","bill of rights",
+  "i have a dream","emancipation proclamation","pledge of allegiance",
+]);
+
+function probeTitle(bookRef) {
+  let t = String(bookRef || "").split(" — ")[0].split(" - ")[0].toLowerCase();
+  t = t.replace(/&/g, " and ").replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+  t = t.replace(/\b(chapter|ch|part|section|lesson|unit)\s+\d+\b/g, " ").replace(/\s+/g, " ").trim();
+  t = t.replace(/^(the\s+)?(book\s+of|gospel\s+of|letter\s+of|epistle\s+of)\s+/, "").trim();
+  t = t.replace(/^(first|second|third|1st|2nd|3rd|1|2|3)\s+/, "").trim();
+  return t;
+}
+
+function isBibleRef(probe) {
+  if (!probe) return false;
+  if (probe === "bible" || probe === "holy bible" || probe === "old testament" || probe === "new testament") return true;
+  const words = probe.split(" ");
+  // Single-word canon names ("jonah"), or canon name leading ("jonah and the whale" style refs stay strict: first two words max)
+  if (BIBLE_BOOKS.has(words[0])) return true;
+  if (words.length > 1 && BIBLE_BOOKS.has(words.slice(0, 2).join(" "))) return true;
+  return false;
+}
+
+async function verifyBookRef(bookRef) {
+  const probe = probeTitle(bookRef);
+  if (!probe) return { ok: false, via: null, probe };
+  if (isBibleRef(probe)) return { ok: true, via: "bible-canon", probe };
+  if (FAMOUS_TEXTS.has(probe)) return { ok: true, via: "famous-text", probe };
+  try {
+    const r = await fetch(
+      `https://openlibrary.org/search.json?title=${encodeURIComponent(probe)}&limit=3&fields=title`,
+      { signal: AbortSignal.timeout(4000) }
+    );
+    if (r.ok) {
+      const d = await r.json();
+      const hit = (d.docs || []).some(doc => {
+        const dt = probeTitle(doc.title || "");
+        return dt && (dt === probe || (probe.length >= 4 && (dt.includes(probe) || probe.includes(dt))));
+      });
+      if (hit) return { ok: true, via: "open-library", probe };
+    }
+  } catch { /* unreachable library → fail closed below */ }
+  return { ok: false, via: null, probe };
+}
+
+async function logUnverified(bookRef) {
+  try {
+    await kv.lpush("unverified-books", JSON.stringify({
+      input: String(bookRef).slice(0, 200), ts: new Date().toISOString(),
+    }));
+  } catch { /* KV may not be available */ }
+}
+
 // ── YouTube transcript extraction ─────────────────────────────────────────────
 function extractVideoId(url) {
   const m = url.match(
@@ -612,6 +691,19 @@ The child should fill in the answer word because they already know it from singi
   if (inputMode === "lookup") {
     if (!bookRef || bookRef.trim().length < 3) {
       return res.status(400).json({ error: "Please enter a book name or chapter reference." });
+    }
+
+    // Fix #3: existence gate — never invent a puzzle for an unverifiable
+    // book. Songs (curated library) and Series Mode (curated data) carry
+    // their own known content, so they skip the gate.
+    if (!songsMode && !seriesMode) {
+      const v = await verifyBookRef(bookRef);
+      if (!v.ok) {
+        await logUnverified(bookRef);
+        return res.status(400).json({
+          error: `We couldn't verify that "${bookRef.trim()}" is a real book or text, so we didn't invent a puzzle for it. Check the spelling — or use Paste Text and we'll build the puzzle from the actual words.`,
+        });
+      }
     }
 
     userPrompt = `Create a crossword puzzle vocabulary list from your knowledge of: "${bookRef}"
